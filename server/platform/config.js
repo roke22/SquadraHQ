@@ -128,6 +128,7 @@ export const VENDOR_FILES = {
   '/vendor/xterm.js': ['./vendor/xterm.js', 'text/javascript; charset=utf-8'],
   '/vendor/addon-fit.js': ['./vendor/addon-fit.js', 'text/javascript; charset=utf-8'],
   '/vendor/xterm.css': ['./vendor/xterm.css', 'text/css; charset=utf-8'],
+  '/vendor/InterVariable.woff2': ['./vendor/InterVariable.woff2', 'font/woff2'],
 }
 
 // Single source of truth: server/package.json.

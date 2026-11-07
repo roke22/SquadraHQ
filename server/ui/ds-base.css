@@ -3,9 +3,19 @@
    default; dark is the system's choice unless light was picked here, or picked
    here (data-theme on <html>, set before the page draws). */
 
+/* Inter, served by this server (vendor/, SIL Open Font License): one variable
+   file for every weight. Until it loads, the system's own font. */
+@font-face {
+  font-family: InterVariable;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/vendor/InterVariable.woff2") format("woff2");
+}
+
 :root {
   /* type */
-  --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --sans: InterVariable, Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 18px; --fs-2xl: 22px;
   /* shape */
