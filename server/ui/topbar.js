@@ -48,8 +48,8 @@ export function renderTop() {
   // (Only the teams views have a selector; a squad's own view is one team.)
   if (!['org', 'leads'].includes(r.view) && !(r.view === 'mosaic' && !r.squad)) setHtml($('topTabs'), '')
   if (r.view === 'inbox') {
+    // (Its subtitle, how many wait on you, is the inbox's own: see renderInbox.)
     setHtml($('topTitle'), esc(T.inbox))
-    $('topSub').textContent = T.inboxSub
     setHtml($('topRight'), '')
     return
   }

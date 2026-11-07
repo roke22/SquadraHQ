@@ -32,6 +32,9 @@ const ROUTE_ID = /^[A-Za-z0-9_-]{1,64}$/
 export function currentRoute() {
   // The inbox is home: what needs you comes first.
   if (location.hash === '' || location.hash === '#' || location.hash === '#/' || location.hash === '#/inbox') return { view: 'inbox' }
+  // One entry of it picked: a question or result (i12), a permission (p<name>), a name to approve (a<name>).
+  const ib = location.hash.match(/^#\/inbox\/([ipa][A-Za-z0-9_-]{1,64})$/)
+  if (ib) return { view: 'inbox', item: ib[1] }
   if (location.hash === '#/teams') return { view: 'mosaic' }
   if (location.hash === '#/archived') return { view: 'archived' }
   if (location.hash === '#/hosts') return { view: 'hosts' }
