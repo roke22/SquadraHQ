@@ -65,7 +65,7 @@ function stepsHtml() {
 function goHtml() {
   const issues = problems()
   return `${issues.length && !draft.running ? `<p class="nt-issues" role="alert">${issues.map(esc).join('<br>')}</p>` : ''}
-    <div class="nt-actions"><a class="btn quiet" href="#/teams">${esc(T.cancel)}</a><button class="btn primary" data-launch ${issues.length || draft.running ? 'disabled' : ''}>${esc(draft.running ? T.opening : T.ntLaunch(members().length))}</button></div>`
+    <div class="nt-actions"><a class="btn plain" href="#/teams">${esc(T.cancel)}</a><button class="btn primary" data-launch ${issues.length || draft.running ? 'disabled' : ''}>${esc(draft.running ? T.opening : T.ntLaunch(members().length))}</button></div>`
 }
 // While typing: only what depends on it, so the field keeps its caret.
 function updateStatus() {

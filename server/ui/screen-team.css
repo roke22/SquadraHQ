@@ -63,3 +63,18 @@
 .pl-who .role { width: 12px; height: 12px; }
 .tq-quiet0 { color: var(--muted); font-size: var(--fs-sm); }
 .pl-foot { padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
+
+/* A phone: each task on its own lines (what, then state, who and reference),
+   and the team's live view, made for a wide screen, isn't offered. */
+@media (max-width: 900px) {
+  .pl-table, .pl-table tbody { display: block; min-width: 0; }
+  .pl-table thead { display: none; }
+  .pl-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .pl-table tr:last-child { border-bottom: 0; }
+  .pl-table td { padding: 0; border: 0; }
+  .pl-table td:first-child { flex: 1 0 100%; }
+  .pl-table td:last-child { margin-left: auto; }
+  .pl-table td:last-child:empty { display: none; }
+  .pl-table .mc-state { font-size: var(--fs-sm); }
+  .wide-only { display: none; }
+}

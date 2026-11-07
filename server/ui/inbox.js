@@ -113,23 +113,33 @@ function firstSteps() {
 
 const emptyState = () => `<div class="empty">${icon('inbox', 'empty-ic')}<b>${esc(T.inboxEmpty)}</b><span>${esc(T.ibxEmptyHint)}</span></div>`
 
+// Who left it, as a mail client shows a sender: their mark, name and team,
+// what it is and when; the way to their session on the right.
+function head(name, kind, at, link = true) {
+  const s = sessions.get(name)
+  const role = s?.role === 'coordinator' ? 'coord' : s?.role === 'solo' ? 'solo' : 'worker'
+  return `<header class="ibx-head"><span class="ibx-avatar ${role}" aria-hidden="true"><span class="role ${role}"></span></span>
+    <div class="ibx-from"><b>${esc(name)}</b><span>${[esc(teamOf(name)), esc(kind), at ? `<time title="${esc(when(at))}">${esc(ago(at))}</time>` : ''].filter(Boolean).join('<span aria-hidden="true"> · </span>')}</span></div>
+    ${link ? `<a class="btn" href="#/s/${encodeURIComponent(name)}" aria-label="${esc(T.ibxOpenSession)}"><span class="ibx-l">${esc(T.ibxOpenSession)}</span><span class="ibx-s" aria-hidden="true">${esc(T.ibxSessionShort)}</span></a>` : ''}
+    <a class="icon-btn ibx-close" href="#/inbox" aria-label="${esc(T.close)}" title="${esc(T.close)} (Esc)">${icon('close')}</a></header>`
+}
+
 function detail(e) {
   if (!e && !sortedSessions().length) return firstSteps()
   if (!e) return emptyState()
   const back = `<a class="ibx-back" href="#/inbox">${icon('chevron', 'flip')}<span>${esc(T.inbox)}</span></a>`
-    + `<a class="icon-btn ibx-close" href="#/inbox" aria-label="${esc(T.close)}" title="${esc(T.close)} (Esc)">${icon('close')}</a>`
   if (e.kind === 'perm') {
     const s = e.s
-    return `${back}<div class="ibx-meta">${who(s.name)}<span>${esc(teamOf(s.name))}</span></div>
-      <h2 class="ibx-q">${esc(T.ibxPermTitle(s.name, ''))}</h2><pre class="ibx-perm">${esc(permWhat(s) || status(s).text)}</pre>
+    return `${back}<article class="ibx-card">${head(s.name, T.ibxPermission, e.at, false)}
+      <div class="ibx-body"><h2 class="ibx-q">${esc(T.ibxPermTitle(s.name, ''))}</h2><pre class="ibx-perm">${esc(permWhat(s) || status(s).text)}</pre>
       <p class="ibx-note">${esc(T.ibxPermHint)}</p>
-      <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div>`
+      <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div></div></article>`
   }
   if (e.kind === 'approve') {
     const s = e.s
-    return `${back}<div class="ibx-meta">${who(s.name)}</div>
-      <h2 class="ibx-q">${esc(T.ibxApproveTitle(s.name))}</h2><p class="ibx-note">${esc(T.ibxApproveHint)}</p>
-      <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div>`
+    return `${back}<article class="ibx-card">${head(s.name, T.approveNote, e.at, false)}
+      <div class="ibx-body"><h2 class="ibx-q">${esc(T.ibxApproveTitle(s.name))}</h2><p class="ibx-note">${esc(T.ibxApproveHint)}</p>
+      <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div></div></article>`
   }
   const i = e.i
   const open = !i.resolved_at
@@ -142,7 +152,9 @@ function detail(e) {
   const opts = i.options.map((o, n) => answering
     ? `<button type="button" class="ibx-opt${n === recIndex ? ' rec' : ''}" data-option="${n}"><kbd>${n + 1}</kbd><span>${esc(o)}</span>${n === recIndex ? `<span class="tag">${esc(T.inboxRecommended)}</span>` : ''}</button>`
     : `<li>${esc(o)}${n === recIndex ? ` <span class="tag">${esc(T.inboxRecommended)}</span>` : ''}</li>`).join('')
-  return `${back}<div class="ibx-meta">${who(i.session)}<span>${esc(teamOf(i.session))}</span><a class="ibx-link" href="#/s/${encodeURIComponent(i.session)}">${esc(T.ibxOpenSession)}</a></div>
+  const kind = !open ? T.ibxClosedAt : ask ? T.ibxKindAsk : T.inboxTell
+  return `${back}<article class="ibx-card${open ? '' : ' closed'}">${head(i.session, kind, i.updated_at ?? i.created_at)}
+    <div class="ibx-body">
     ${changed ? `<div class="ibx-changed" data-changed role="status">${esc(T.inboxChangedSince)}</div>` : ''}
     <h2 class="ibx-q${ask ? '' : ' tell'}">${esc(i.text)}</h2>
     ${i.options.length ? (answering ? `<div class="ibx-opts" role="group" aria-label="${esc(T.inboxOptions)}">${opts}</div>` : `<ul class="ibx-optlist">${opts}</ul>`) : ''}
@@ -154,12 +166,13 @@ function detail(e) {
     ${i.answer != null ? `<p class="ibx-result">${esc(T.inboxAnswered(i.answered_by ?? '', i.answer))}</p>` : ''}
     ${i.dismissed_by ? `<p class="ibx-result">${esc(T.inboxDismissed(i.dismissed_by))}</p>` : ''}
     ${i.closed_reason ? `<p class="ibx-result">${esc(T.inboxClosed(i.closed_reason))}</p>` : ''}
+    </div>
     <dl class="ibx-facts">
       ${i.ref ? `<dt>${esc(T.ibxRef)}</dt><dd>${refHtml(i.ref)}</dd>` : ''}
       <dt>${esc(T.ibxLeft)}</dt><dd>${esc(when(i.created_at))}</dd>
       ${i.updated_at ? `<dt>${esc(T.ibxChanged)}</dt><dd>${esc(when(i.updated_at))}</dd>` : ''}
       ${i.resolved_at ? `<dt>${esc(T.ibxClosedAt)}</dt><dd>${esc(when(i.resolved_at))}</dd>` : ''}
-    </dl>`
+    </dl></article>`
 }
 
 let doneOpen = false

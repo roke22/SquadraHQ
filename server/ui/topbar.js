@@ -62,7 +62,7 @@ export function renderTop() {
   if (r.view === 'newteam') {
     setHtml($('topTitle'), esc(T.newTeam))
     $('topSub').textContent = ''
-    setHtml($('topRight'), `<a class="btn quiet" href="#/teams">${esc(T.cancel)}</a>`)
+    setHtml($('topRight'), `<a class="btn plain" href="#/teams">${esc(T.cancel)}</a>`)
     return
   }
   if (r.view === 'team') {
@@ -70,7 +70,7 @@ export function renderTop() {
     const meta = state.squadMeta.get(name)
     // (Its subtitle, who is connected, is the page's own: see renderTeam.)
     setHtml($('topTitle'), esc(meta?.title || name))
-    setHtml($('topRight'), `<a class="btn" href="#/q/${encodeURIComponent(name)}/live">${esc(T.tqLive)}</a>${can('operator') ? `<button class="btn" data-addworker="${esc(name)}">${esc(T.tqAddWorker)}</button>` : ''}<a class="btn primary" href="#/s/${encodeURIComponent(name)}">${esc(T.tqGiveOrder)}</a>`)
+    setHtml($('topRight'), `<a class="btn wide-only" href="#/q/${encodeURIComponent(name)}/live">${esc(T.tqLive)}</a>${can('operator') ? `<button class="btn" data-addworker="${esc(name)}">${esc(T.tqAddWorker)}</button>` : ''}<a class="btn primary" href="#/s/${encodeURIComponent(name)}">${esc(T.tqGiveOrder)}</a>`)
     return
   }
   if (r.view === 'org') {

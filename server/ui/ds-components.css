@@ -11,22 +11,29 @@
 .ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 
 /* --- buttons --------------------------------------------------------------- */
+/* What can be pressed wears the accent, so it reads as something to do: filled
+   for the main action of a place, tinted for the others, red for what stops or
+   removes; grey only for stepping back (cancel). */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 30px; padding: 4px 11px; border: 1px solid var(--line-2); border-radius: var(--r);
-  background: transparent; color: var(--text); font: 500 var(--fs-md)/1.2 var(--sans);
+  min-height: 30px; padding: 4px 11px; border: 1px solid transparent; border-radius: var(--r);
+  background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent); font: 500 var(--fs-md)/1.2 var(--sans);
   white-space: nowrap; text-decoration: none; cursor: pointer;
   transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
 }
-.btn:hover { background: var(--raised); }
+.btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .btn:active { transform: translateY(.5px); }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: default; pointer-events: none; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn.primary:hover { background: color-mix(in srgb, var(--accent) 90%, var(--text)); border-color: transparent; }
-.btn.danger { color: var(--err); }
+.btn.danger { background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
+.btn.danger:hover { background: color-mix(in srgb, var(--err) 17%, transparent); }
 .btn.primary.danger { background: var(--err); border-color: var(--err); color: var(--on-accent); }
-.btn.quiet { border-color: transparent; color: var(--muted); }
-.btn.quiet:hover { color: var(--text); }
+.btn.quiet { background: transparent; color: var(--accent); }
+.btn.quiet:hover { background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.btn.quiet.danger { color: var(--err); }
+.btn.plain, .btn[data-cancel] { background: var(--raised); color: var(--text); }
+.btn.plain:hover, .btn[data-cancel]:hover { background: color-mix(in srgb, var(--raised) 65%, var(--line-2)); }
 .btn svg, .icon-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* A square button with only an icon (it carries an aria-label). */
@@ -124,8 +131,11 @@ table.people select { width: auto; min-height: 28px; padding: 3px 8px; }
   border-radius: var(--r-lg); box-shadow: var(--shadow-pop); animation: ds-pop var(--t) var(--ease);
 }
 .modal.wide { width: min(700px, 100%); }
-.modal h3 { margin: 0 0 var(--s2); font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.005em; }
+.modal h3 { margin: 0 0 var(--s4); font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.005em; }
+.modal h3 + p { margin-top: calc(var(--s2) * -1); }
 .modal p { margin: 0 0 var(--s4); color: var(--muted); }
+.modal p.hint { margin: 0 0 var(--s3); font-size: var(--fs-sm); }
+.err-hint { margin-top: 2px; color: var(--err); font-size: var(--fs-sm); }
 .modal .err { color: var(--err); font-size: var(--fs-sm); min-height: 1.2em; }
 .modal .actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
 

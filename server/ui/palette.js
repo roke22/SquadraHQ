@@ -50,7 +50,7 @@ function candidates() {
     items.push({ group: 'teams', label: titleOf(c.name), sub: `${c.name} · ${T.squadCount(list.filter(s => s.coordinator === c.name && s.online).length, n)}`, lead: icon('teams'), go: `#/q/${encodeURIComponent(c.name)}` })
   }
   for (const i of state.inbox.filter(x => !x.resolved_at).slice(0, 20)) {
-    items.push({ group: 'inbox', label: i.text.replace(/\s+/g, ' ').slice(0, 120), sub: i.session, lead: icon('inbox'), go: '#/', focus: `[data-inbox="${i.id}"]` })
+    items.push({ group: 'inbox', label: i.text.replace(/\s+/g, ' ').slice(0, 120), sub: i.session, lead: icon('inbox'), go: `#/inbox/i${i.id}` })
   }
   items.push(
     { group: 'screens', label: T.inbox, lead: icon('inbox'), go: '#/' },

@@ -170,7 +170,7 @@ export function newSessionDialog(hostId, preset = {}) {
     }
     return `${pick ? '' : `<option value="" selected>${T.coordPick}</option>`}${list.map(c => `<option value="${esc(c)}" ${c === pick ? 'selected' : ''}>${esc(label(c))}</option>`).join('')}`
   }
-  const d = dialog(`<h3>${preset.reopen ? esc(T.reopenTitle(preset.name)) : preset.coordinator ? esc(T.addWorkerTo(preset.coordinator)) : T.newSessionTitle}</h3>${preset.reopen ? `<p class="hint" style="font-size:12.5px;margin:-2px 0 12px">${T.reopenHint}</p>` : ''}
+  const d = dialog(`<h3>${preset.reopen ? esc(T.reopenTitle(preset.name)) : preset.coordinator ? esc(T.addWorkerTo(preset.coordinator)) : T.newSessionTitle}</h3>${preset.reopen ? `<p class="hint">${T.reopenHint}</p>` : ''}
       <label class="field"><span>${T.machine}</span><select name="host">${online.map(h => `<option value="${esc(h.id)}" ${h.id === hostId ? 'selected' : ''}>${esc(h.name)}</option>`).join('')}</select></label>
       <div class="row2">
         <label class="field"><span>${T.role}</span><select name="role"><option value="worker" ${hasCoord ? 'selected' : ''}>${T.roleWorker}</option><option value="coordinator" ${hasCoord ? '' : 'selected'}>${T.roleCoordinator}</option><option value="solo">${T.roleSoloOption}</option></select></label>
@@ -192,8 +192,8 @@ export function newSessionDialog(hostId, preset = {}) {
         <option value="">${T.compactDefault}</option>
         ${[300, 400, 500, 700, 800].map(k => `<option value="${k * 1000}">${T.compactK(k)}</option>`).join('')}
       </select><span class="hint">${T.compactHint}</span></label>
-      <p class="hint" style="font-size:12px;color:var(--muted);margin:0 0 8px">${T.resumeHint}</p>
-      <div class="err" style="color:var(--err);font-size:13px;min-height:1.2em"></div>
+      <p class="hint">${T.resumeHint}</p>
+      <div class="err"></div>
       <div class="actions"><button class="btn" data-cancel>${T.cancel}</button><button class="btn primary" data-ok>${T.open}</button></div>`, { wide: true })
   const f = name => d.el.querySelector(`[name=${name}]`)
   const suggestName = () => {
@@ -204,11 +204,12 @@ export function newSessionDialog(hostId, preset = {}) {
   // A coordinator that wasn't opened from this dashboard is only a name a
   // session gave itself: said right next to the field.
   const coordHint = document.createElement('div')
-  coordHint.style.cssText = 'color:var(--err);font-size:12px;min-height:1em'
+  coordHint.className = 'err-hint'
   f('coordinator').after(coordHint)
   const checkCoord = () => {
     const v = f('coordinator').value
     coordHint.textContent = !coords.length && !preset.coordinator ? T.coordNoneYet : v && !ownCoords.includes(v) ? `${T.coordSelf}` : ''
+    coordHint.hidden = !coordHint.textContent
   }
   f('coordinator').addEventListener('change', checkCoord)
   checkCoord()

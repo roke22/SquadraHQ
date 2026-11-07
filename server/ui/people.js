@@ -112,13 +112,13 @@ export function openSettings(start) {
     const fixed = m => m.role === 'owner' && (!can('owner') || owners < 2)
     body.innerHTML = `<table class="people"><tbody>${list.map(m => `<tr><td><b>${esc(m.name)}</b><br><span class="note">${esc(m.email)}${m.disabled ? ` · ${esc(T.disabled)}` : ''}</span></td>
         <td>${fixed(m) ? esc(T.roles[m.role]) : roleSelect(m.role, `data-role-of="${esc(m.id)}"`)}</td><td>${fixed(m) ? '' : `<button class="btn danger" data-remove="${esc(m.id)}">${esc(T.remove)}</button>`}</td></tr>`).join('')}</tbody></table>
-      <form data-invite class="people-form"><label class="field"><span>${esc(T.email)}</span><input type="text" name="email" required></label>
+      <h4>${esc(T.inviteTitle)}</h4><div class="set-card"><form data-invite class="people-form"><label class="field"><span>${esc(T.email)}</span><input type="text" name="email" required></label>
         <label class="field"><span>${esc(T.role)}</span>${roleSelect('operator', 'name="role"')}</label>
-        <button class="btn primary">${esc(T.invite)}</button></form><div data-link></div>
+        <button class="btn primary">${esc(T.invite)}</button></form><div data-link></div></div>
       ${pending.length ? `<h4>${esc(T.pendingInvites)}</h4><table class="people"><tbody>${pending.map(i => `<tr><td>${esc(i.email)} <span class="note">${esc(T.roles[i.role] ?? i.role)}</span></td><td><button class="btn danger" data-cancel-invite="${esc(i.id)}">${esc(T.cancelInvite)}</button></td></tr>`).join('')}</tbody></table>` : ''}
-      <h4>${esc(T.joinToken)}</h4><p class="note">${esc(T.joinTokenHint)}</p>
+      <h4>${esc(T.joinToken)}</h4><div class="set-card"><p class="note">${esc(T.joinTokenHint)}</p>
       <div class="cmdrow"><pre class="cmd">${esc(join_token)}</pre><button class="btn" data-copy>${esc(T.copy)}</button></div>
-      <button class="btn danger" data-rotate>${esc(T.rotate)}</button>`
+      <button class="btn danger" data-rotate>${esc(T.rotate)}</button></div>`
     body.querySelector('[data-invite]').onsubmit = async e => {
       e.preventDefault()
       ok()
@@ -146,14 +146,14 @@ export function openSettings(start) {
     const rows = log.map(e => `<tr><td><span class="note">${esc(fmtTime(e.at))}</span></td><td>${esc(e.who ?? '—')}</td><td>${esc(e.action)}${e.target ? ` · ${esc(e.target)}` : ''}</td></tr>`).join('')
     body.innerHTML = `<h4>${esc(T.auditTitle)}</h4>${rows ? `<table class="people audit"><tbody>${rows}</tbody></table>` : `<p class="note">${esc(T.auditEmpty)}</p>`}
       ${can('owner') ? `<h4>${esc(T.retentionTitle)}</h4>
-      <form data-retention class="people-form"><label class="field"><span>${esc(T.retentionDays)}</span><input type="text" inputmode="numeric" name="retention_days" value="${esc(kept.retention_days)}"></label>
+      <div class="set-card"><form data-retention class="people-form"><label class="field"><span>${esc(T.retentionDays)}</span><input type="text" inputmode="numeric" name="retention_days" value="${esc(kept.retention_days)}"></label>
         <label class="field"><span>${esc(T.eventHours)}</span><input type="text" inputmode="numeric" name="event_hours" value="${esc(kept.event_hours)}"></label>
-        <button class="btn primary">${esc(T.save)}</button></form><p class="note" data-saved></p>
-      <h4>${esc(T.exportTitle)}</h4><p class="note">${esc(T.exportHint)}</p>
-      <a class="btn" href="${esc(inCompany('/api/company/export'))}" download>${esc(T.exportBtn)}</a>
-      ${state.company === 'default' ? '' : `<h4>${esc(T.deleteCompanyTitle)}</h4><p class="note">${esc(T.deleteCompanyHint)}</p>
+        <button class="btn primary">${esc(T.save)}</button></form><p class="note" data-saved></p></div>
+      <h4>${esc(T.exportTitle)}</h4><div class="set-card set-row"><p class="note">${esc(T.exportHint)}</p>
+      <a class="btn" href="${esc(inCompany('/api/company/export'))}" download>${esc(T.exportBtn)}</a></div>
+      ${state.company === 'default' ? '' : `<h4>${esc(T.deleteCompanyTitle)}</h4><div class="set-card"><p class="note">${esc(T.deleteCompanyHint)}</p>
       <form data-delete-company class="people-form"><label class="field"><span>${esc(T.deleteCompanyConfirm(here?.name ?? ''))}</span><input type="text" name="confirm" autocomplete="off" required></label>
-        <button class="btn danger">${esc(T.deleteCompanyBtn)}</button></form>`}` : ''}`
+        <button class="btn danger">${esc(T.deleteCompanyBtn)}</button></form></div>`}` : ''}`
     const retention = body.querySelector('[data-retention]')
     if (retention) {
       retention.onsubmit = async e => {
@@ -187,8 +187,8 @@ export function openSettings(start) {
     const mine = new Set(state.me.companies.map(c => c.id))
     body.innerHTML = `<table class="people"><tbody>${list.map(c => `<tr><td><b>${esc(c.name)}</b><br><span class="note">${esc(c.id)}${c.status === 'unavailable' ? ` · ${esc(T.unavailable)}` : ''}</span></td>
         <td>${c.status === 'deleting' ? `<span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span> <button class="btn" data-restore="${esc(c.id)}">${esc(T.restore)}</button>` : mine.has(c.id) ? `<a class="btn" href="?company=${encodeURIComponent(c.id)}">${esc(T.openCompany)}</a>` : `<button class="btn" data-join="${esc(c.id)}">${esc(T.joinCompany)}</button>`}</td></tr>`).join('')}</tbody></table>
-      <form data-create class="people-form"><label class="field"><span>${esc(T.companyName)}</span><input type="text" name="name" required maxlength="80"></label>
-        <button class="btn primary">${esc(T.createCompany)}</button></form><div data-link></div>`
+      <div class="set-card"><form data-create class="people-form"><label class="field"><span>${esc(T.companyName)}</span><input type="text" name="name" required maxlength="80"></label>
+        <button class="btn primary">${esc(T.createCompany)}</button></form><div data-link></div></div>`
     body.querySelector('[data-create]').onsubmit = async e => {
       e.preventDefault()
       ok()
@@ -225,11 +225,11 @@ export function openSettings(start) {
     drawing++
     const me = state.me.user
     const waiting = state.me.deleting ?? []
-    body.innerHTML = `<p><b>${esc(me.name)}</b> · ${esc(me.email)}</p>
+    body.innerHTML = `<div class="set-card set-me"><span class="set-avatar" aria-hidden="true">${esc((me.name || me.email || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(me.name)}</b><span class="note">${esc(me.email)}</span></div></div>
       ${waiting.length ? `<table class="people"><tbody>${waiting.map(c => `<tr><td><b>${esc(c.name)}</b><br><span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span></td><td><button class="btn" data-restore="${esc(c.id)}">${esc(T.restore)}</button></td></tr>`).join('')}</tbody></table>` : ''}
-      <form data-password class="people-stack"><label class="field"><span>${esc(T.currentPassword)}</span><input type="password" name="current" autocomplete="current-password" required></label>
+      <h4>${esc(T.passwordTitle)}</h4><div class="set-card"><form data-password class="people-stack"><label class="field"><span>${esc(T.currentPassword)}</span><input type="password" name="current" autocomplete="current-password" required></label>
       <label class="field"><span>${esc(T.newPassword)}</span><input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
-      <button class="btn primary">${esc(T.setPassword)}</button></form><p class="note" data-done></p>`
+      <button class="btn primary">${esc(T.setPassword)}</button></form><p class="note" data-done></p></div>`
     body.querySelector('[data-password]').onsubmit = async e => {
       e.preventDefault()
       ok()

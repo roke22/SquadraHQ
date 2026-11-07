@@ -5,14 +5,12 @@
 .ibx { flex: 1; min-height: 0; display: flex; }
 .ibx-list { flex: 1; min-width: 0; overflow-y: auto; padding: 8px 20px 32px; }
 .ibx-col { max-width: 860px; margin: 0 auto; }
-.ibx-detail { display: none; position: relative; flex: 1; min-width: 0; overflow-y: auto; padding: 28px 40px 48px; }
-.ibx-detail > * { max-width: 680px; }
+.ibx-detail { display: none; flex: 1; min-width: 0; overflow-y: auto; padding: 20px 28px 48px; }
 .ibx.has-pick .ibx-list { flex: 0 0 400px; padding: 8px 12px 24px; border-right: 1px solid var(--line); }
 .ibx.has-pick .ibx-detail, .ibx.none .ibx-detail, .ibx.fresh .ibx-detail { display: block; }
 .ibx.none .ibx-list, .ibx.fresh .ibx-list { display: none; }
 .ibx-detail.enter { animation: ibx-in var(--t-slow) var(--ease); }
 @keyframes ibx-in { from { opacity: 0; transform: translateX(10px); } }
-.ibx-close { position: absolute; top: 18px; right: 18px; }
 .ibx-col > .empty { padding: 40px 0 8px; }
 
 /* Each group is one card; its entries part with a hairline that starts at the text. */
@@ -42,7 +40,22 @@ details.ibx-group > summary:hover { color: var(--text); }
 .ibx-upd { color: var(--warn); font-weight: 500; }
 
 .ibx-back { display: none; }
-.ibx-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 14px; padding-right: 36px; font-size: var(--fs-sm); color: var(--muted); }
+
+/* The one open: a card, headed like a message (who, team, what, when), then
+   what it says and how to answer, then its facts in a quiet footer. */
+.ibx-card { max-width: 760px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 1px 2px rgba(15, 17, 20, .04), 0 10px 30px rgba(15, 17, 20, .05); }
+.ibx-head { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 20px; border-bottom: 1px solid var(--line); }
+.ibx-avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--raised); }
+.ibx-avatar.coord { background: var(--coord-soft); }
+.ibx-avatar.worker { background: var(--worker-soft); }
+.ibx-avatar .role { width: 17px; height: 17px; }
+.ibx-from { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.ibx-from b { font: 600 13px/1.3 var(--mono); }
+.ibx-from > span { font-size: var(--fs-sm); color: var(--muted); }
+.ibx-head .btn { flex: none; }
+.ibx-head .ibx-s { display: none; }
+.ibx-from > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ibx-body { padding: 22px 24px 6px; }
 .ibx-link { color: var(--text); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
 .ibx-link:hover { text-decoration-color: currentColor; }
 .ibx-changed { margin-bottom: 14px; padding: 9px 12px; border-radius: var(--r-md); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); color: var(--text); font-weight: 500; }
@@ -75,7 +88,7 @@ details.ibx-group > summary:hover { color: var(--text); }
 .ibx-actions .ibx-note { margin: 0; }
 .ibx-result { margin: 0 0 14px; padding: 9px 12px; border-radius: var(--r-md); background: var(--raised); white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.ibx-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 18px; margin: 8px 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: var(--fs-sm); }
+.ibx-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 18px; margin: 0; padding: 14px 24px 16px; border-top: 1px solid var(--line); border-radius: 0 0 var(--r-lg) var(--r-lg); background: color-mix(in srgb, var(--raised) 45%, var(--panel)); font-size: var(--fs-sm); }
 .ibx-facts dt { color: var(--muted); }
 .ibx-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 
@@ -87,7 +100,12 @@ details.ibx-group > summary:hover { color: var(--text); }
 /* A phone: the list, or the one picked over the whole screen with a way back. */
 @media (max-width: 900px) {
   .ibx-list, .ibx.has-pick .ibx-list { flex: 1; padding: 4px 12px 32px; border-right: 0; }
-  .ibx-detail { padding: 12px 16px 32px; }
+  .ibx-detail { padding: 8px 12px 32px; }
+  .ibx-head { padding: 12px 12px 12px 16px; }
+  .ibx-head .ibx-l { display: none; }
+  .ibx-head .ibx-s { display: inline; }
+  .ibx-body { padding: 18px 16px 4px; }
+  .ibx-facts { padding: 12px 16px 14px; }
   .ibx.has-pick .ibx-list { display: none; }
   .ibx-close { display: none; }
   .ibx-detail.enter { animation: none; }
