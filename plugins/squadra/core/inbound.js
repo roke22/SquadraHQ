@@ -317,6 +317,8 @@ export async function handleInbound(s, msg, { edited = false } = {}) {
     while (s.tasks.size > 50) s.tasks.delete(s.tasks.keys().next().value)
   }
   const report = REPORTS.includes(msg.squadra_report) ? msg.squadra_report : null
+  // (A coordinator's plan is behind once one of its tasks has been reported on.)
+  if (report && s.role === 'coordinator' && !edited) s.lastReportAt = Date.now()
   // image_path goes in meta only — an in-content "[image attached — read: PATH]"
   // annotation is forgeable by any allowlisted sender typing that string.
   agent.deliver({

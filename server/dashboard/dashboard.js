@@ -280,7 +280,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     try {
       // (Said to come from the inbox: typed here, it would look as if the user
       // were following this session now, and the next question went to the chat.)
-      await typeAnswer(taken.session, `Inbox #${taken.id} ("${asked.length > 80 ? `${asked.slice(0, 80)}…` : asked}"), the user answers from their inbox: ${taken.answer} [They are not following this session: anything else for them goes to ask_user or tell_user.]`)
+      await typeAnswer(taken.session, `Inbox #${taken.id} ("${asked.length > 80 ? `${asked.slice(0, 80)}…` : asked}"), the user answers from their inbox: ${taken.answer} [They are not following this session: anything else for them goes to ask_user or tell_user. Update your plan with update_plan.]`)
     } catch (err) {
       inbox.giveBack(taken.id)
       throw err
