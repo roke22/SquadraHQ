@@ -59,6 +59,14 @@ export function renderTop() {
     setHtml($('topRight'), can('operator') ? `<button class="btn primary" data-newteam>${esc(T.newTeam)}</button>` : '')
     return
   }
+  if (r.view === 'team') {
+    const name = r.squad
+    const meta = state.squadMeta.get(name)
+    // (Its subtitle, who is connected, is the page's own: see renderTeam.)
+    setHtml($('topTitle'), esc(meta?.title || name))
+    setHtml($('topRight'), `<a class="btn" href="#/q/${encodeURIComponent(name)}/live">${esc(T.tqLive)}</a>${can('operator') ? `<button class="btn" data-addworker="${esc(name)}">${esc(T.tqAddWorker)}</button>` : ''}<a class="btn primary" href="#/s/${encodeURIComponent(name)}">${esc(T.tqGiveOrder)}</a>`)
+    return
+  }
   if (r.view === 'org') {
     const { squads } = orgSquads()
     setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('org'))
@@ -84,7 +92,7 @@ export function renderTop() {
       setHtml($('topTitle'), `<span class="dot ${c ? status(c).dot : ''}"></span>👥 ${esc(T.squadOf(r.squad))}`)
       const linked = linksOf(r.squad)
       $('topSub').textContent = [T.squadCount(ws.filter(w => w.online).length, ws.length), linked.length ? T.linkedWith(linked.join(', ')) : ''].filter(Boolean).join(' · ')
-      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}" title="${esc(T.addWorkerTo(r.squad))}">${T.addWorker}</button>` : ''}${can('manager') ? `<button class="btn" data-links="${esc(r.squad)}" title="${esc(T.linksTitle(r.squad))}">${T.links(linked.length)}</button><button class="btn" data-savetpl="${esc(r.squad)}" title="${esc(T.saveTemplateTitle(r.squad))}">${T.saveTemplate}</button>` : ''}<button class="btn" data-go="#/teams">${T.backAll}</button>`)
+      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}" title="${esc(T.addWorkerTo(r.squad))}">${T.addWorker}</button>` : ''}${can('manager') ? `<button class="btn" data-links="${esc(r.squad)}" title="${esc(T.linksTitle(r.squad))}">${T.links(linked.length)}</button><button class="btn" data-savetpl="${esc(r.squad)}" title="${esc(T.saveTemplateTitle(r.squad))}">${T.saveTemplate}</button>` : ''}<a class="btn" href="#/q/${encodeURIComponent(r.squad)}">${esc(T.tqBackToTeam)}</a>`)
       return
     }
     setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('mosaic'))

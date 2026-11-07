@@ -134,6 +134,9 @@ test('an invitation: a link of one use brings someone in, with only their role',
   await expect(guest.locator('#nav')).toContainText('coord')
   // What it can't do isn't offered: anywhere it goes, and nothing asks the server for it.
   await guest.goto(`${server.url}/#/q/coord`)
+  await expect(guest.locator('#team .tq-members')).toContainText('worker1')
+  await expect(guest.locator('[data-describe], [data-links], [data-savetpl], [data-addworker]')).toHaveCount(0)
+  await guest.goto(`${server.url}/#/q/coord/live`)
   await expect(guest.locator('#colsSeg')).toBeVisible()
   await expect(guest.locator('[data-addworker], [data-links], [data-savetpl], #modeSeg')).toHaveCount(0)
   await guest.goto(`${server.url}/#/s/worker1/chat`)

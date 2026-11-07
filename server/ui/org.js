@@ -417,7 +417,7 @@ function linkMenu(anchor, a, b) {
   ], `${esc(squadTitle(a))} ↔ ${esc(squadTitle(b))}<br>${esc(T.orgLinkRecent(recentOf(l)))}`)
 }
 
-function squadDialog(name) {
+export function squadDialog(name) {
   const m = state.squadMeta.get(name) ?? {}
   const d = dialog(`<h3>${esc(T.orgEditSquadTitle(name))}</h3>
       <label class="field"><span>${T.orgSquadTitle}</span><input type="text" name="title" maxlength="40" value="${esc(m.title ?? '')}" placeholder="${esc(name)}" autocomplete="off"></label>

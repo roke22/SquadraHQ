@@ -9,6 +9,7 @@ import { personaTag, sessionTerm, renderTop } from './topbar.js'
 import { buildMosaic, renderArchived } from './mosaic.js'
 import { renderInbox } from './inbox.js'
 import { renderTeams } from './teams.js'
+import { renderTeam } from './team.js'
 import { closeMenu } from './dialogs.js'
 import { renderHosts } from './machines.js'
 import { hideOrgTip, renderOrg } from './org.js'
@@ -42,8 +43,11 @@ export function currentRoute() {
   if (location.hash === '#/hosts') return { view: 'hosts' }
   if (location.hash === '#/c') return { view: 'leads' }
   if (location.hash === '#/org') return { view: 'org' }
-  const q = location.hash.match(/^#\/q\/(.+)$/)
-  if (q) return ROUTE_NAME.test(dec(q[1])) ? { view: 'mosaic', squad: dec(q[1]) } : { view: 'mosaic' }
+  // A team: its page, or every session of it live.
+  const ql = location.hash.match(/^#\/q\/([^/]+)\/live$/)
+  if (ql) return ROUTE_NAME.test(dec(ql[1])) ? { view: 'mosaic', squad: dec(ql[1]) } : { view: 'teams' }
+  const q = location.hash.match(/^#\/q\/([^/]+)$/)
+  if (q) return ROUTE_NAME.test(dec(q[1])) ? { view: 'team', squad: dec(q[1]) } : { view: 'teams' }
   const h = location.hash.match(/^#\/h\/(.+)$/)
   if (h) return ROUTE_ID.test(dec(h[1])) ? { view: 'hosts', host: dec(h[1]) } : { view: 'hosts' }
   const t = location.hash.match(/^#\/t\/([^/]+)\/(.+)$/)
@@ -105,6 +109,7 @@ export function route() {
   $('archived').hidden = r.view !== 'archived'
   $('inbox').hidden = r.view !== 'inbox'
   $('teams').hidden = r.view !== 'teams'
+  $('team').hidden = r.view !== 'team'
   $('org').hidden = r.view !== 'org'
   hideOrgTip()
   $('hosts').hidden = r.view !== 'hosts'
@@ -127,12 +132,12 @@ export function route() {
     $('session').hidden = true
     $('mosaic').hidden = false
     buildMosaic()
-  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams') {
+  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams' || r.view === 'team') {
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }
     clearMosaic()
     $('session').hidden = true
     $('mosaic').hidden = true
-    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else renderArchived()
+    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else if (r.view === 'team') renderTeam(); else renderArchived()
   } else if (st) {
     // The session's live terminal, as in Machines: watch it and type to it.
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }

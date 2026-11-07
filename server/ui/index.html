@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/ui/overlays.css">
 <link rel="stylesheet" href="/ui/screen-inbox.css">
 <link rel="stylesheet" href="/ui/screen-teams.css">
+<link rel="stylesheet" href="/ui/screen-team.css">
 <script>
   // Light or dark, first thing, so the page doesn't flash.
   try { const t = localStorage.getItem('squadraTheme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t } catch {}
@@ -66,6 +67,7 @@
     </header>
     <div id="alerts" hidden></div>
     <div id="teams" hidden></div>
+    <div id="team" hidden></div>
     <div id="mosaic" hidden></div>
     <div id="archived" hidden></div>
     <div id="inbox" hidden></div>

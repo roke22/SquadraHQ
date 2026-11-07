@@ -48,7 +48,7 @@ function patch(a, b) {
 // coordinator and workers. What needs you is on the right of each row: a
 // permission waiting (warn) or messages not read yet (accent).
 
-const isTeams = r => r.view === 'teams' || r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
+const isTeams = r => r.view === 'teams' || r.view === 'team' || r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
 const isMachines = r => r.view === 'hosts' || r.view === 'terminal'
 const here = on => (on ? ' class="rail-item on" aria-current="page"' : ' class="rail-item"')
 
@@ -78,7 +78,7 @@ function teamBlock({ coord, workers }, r) {
   const waiting = inside.some(s => status(s).waiting)
   const unseen = inside.reduce((t, s) => t + (unread.get(s.name) ?? 0), 0)
   const alert = open ? '' : waiting ? '<span class="badge attn" aria-hidden="true">!</span>' : unseen ? `<span class="badge" aria-hidden="true">${unseen > 99 ? '99+' : unseen}</span>` : ''
-  const squadOn = r.view === 'mosaic' && r.squad === coord.name
+  const squadOn = (r.view === 'team' || r.view === 'mosaic') && r.squad === coord.name
   return `<div class="rail-team${open ? ' open' : ''}">
       <div class="rail-team-h"><button type="button" class="rail-fold" data-squad="${esc(coord.name)}" aria-expanded="${open}" aria-label="${esc(T.foldTeam(name, open))}">${icon('chevron')}</button><a href="#/q/${encodeURIComponent(coord.name)}" class="rail-team-name${squadOn ? ' on' : ''}"${squadOn ? ' aria-current="page"' : ''}>${esc(name)}</a>${alert}</div>
       <div class="rail-team-body">${sessionRow(coord, r)}${workers.length ? `<div class="rail-workers">${workers.map(w => sessionRow(w, r)).join('')}</div>` : ''}</div>
