@@ -94,7 +94,22 @@ function row(e, on) {
     + `<span class="dot ${dot}" aria-hidden="true"></span><span class="ibx-item-b"><span class="ibx-item-t">${esc(title)}</span><span class="ibx-item-m">${meta.filter(Boolean).join('<span aria-hidden="true">·</span>')}</span></span></a></li>`
 }
 
+// Nothing open yet on this company: the three steps to a first team.
+function firstSteps() {
+  const machine = hosts.size > 0
+  const team = sortedSessions().some(s => s.role === 'coordinator')
+  const step = (n, done, now, title, hint, action) => `<li class="fs-step${done ? ' done' : now ? ' now' : ''}"><span class="fs-mark" aria-hidden="true">${done ? '✓' : n}</span><div><b>${esc(title)}</b>${now && hint ? `<p>${esc(hint)}</p>` : ''}${now && action ? action : ''}</div>${done ? `<span class="sr-only">${esc(T.fsDone)}</span>` : ''}</li>`
+  return `<div class="fs"><h2 class="fs-title">${esc(T.fsTitle)}</h2><p class="fs-sub">${esc(T.fsSub)}</p>
+    <ol class="fs-steps card">
+      ${step(1, true, false, T.fsAccount)}
+      ${step(2, machine, !machine, T.fsMachine, T.fsMachineHint, can('manager') ? `<button type="button" class="btn primary" data-addmachine>${esc(T.actAddMachine)}</button>` : '')}
+      ${step(3, team, machine && !team, T.fsTeam, T.fsTeamHint, can('operator') ? `<button type="button" class="btn primary" data-newteam>${esc(T.newTeam)}</button>` : '')}
+    </ol>
+    <p class="fs-hint">${T.fsLogin}</p></div>`
+}
+
 function detail(e) {
+  if (!e && !sortedSessions().length) return firstSteps()
   if (!e) return `<div class="empty">${icon('inbox', 'empty-ic')}<b>${esc(T.inboxEmpty)}</b><span>${esc(T.ibxEmptyHint)}</span></div>`
   const back = `<a class="ibx-back" href="#/inbox">${icon('chevron', 'flip')}<span>${esc(T.inbox)}</span></a>`
   if (e.kind === 'perm') {
@@ -155,7 +170,8 @@ export function renderInbox() {
   const list = groups.filter(g => g.list.length).map(g => g.folded
     ? `<details class="ibx-group"${doneOpen ? ' open' : ''} data-folded><summary class="ibx-group-h"><span>${esc(g.label)}</span><span class="badge soft">${g.list.length}</span></summary><ul>${g.list.map(e => row(e, e === picked)).join('')}</ul></details>`
     : `<section class="ibx-group"><h2 class="ibx-group-h"><span>${esc(g.label)}</span><span class="badge soft">${g.list.length}</span></h2><ul>${g.list.map(e => row(e, e === picked)).join('')}</ul></section>`).join('')
-  setHtml($('inbox'), `<div class="ibx${r.item ? ' has-pick' : ''}">
+  const fresh = !all.length && !sortedSessions().length
+  setHtml($('inbox'), `<div class="ibx${r.item ? ' has-pick' : ''}${fresh ? ' fresh' : ''}">
       <nav class="ibx-list" aria-label="${esc(T.inbox)}">${list || `<p class="ibx-none">${esc(T.ibxNothingListed)}</p>`}</nav>
       <section class="ibx-detail" aria-live="polite">${detail(picked)}</section>
     </div>`)
@@ -202,6 +218,8 @@ function choose(n) {
 }
 
 $('inbox').addEventListener('click', async e => {
+  if (e.target.closest('[data-addmachine]')) { location.hash = '#/hosts'; return (await import('./machines.js')).addMachineDialog() }
+  if (e.target.closest('[data-newteam]')) return (await import('./squads.js')).newSessionDialog(undefined, { role: 'coordinator' })
   const opt = e.target.closest('[data-option]')
   if (opt) return choose(Number(opt.dataset.option))
   const b = e.target.closest('[data-resolve]')

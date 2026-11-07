@@ -105,7 +105,7 @@ $('menuBtn').setAttribute('aria-label', T.openMenu)
 function themeButtons() {
   const dark = themeNow() === 'dark'
   for (const b of document.querySelectorAll('[data-theme-toggle]')) {
-    b.textContent = dark ? '☀️' : '🌙'
+    b.innerHTML = icon(dark ? 'sun' : 'moon')
     b.title = dark ? T.lightMode : T.darkMode
     b.setAttribute('aria-label', b.title)
   }

@@ -1,0 +1,21 @@
+/* Signing in, and making the first owner: one card in the middle. */
+
+#login, #splash { background: var(--bg); }
+.login-card { width: min(420px, 100%); padding: 32px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--shadow-pop); }
+.login-card .brand { gap: 10px; margin-bottom: 8px; font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.015em; }
+.login-card .brand .logo { width: 30px; height: 30px; }
+.login-card > p { margin: 4px 0 20px; color: var(--muted); line-height: 1.55; }
+.login-card .field { margin-bottom: 12px; }
+.login-card .field input { height: 38px; font-family: var(--sans); }
+.login-card .field input[name=token], .login-card .field input[name=code], .login-card .field input[name=recovery] { font-family: var(--mono); letter-spacing: .02em; }
+.login-card button[type=submit] { width: 100%; height: 40px; margin-top: 8px; border: 0; border-radius: var(--r); background: var(--accent); color: var(--on-accent); font-weight: 600; transition: background-color var(--t-fast) var(--ease); }
+.login-card button[type=submit]:hover { background: color-mix(in srgb, var(--accent) 90%, var(--text)); }
+.login-card .linkish { width: auto; height: auto; margin: 2px 0 0; padding: 0; border: 0; background: none; color: var(--text); font-weight: 400; font-size: var(--fs-sm); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.login-err { min-height: 1.4em; margin-top: 10px; color: var(--err); font-size: var(--fs-sm); }
+.login-card .foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: var(--fs-xs); }
+.login-card .theme-btn, .theme-btn { display: inline-grid; place-items: center; width: 26px; height: 22px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: none; color: var(--muted); }
+.login-card .theme-btn .ic, .theme-btn .ic { width: 13px; height: 13px; }
+.login-card .theme-btn:hover, .theme-btn:hover { background: var(--raised); color: var(--text); }
+.lang { border-color: var(--line-2); border-radius: var(--r-sm); }
+.login-card .lang button, .lang button { height: 22px; }
+.login-card .lang button.on, .lang button.on { background: var(--raised); color: var(--text); font-weight: 600; }
