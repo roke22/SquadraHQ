@@ -516,3 +516,31 @@ test('the Chat button: from a terminal and from the machines, it opens the chat'
   await page.goto(`${server.url}/#/hosts`)
   await chatOpens(page.locator('#hosts .term-row', { hasText: 'worker2' }).getByRole('button', { name: 'Chat', exact: true }))
 })
+
+test('beside a session terminal: what it is doing, and what mattered, read from what it reported', async ({ page }) => {
+  await server.call('api/terminals/open', { host: machine.id, spec: { name: 'tlw', role: 'coordinator' } })
+  const s = await startSession(server, 'tlw', 'coordinator', undefined, machine.identities.get('tlw'))
+  const t = Date.now()
+  const ev = (kind, ago, extra = {}) => ({ kind, ts: t - ago * 1000, ...extra })
+  const bash = (id, cmd, ago, ok = true) => [ev('tool_start', ago, { id, tool: 'Bash', summary: cmd }), ev('tool_end', ago - 1, { id, tool: 'Bash', ok })]
+  await s.observe([
+    ev('prompt', 60, { text: 'Fix the cart' }),
+    ev('tool_start', 50, { id: 'e1', tool: 'Edit', summary: 'src/cart.js (+3 −1)' }), ev('tool_end', 49, { id: 'e1', tool: 'Edit', ok: true }),
+    ...bash('b1', 'npm test', 40, false), ...bash('b2', 'git commit -m "Round the total"', 30), ...bash('b3', 'ls -la', 20),
+    ev('stop', 10),
+  ])
+  await signIn(page, '#/s/tlw')
+  const tl = page.locator('.tv-aside .tl-list')
+  // What it typed, the files it edited, the tests and the commit; a plain command is left out.
+  await expect(tl.locator('.tl-item')).toHaveCount(4)
+  for (const text of ['Fix the cart', 'Edited a file', 'src/cart.js', 'Tests failed', 'Round the total']) await expect(tl).toContainText(text)
+  await expect(tl).not.toContainText('ls -la')
+  // A new one shows up by itself.
+  await s.observe(bash('b4', 'npm test', 5))
+  await expect(tl).toContainText('Tests passed')
+  // The panel folds, and stays folded.
+  await page.locator('[data-tvfold]').click()
+  await expect(page.locator('.tv')).toHaveClass(/folded/)
+  await page.reload()
+  await expect(page.locator('.tv')).toHaveClass(/folded/)
+})

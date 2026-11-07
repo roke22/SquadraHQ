@@ -16,6 +16,8 @@ import { closeMenu } from './dialogs.js'
 import { renderHosts } from './machines.js'
 import { hideOrgTip, renderOrg } from './org.js'
 import { TermView } from './terminal.js'
+import { Timeline } from './timeline.js'
+import { icon } from './icons.js'
 
 // views
 export let mosaicPanes = new Map() // name -> {pane, view}
@@ -121,13 +123,14 @@ export function route() {
   const termMode = r.view === 'terminal' || !!st
   $('terminal').hidden = !termMode
   if (!termMode && state.termView) { state.termView.destroy(); state.termView = null; $('terminal').innerHTML = '' }
+  if ((!termMode || r.view === 'terminal') && state.timeline) { state.timeline.destroy(); state.timeline = null }
   if (r.view === 'hosts' || r.view === 'terminal') {
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }
     clearMosaic()
     $('session').hidden = true
     $('mosaic').hidden = true
     if (r.view === 'hosts') renderHosts(r.host)
-    else if (!state.termView || state.termView.host !== r.host || state.termView.term !== r.term) {
+    else if (!state.termView || state.termView.host !== r.host || state.termView.term !== r.term || state.termView.root !== $('terminal')) {
       state.termView?.destroy()
       state.termView = new TermView(r.host, r.term, $('terminal'))
     }
@@ -148,9 +151,16 @@ export function route() {
     clearMosaic()
     $('mosaic').hidden = true
     $('session').hidden = true
-    if (!state.termView || state.termView.host !== st.host.id || state.termView.term !== r.name) {
+    if (!state.termView || state.termView.host !== st.host.id || state.termView.term !== r.name || !state.timeline) {
       state.termView?.destroy()
-      state.termView = new TermView(st.host.id, r.name, $('terminal'))
+      state.timeline?.destroy()
+      // The terminal as it is, and beside it what it is doing and what mattered.
+      // (Folded unless chosen otherwise on a phone, where it would cover the terminal.)
+      const kept = store.get(companyPref('squadraTlFolded'))
+      const folded = kept ? kept === '1' : matchMedia('(max-width: 900px)').matches
+      $('terminal').innerHTML = `<div class="tv${folded ? ' folded' : ''}"><div class="tv-term"></div><aside class="tv-aside" aria-label="${esc(T.tlAside(r.name))}"><button type="button" class="icon-btn tv-fold" data-tvfold aria-expanded="${!folded}" aria-label="${esc(folded ? T.tlShow : T.tlHide)}" title="${esc(folded ? T.tlShow : T.tlHide)}">${icon('chevron', folded ? 'flip' : '')}</button><div class="tv-body"></div></aside></div>`
+      state.termView = new TermView(st.host.id, r.name, $('terminal').querySelector('.tv-term'))
+      state.timeline = new Timeline(r.name, $('terminal').querySelector('.tv-body'))
     }
     unread.delete(r.name)
   } else {

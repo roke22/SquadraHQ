@@ -12,6 +12,7 @@ import { route, currentRoute, mosaicPanes, refreshLeads, dec } from './router.js
 import { renderTop, sessionTerm } from './topbar.js'
 import { paneHead, buildMosaic, paneClass, refreshSquadRows, renderArchived } from './mosaic.js'
 import { renderHosts, terminalOf } from './machines.js'
+import { timelines, refreshTimelines } from './timeline.js'
 import { noteLinkMessage } from './squads.js'
 import { renderOrg } from './org.js'
 import { renderInbox, refreshInbox } from './inbox.js'
@@ -74,6 +75,7 @@ function onStream(type, data) {
     if (r.view === 'org') { soon(renderOrg); soon(renderTop) }
     if (r.view === 'session' && r.name === data.name && data.deleted) { location.hash = '#/'; return }
     for (const v of views) if (v.name === data.name) { v.renderStatus(); v.scheduleRender() }
+    for (const t of timelines) if (t.name === data.name) t.soon()
     soon(renderNav); soon(refreshInbox); soon(refreshTeams); soon(refreshTeam); soon(refreshSessionAside)
     // The top bar shows one session (or one squad): only its changes matter.
     if ((r.view === 'session' && r.name === data.name) || r.view === 'terminal' || r.squad) soon(renderTop)
@@ -86,11 +88,12 @@ function onStream(type, data) {
   }
   if (type === 'plans') {
     state.plans = new Map((Array.isArray(data) ? data : []).map(p => [p.coordinator, p]))
-    soon(refreshTeam); soon(refreshTeams)
+    soon(refreshTeam); soon(refreshTeams); soon(refreshTimelines)
   }
   if (type === 'inbox') {
     state.inbox = Array.isArray(data) ? data : []
     if (currentRoute().view === 'inbox') soon(renderInbox)
+    soon(refreshTimelines)
     soon(renderNav); soon(refreshInbox); soon(refreshTeams); soon(refreshTeam); soon(refreshSessionAside)
     return
   }
@@ -129,6 +132,7 @@ function onStream(type, data) {
     if (it.t === 'event' && it.kind === 'usage') return
     let shown = false
     for (const v of views) if (v.live(it)) shown = true
+    for (const t of timelines) t.live(it)
     // unread counters for sessions not on screen
     const r = currentRoute()
     if (r.view === 'session') {

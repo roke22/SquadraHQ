@@ -112,6 +112,7 @@ const SHOTS = [
   ['teams', '#/teams', '.tm-card'],
   ['team', '#/q/coord-dev', '.pl-table'],
   ['session', '#/s/web/chat', '.sv-aside .sv-member'],
+  ['terminal', '#/s/web', '.tv-aside .tl-item'],
   ['machines', '#/hosts', '.mc-table'],
   ['org-chart', '#/org', '.org-card'],
   ['live', '#/q/coord-dev/live', '.pane'],
