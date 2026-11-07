@@ -73,13 +73,14 @@ async function company(lang) {
   const d = DATA[lang]
   const server = await startServer()
   const machine = await startMachine(server, 'mac-mini', { id: 'api', role: 'worker', coordinator: 'coord-dev' }, { screens: screens(d) })
-  const open = async (name, role, coordinator) => {
+  // (One team runs Claude Code, Codex and Grok, to show each agent's mark.)
+  const open = async (name, role, coordinator, agent) => {
     await server.call('api/terminals/open', { host: machine.id, spec: { name, role, ...(coordinator ? { coordinator } : {}) } })
-    return startSession(server, name, role, coordinator, machine.identities.get(name))
+    return startSession(server, name, role, coordinator, machine.identities.get(name), { agent })
   }
   const dev = await open('coord-dev', 'coordinator')
-  const web = await open('web', 'worker', 'coord-dev')
-  const api = await startSession(server, 'api', 'worker', 'coord-dev')
+  const web = await open('web', 'worker', 'coord-dev', 'grok')
+  const api = await startSession(server, 'api', 'worker', 'coord-dev', undefined, { agent: 'codex' })
   const qa = await open('coord-qa', 'coordinator')
   await open('pruebas', 'worker', 'coord-qa')
   await open('editor', 'coordinator')

@@ -2,7 +2,7 @@ import { $ } from './dom.js'
 import { T, LOCALE } from './i18n.js'
 import { state, can, sessions, hosts } from './state.js'
 import { esc, now } from './format.js'
-import { sortedSessions, status } from './content.js'
+import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { postJson } from './machines.js'
 import { alertBox } from './mosaic.js'
@@ -39,7 +39,7 @@ const teamOf = name => {
 const who = name => {
   const s = sessions.get(name)
   const role = s?.role === 'coordinator' ? 'coord' : s?.role === 'solo' ? 'solo' : 'worker'
-  return `<span class="ibx-who"><span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s?.role] ?? '')} </span>${esc(name)}</span>`
+  return `<span class="ibx-who"><span class="role ${role}" aria-hidden="true"></span>${agentMark(name)}<span class="sr-only">${esc(T.roleName[s?.role] ?? '')} </span>${esc(name)}</span>`
 }
 
 // The version of each question the user has had in front of them: if its
@@ -119,7 +119,7 @@ function head(name, kind, at, link = true) {
   const s = sessions.get(name)
   const role = s?.role === 'coordinator' ? 'coord' : s?.role === 'solo' ? 'solo' : 'worker'
   return `<header class="ibx-head"><span class="ibx-avatar ${role}" aria-hidden="true"><span class="role ${role}"></span></span>
-    <div class="ibx-from"><b>${esc(name)}</b><span>${[esc(teamOf(name)), esc(kind), at ? `<time title="${esc(when(at))}">${esc(ago(at))}</time>` : ''].filter(Boolean).join('<span aria-hidden="true"> · </span>')}</span></div>
+    <div class="ibx-from"><b>${esc(name)} ${agentMark(name)}</b><span>${[esc(teamOf(name)), esc(kind), at ? `<time title="${esc(when(at))}">${esc(ago(at))}</time>` : ''].filter(Boolean).join('<span aria-hidden="true"> · </span>')}</span></div>
     ${link ? `<a class="btn" href="#/s/${encodeURIComponent(name)}" aria-label="${esc(T.ibxOpenSession)}"><span class="ibx-l">${esc(T.ibxOpenSession)}</span><span class="ibx-s" aria-hidden="true">${esc(T.ibxSessionShort)}</span></a>` : ''}
     <a class="icon-btn ibx-close" href="#/inbox" aria-label="${esc(T.close)}" title="${esc(T.close)} (Esc)">${icon('close')}</a></header>`
 }

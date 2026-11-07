@@ -4,7 +4,7 @@ import {
 } from 'node:crypto'
 import {
   bad, ApiError, allowServerWide, ipKey, cachedFile, now, sha256, serverBaseUrl, clientIp, refuseSocket, logError,
-  VERSION, cleanText, pathTooLong, cutText, acceptWebSocket, sameOrigin, trimSlashes,
+  VERSION, cleanText, pathTooLong, cutText, acceptWebSocket, sameOrigin, trimSlashes, AGENTS,
 } from '../platform/index.js'
 
 const HOST_SCRIPT = [new URL('../../host/squadra-host.mjs', import.meta.url), new URL('../squadra-host.mjs', import.meta.url)]
@@ -270,6 +270,7 @@ export function createMachines(platform, { sessions, observation }) {
       // can't label one of its terminals as another machine's session).
       name: str(t?.id, 40),
       role: ['coordinator', 'worker', 'solo'].includes(t?.role) ? t.role : null,
+      agent: AGENTS.includes(t?.agent) ? t.agent : 'claude',
       coordinator: str(t?.coordinator, 40),
       folder: str(t?.folder, 500),
       compact_window: Number.isInteger(t?.compact_window) ? t.compact_window : null,
@@ -287,6 +288,9 @@ export function createMachines(platform, { sessions, observation }) {
       node: str(info.node, 40),
       tmux: str(info.tmux, 40),
       claude: str(info.claude, 80),
+      // The agents it can run, each with its version (an older machine says
+      // nothing: Claude Code, as before).
+      agents: (Array.isArray(info.agents) ? info.agents : []).filter(a => AGENTS.includes(a?.id)).slice(0, 8).map(a => ({ id: a.id, version: str(a.version, 80) })),
       version: str(info.version, 40),
       folders: (Array.isArray(info.folders) ? info.folders : []).slice(0, 50).map(f => str(f, 500)).filter(Boolean),
       home: str(info.home, 500),
@@ -791,12 +795,17 @@ export function createMachines(platform, { sessions, observation }) {
     // the session claims later).
     const openedRole = spec.role === 'coordinator' || spec.role === 'solo' ? spec.role : 'worker'
     const openedPersona = PERSONA_ID_RE.test(String(spec.persona ?? '')) ? spec.persona : null
+    // The agent it runs, among those that machine has (one that says none has Claude Code only).
+    const agent = AGENTS.includes(spec.agent) ? spec.agent : 'claude'
+    const has = hostLinks.get(id)?.info?.agents
+    if (agent !== 'claude' && !(Array.isArray(has) && has.some(a => a?.id === agent))) throw bad(`that machine doesn't have ${agent} installed`)
+    if (agent === 'claude') delete spec.agent; else spec.agent = agent
     // A coordinator's links are the ones set here, never what the page sends.
     delete spec.links
     if (openedRole === 'coordinator') { const l = linksOf(name); if (l.length) spec.links = l }
     if (!existing) {
       spec.identity = register(name, false).secret
-      db.prepare('UPDATE identities SET host_id = ?, opened_role = ?, opened_persona = ? WHERE name = ?').run(id, openedRole, openedPersona, name)
+      db.prepare('UPDATE identities SET host_id = ?, opened_role = ?, opened_persona = ?, agent = ? WHERE name = ?').run(id, openedRole, openedPersona, agent, name)
       created = true
     } else {
       // Already this machine's name, and not connected: a new secret goes with
@@ -804,7 +813,7 @@ export function createMachines(platform, { sessions, observation }) {
       // the session was disconnected from the dashboard).
       dropLease(name)
       spec.identity = register(name, true).secret
-      db.prepare('UPDATE identities SET opened_role = ?, opened_persona = ? WHERE name = ?').run(openedRole, openedPersona, name)
+      db.prepare('UPDATE identities SET opened_role = ?, opened_persona = ?, agent = ? WHERE name = ?').run(openedRole, openedPersona, agent, name)
     }
     // A worker's coordinator, as it was opened (until it says so itself at
     // login): the org chart keeps it in its squad while it isn't connected.

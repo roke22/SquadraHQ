@@ -1626,6 +1626,8 @@ async function hostInfo() {
     node: process.version,
     tmux: tv?.text ?? null,
     claude: CLAUDE_VERSION,
+    // The agents sessions can run here, each with its version.
+    agents: [...(CLAUDE_VERSION ? [{ id: 'claude', version: CLAUDE_VERSION }] : [])],
     plugin: PLUGIN,
     version: VERSION,
     folders: settings.folders,

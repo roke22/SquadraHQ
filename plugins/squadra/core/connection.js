@@ -58,7 +58,7 @@ export async function connect({ name, role, coordinator, staticAccess, seedAllow
       const proved = await serverIdentity()
       s.serverKey = proved?.key ?? null
       s.claimed = await call('claimSession', {
-        instance: s.instance, role, coordinator, persona: s.persona,
+        instance: s.instance, role, coordinator, persona: s.persona, agent: agent.kind ?? 'claude',
         ...(proved ? { signing_key: s.signingKey.public, challenge: proved.challenge, proof: proveKey(s.signingKey, proved.key, 'claim', s.name, proved.challenge, s.instance) } : {}),
       }, { s })
     }

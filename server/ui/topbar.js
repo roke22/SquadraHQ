@@ -2,7 +2,7 @@ import { $, store } from './dom.js'
 import { T } from './i18n.js'
 import { sessions, state, linksOf, hosts, can } from './state.js'
 import { esc, kfmt } from './format.js'
-import { sortedSessions, status } from './content.js'
+import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 import { applyCols, buildMosaic } from './mosaic.js'
@@ -138,7 +138,7 @@ export function renderTop() {
     const role = s?.role === 'coordinator' ? 'coord' : s?.role === 'solo' ? 'solo' : 'worker'
     const team = s?.role === 'coordinator' ? s.name : s?.coordinator
     const teamName = team ? state.squadMeta.get(team)?.title || team : ''
-    setHtml($('topTitle'), `<span class="role ${role}" aria-hidden="true"></span><span class="sv-name">${esc(r.name)}</span>${s?.archived_at ? ` <span class="tag">${esc(T.archivedTag)}</span>` : ''}`)
+    setHtml($('topTitle'), `<span class="role ${role}" aria-hidden="true"></span>${agentMark(r.name)}<span class="sv-name">${esc(r.name)}</span>${s?.archived_at ? ` <span class="tag">${esc(T.archivedTag)}</span>` : ''}`)
     $('topSub').textContent = [s ? T.roleName[s.role] ?? T.roleName.worker : '', teamName, st.text].filter(Boolean).join(' · ')
     // Its conversation, or its live terminal when it has one.
     const where = terminalOf(r.name)

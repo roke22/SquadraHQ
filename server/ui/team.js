@@ -3,7 +3,7 @@ import { T, LOCALE } from './i18n.js'
 import { state, sessions, hosts, can, linksOf } from './state.js'
 import { api } from './api.js'
 import { esc, now } from './format.js'
-import { sortedSessions, status } from './content.js'
+import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 
@@ -36,7 +36,7 @@ function who(s, extra = '') {
   const st = status(s)
   const role = s.role === 'coordinator' ? 'coord' : 'worker'
   const h = hosts.get(s.host_id)
-  return `<li><a href="#/s/${encodeURIComponent(s.name)}" class="tq-member${s.online ? '' : ' offline'}"><span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span>`
+  return `<li><a href="#/s/${encodeURIComponent(s.name)}" class="tq-member${s.online ? '' : ' offline'}"><span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}<span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span>`
     + `<span class="tq-name">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span class="tq-where">${esc(h?.name ?? T.tqNoMachine)}</span>${extra}</a></li>`
 }
 
@@ -64,7 +64,7 @@ function planCard(coord) {
       <div class="tq-body pl-sum">${planMeter(plan, true)}<div class="pl-legend">${[['done', T.planDone(count('done'), n)], ['doing', T.planDoing(count('doing'))], ['blocked', T.planBlocked(count('blocked'))], ['waiting', T.planWaiting(count('waiting'))]].filter(([s]) => count(s)).map(([s, l]) => `<span><i class="pl-key pl-${s}" aria-hidden="true"></i>${esc(l)}</span>`).join('')}</div></div>
       <div class="mc-scroll"><table class="pl-table"><thead><tr><th scope="col">${esc(T.planTask)}</th><th scope="col">${esc(T.planWho)}</th><th scope="col">${esc(T.mcState)}</th><th scope="col">${esc(T.ibxRef)}</th></tr></thead><tbody>
       ${plan.tasks.map(t => `<tr class="pl-row-${t.state}"><td><span class="pl-t">${esc(t.title)}</span>${t.note ? `<span class="pl-note">${esc(t.note)}</span>` : ''}</td>
-        <td>${t.who ? `<a class="pl-who" href="#/s/${encodeURIComponent(t.who)}"><span class="role worker" aria-hidden="true"></span>${esc(t.who)}</a>` : `<span class="tq-quiet0">${esc(T.planNobody)}</span>`}</td>
+        <td>${t.who ? `<a class="pl-who" href="#/s/${encodeURIComponent(t.who)}"><span class="role worker" aria-hidden="true"></span>${agentMark(t.who)}${esc(t.who)}</a>` : `<span class="tq-quiet0">${esc(T.planNobody)}</span>`}</td>
         <td><span class="mc-state"><span class="dot ${TASK_DOT[t.state]}${t.state === 'doing' ? ' pulse' : ''}" aria-hidden="true"></span>${esc(T.planState[t.state])}</span></td>
         <td>${t.ref ? refLink(t.ref) : ''}</td></tr>`).join('')}
       </tbody></table></div>

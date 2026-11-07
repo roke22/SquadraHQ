@@ -2,7 +2,7 @@ import { $ } from './dom.js'
 import { T, LOCALE } from './i18n.js'
 import { state, sessions, hosts } from './state.js'
 import { esc, kfmt } from './format.js'
-import { sortedSessions, status } from './content.js'
+import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 
@@ -13,7 +13,7 @@ const when = t => new Date(t).toLocaleString(LOCALE, { dateStyle: 'medium', time
 function member(s, here) {
   const st = status(s)
   const role = s.role === 'coordinator' ? 'coord' : 'worker'
-  return `<li><a href="#/s/${encodeURIComponent(s.name)}" class="sv-member${s.name === here ? ' on' : ''}${s.online ? '' : ' offline'}"${s.name === here ? ' aria-current="page"' : ''}><span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><span class="sv-mname">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span class="sv-mwhat">${esc(st.text)}</span></a></li>`
+  return `<li><a href="#/s/${encodeURIComponent(s.name)}" class="sv-member${s.name === here ? ' on' : ''}${s.online ? '' : ' offline'}"${s.name === here ? ' aria-current="page"' : ''}><span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}<span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><span class="sv-mname">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span class="sv-mwhat">${esc(st.text)}</span></a></li>`
 }
 
 export function renderSessionAside() {

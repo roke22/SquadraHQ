@@ -2,7 +2,7 @@ import { $ } from './dom.js'
 import { T, LOCALE } from './i18n.js'
 import { state, can } from './state.js'
 import { esc, base, num, kfmt } from './format.js'
-import { status, sortedSessions, squadsOf } from './content.js'
+import { status, sortedSessions, squadsOf, agentMark } from './content.js'
 import { ChatView } from './chat.js'
 import { setHtml } from './nav.js'
 import { currentRoute, clearMosaic, mosaicPanes, teamStrip, giveWork } from './router.js'
@@ -16,7 +16,7 @@ import { TermView } from './terminal.js'
 export function paneHead(s) {
   const a = s.activity ?? {}
   const role = s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'
-  return `<span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><button class="title" data-go="#/s/${encodeURIComponent(s.name)}">${esc(s.name)}</button><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${personaTag(s.persona)}
+  return `<span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}<span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><button class="title" data-go="#/s/${encodeURIComponent(s.name)}">${esc(s.name)}</button><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${personaTag(s.persona)}
       <span class="meta" title="${esc(a.cwd ?? '')}">${esc(base(a.cwd))}</span>${ctxBadge(a)}
       <button class="icon-btn more" data-menu="${esc(s.name)}" title="${esc(T.actions(s.name))}" aria-label="${esc(T.actions(s.name))}" aria-haspopup="menu">${icon('more')}</button>`
 }
@@ -169,7 +169,7 @@ export function renderArchived() {
   setHtml($('archived'), `<div class="arch-list">${list.length ? list.map(s => `
       <div class="arch ${s.role ?? ''}">
         <div class="info">
-          <div class="n"><span class="role ${s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><span class="arch-name">${esc(s.name)}</span></div>
+          <div class="n"><span class="role ${s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'}" aria-hidden="true"></span>${agentMark(s)}<span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><span class="arch-name">${esc(s.name)}</span></div>
           <div class="m">${T.archivedAt(new Date(s.archived_at).toLocaleString(LOCALE))} · ${esc(status(s).text)}${s.activity?.cwd ? ` · ${esc(s.activity.cwd)}` : ''}</div>
         </div>
         <div class="acts">

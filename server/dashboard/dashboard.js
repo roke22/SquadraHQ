@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { unix, now, guarded, bad, ApiError, VERSION, ROLES } from '../platform/index.js'
+import { unix, now, guarded, bad, ApiError, VERSION, ROLES, AGENTS } from '../platform/index.js'
 
 export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, plans, organization }) {
   const { rotateJoinToken, db, bus, broadcast, sseClients, truncateLog, dataDir, log, every } = platform
@@ -40,7 +40,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   bus.on('session-changed', name => broadcast('session', sessionView(name)))
 
   function sessionView(name) {
-    const row = db.prepare('SELECT name, role, coordinator, created_at, archived_at, cleared_at, host_id, opened_role, opened_persona, description, needs_approval FROM identities WHERE name = ?').get(name)
+    const row = db.prepare('SELECT name, role, coordinator, created_at, archived_at, cleared_at, host_id, opened_role, opened_persona, description, needs_approval, agent FROM identities WHERE name = ?').get(name)
     if (!row) return { name, deleted: true }
     const a = activityOf(name)
     return {
@@ -48,6 +48,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
       role: row.role ?? null,
       coordinator: row.coordinator ?? null,
       persona: personaView(name),
+      agent: AGENTS.includes(row.agent) ? row.agent : 'claude', // Claude Code, Codex CLI or Grok CLI
       archived_at: row.archived_at ?? null,
       cleared_at: row.cleared_at ?? null,
       host_id: row.host_id ?? null, // the machine that opened it from the dashboard

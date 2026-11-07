@@ -185,6 +185,7 @@ export function newSessionDialog(hostId, preset = {}) {
         <label class="field"><span>${T.folder}</span><select name="folder"></select></label>
         <label class="field"><span>${T.subfolder}</span><input type="text" name="sub" placeholder="${esc(T.subfolderHint)}" autocomplete="off"></label>
       </div>
+      <label class="field" data-agentfield hidden><span>${T.agent}</span><select name="agent"></select></label>
       <label class="field"><span>${T.persona}</span><select name="persona"><option value="">${T.personaNone}</option></select></label>
       <div class="persona-hint"></div>
       <label class="field"><span>${T.compact}</span><select name="compact">
@@ -220,7 +221,16 @@ export function newSessionDialog(hostId, preset = {}) {
   folderHint.style.cssText = 'font-size:12px;color:var(--muted)'
   d.el.querySelector('[name=folder]').closest('.row2').after(folderHint)
   let shownFolders = null
+  // The agents the chosen machine can run: chosen here only when there is more than one.
+  const syncAgents = () => {
+    const list = hosts.get(f('host').value)?.info?.agents
+    const ids = Array.isArray(list) && list.length ? list.map(a => a.id) : ['claude']
+    const was = f('agent').value || 'claude'
+    f('agent').innerHTML = ids.map(a => `<option value="${esc(a)}" ${a === was ? 'selected' : ''}>${esc(T.agentName[a] ?? a)}</option>`).join('')
+    d.el.querySelector('[data-agentfield]').hidden = ids.length < 2
+  }
   const syncFolders = () => {
+    syncAgents()
     const h = hosts.get(f('host').value)
     const folders = h?.info?.folders ?? []
     const key = JSON.stringify(folders)
@@ -340,6 +350,7 @@ export function newSessionDialog(hostId, preset = {}) {
     if (!base) { err.textContent = T.folderRequired; f('folder').focus(); return }
     if (f('compact').value) spec.compact_window = Number(f('compact').value)
     if (f('persona').value) spec.persona = f('persona').value
+    if (f('agent')?.value && f('agent').value !== 'claude') spec.agent = f('agent').value
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(spec.name)) { err.textContent = T.sessionName + ': A-Z a-z 0-9 _ -'; f('name').focus(); return }
     ok.disabled = true
     ok.textContent = T.opening

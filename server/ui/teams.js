@@ -2,7 +2,7 @@ import { $ } from './dom.js'
 import { T } from './i18n.js'
 import { state, can, linksOf, unread } from './state.js'
 import { esc } from './format.js'
-import { sortedSessions, status, squadsOf } from './content.js'
+import { sortedSessions, status, squadsOf, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 import { personaTag } from './topbar.js'
@@ -19,7 +19,7 @@ function person(s, sub) {
   const n = unread.get(s.name) ?? 0
   const attention = st.waiting ? `<span class="badge attn" aria-hidden="true">!</span><span class="sr-only">${esc(T.waitingOnYou)}</span>` : n ? `<span class="badge" aria-hidden="true">${n > 99 ? '99+' : n}</span><span class="sr-only">${esc(T.unreadN(n))}</span>` : ''
   return `<li><a href="#/s/${encodeURIComponent(s.name)}" class="tm-person${sub ? ' sub' : ''}${s.online ? '' : ' offline'}">
-      <span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? T.roleName.worker)}</span>
+      <span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}<span class="sr-only">${esc(T.roleName[s.role] ?? T.roleName.worker)}</span>
       <span class="tm-who">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span>${personaTag(s.persona)}
       <span class="tm-what">${esc(st.text)}</span>${attention}</a></li>`
 }

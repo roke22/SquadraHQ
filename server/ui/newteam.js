@@ -23,6 +23,9 @@ function fresh() {
   return { title: '', goal: '', start: 'workers', coord: { name: '', persona: '' }, workers: [{ name: w1, persona: '' }, { name: w2, persona: '' }], host: online[0]?.id ?? '', folder: online[0]?.info?.folders?.[0] ?? '', sub: '', coordTouched: false, running: false, results: {} }
 }
 
+// The agents the chosen machine can run (an older machine: Claude Code only).
+const agentsOf = id => { const a = hosts.get(id)?.info?.agents; return Array.isArray(a) && a.length ? a.map(x => x.id) : ['claude'] }
+
 const folderNow = () => draft.folder ? (draft.sub.trim() ? `${draft.folder.replace(/\/+$/, '')}/${draft.sub.trim().replace(/^\/+|\/+$/g, '')}` : draft.folder) : ''
 const members = () => [{ ...draft.coord, role: 'coordinator' }, ...(draft.start === 'solo' ? [] : draft.workers.map(w => ({ ...w, role: 'worker' })))]
 function problems() {
@@ -51,6 +54,7 @@ function memberRow(m, i) {
       <span class="role ${role}" aria-hidden="true"></span>
       <label class="nt-name"><span class="sr-only">${esc(T.ntNameOf(T.roleName[m.role]))}</span><input type="text" value="${esc(m.name)}" maxlength="32" spellcheck="false" autocomplete="off" data-name="${i}" ${draft.running ? 'disabled' : ''}></label>
       <span class="nt-role">${esc(T.roleName[m.role])}</span>
+      ${agentsOf(draft.host).length > 1 ? `<label class="nt-agent"><span class="sr-only">${esc(T.agent)}</span><select data-agent="${i}" ${draft.running ? 'disabled' : ''}>${agentsOf(draft.host).map(a => `<option value="${a}" ${a === (m.agent ?? 'claude') ? 'selected' : ''}>${esc(T.agentName[a])}</option>`).join('')}</select></label>` : ''}
       <label class="nt-persona"><span class="sr-only">${esc(T.persona)}</span><select data-persona="${i}" ${draft.running ? 'disabled' : ''}><option value="">${esc(T.personaNone)}</option>${personaOptions(personas.list, m.persona, false)}</select></label>
       ${m.role === 'worker' && !draft.running ? `<button type="button" class="icon-btn" data-remove="${i - 1}" aria-label="${esc(T.ntRemove(m.name))}">${icon('close')}</button>` : '<span class="nt-gap"></span>'}
       ${res ? `<span class="nt-res ${res.ok ? 'ok' : res.ok === false ? 'bad' : ''}" role="status">${esc(res.text)}</span>` : ''}
@@ -147,7 +151,7 @@ async function launch() {
     renderNewTeam()
     const tpl = draft.start.startsWith('tpl:') ? state.templates.find(t => `tpl:${t.name}` === draft.start) : null
     const own = tpl ? (i ? tpl.workers[i - 1] : tpl.coordinator) : null
-    const spec = { name: m.name, role: m.role, folder: own?.folder ?? folder, ...(m.persona ? { persona: m.persona } : {}), ...(own?.compact_window ? { compact_window: own.compact_window } : { compact_window: 600000 }) }
+    const spec = { name: m.name, role: m.role, folder: own?.folder ?? folder, ...(m.persona ? { persona: m.persona } : {}), ...(m.agent && m.agent !== 'claude' && agentsOf(draft.host).includes(m.agent) ? { agent: m.agent } : {}), ...(own?.compact_window ? { compact_window: own.compact_window } : { compact_window: 600000 }) }
     if (i) spec.coordinator = list[0].name
     try {
       await postJson('/api/terminals/open', { host: draft.host, spec })
@@ -182,6 +186,7 @@ $('newteam').addEventListener('change', e => {
   if (t.name === 'host') { draft.host = t.value; draft.folder = hosts.get(t.value)?.info?.folders?.[0] ?? '' }
   else if (t.name === 'folder') draft.folder = t.value
   else if (t.dataset.persona != null) { const i = Number(t.dataset.persona); if (i === 0) draft.coord.persona = t.value; else draft.workers[i - 1].persona = t.value; return }
+  else if (t.dataset.agent != null) { const i = Number(t.dataset.agent); if (i === 0) draft.coord.agent = t.value; else draft.workers[i - 1].agent = t.value; return }
   else return
   renderNewTeam()
 })

@@ -2,7 +2,7 @@ import { $ } from './dom.js'
 import { T } from './i18n.js'
 import { state, sessions, hosts, can } from './state.js'
 import { esc } from './format.js'
-import { sortedSessions, status } from './content.js'
+import { sortedSessions, status, agentMark } from './content.js'
 import { icon } from './icons.js'
 import { toggleTheme } from './theme.js'
 
@@ -43,7 +43,7 @@ function candidates() {
     const st = status(s)
     const role = s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'
     const team = teamOf(s) ? titleOf(teamOf(s)) : ''
-    items.push({ group: 'sessions', label: s.name, mono: true, sub: [team, st.text].filter(Boolean).join(' · '), lead: `<span class="role ${role}" aria-hidden="true"></span>`, tail: `<span class="dot ${st.dot || 'off'}" aria-hidden="true"></span>`, keys: [team], go: `#/s/${encodeURIComponent(s.name)}`, rank: st.waiting ? 1 : 0 })
+    items.push({ group: 'sessions', label: s.name, mono: true, sub: [team, st.text].filter(Boolean).join(' · '), lead: `<span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}`, tail: `<span class="dot ${st.dot || 'off'}" aria-hidden="true"></span>`, keys: [team], go: `#/s/${encodeURIComponent(s.name)}`, rank: st.waiting ? 1 : 0 })
   }
   for (const c of list.filter(s => s.role === 'coordinator')) {
     const n = list.filter(s => s.coordinator === c.name).length

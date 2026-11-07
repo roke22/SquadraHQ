@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import {
-  cleanText, cutText, bad, ApiError, guarded, sha256, now, unix, sendError, sendJson, readParams,
+  cleanText, cutText, bad, ApiError, guarded, sha256, now, unix, sendError, sendJson, readParams, AGENTS,
 } from '../platform/index.js'
 
 export function createSessions(platform) {
@@ -266,6 +266,8 @@ export function createSessions(platform) {
       const role = ['coordinator', 'worker', 'solo'].includes(p.role) ? p.role : null
       const coordinator = role === 'worker' && NAME_RE.test(String(p.coordinator ?? '')) ? String(p.coordinator) : null
       if (role) db.prepare('UPDATE identities SET role = ?, coordinator = ?, persona = ? WHERE name = ?').run(role, coordinator, personaOf(p.persona), name)
+      // Which agent it is, as its plugin says (an older one says nothing: Claude Code).
+      if (AGENTS.includes(p.agent)) db.prepare('UPDATE identities SET agent = ? WHERE name = ?').run(p.agent, name)
       const approval = approvalRow(name)
       // (It may have just become one to approve, or to wait for.)
       if (role && (role === 'coordinator' ? approval.needs_approval : coordinator && approvalRow(coordinator)?.needs_approval)) setImmediate(() => bus.emit('session-changed', role === 'coordinator' ? name : coordinator))

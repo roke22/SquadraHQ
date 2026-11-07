@@ -2,7 +2,7 @@ import { $, store } from './dom.js'
 import { T } from './i18n.js'
 import { hosts, state, unread, companyPref, can } from './state.js'
 import { esc } from './format.js'
-import { sortedSessions, status, squadsOf, squadOpen } from './content.js'
+import { sortedSessions, status, squadsOf, squadOpen, agentMark } from './content.js'
 import { currentRoute } from './router.js'
 import { addMachineDialog } from './machines.js'
 import { icon } from './icons.js'
@@ -65,7 +65,7 @@ function sessionRow(s, r) {
   const on = r.view === 'session' && r.name === s.name
   const say = [T.roleName[s.role] ?? T.roleName.worker, s.name, st.text, a.say].filter(Boolean).join(' · ')
   return `<a href="#/s/${encodeURIComponent(s.name)}" class="rail-item rail-sess ${role}${on ? ' on' : ''}${s.online ? '' : ' offline'}"${on ? ' aria-current="page"' : ''} title="${esc(st.text)}" aria-label="${esc(say)}">`
-    + `<span class="role ${role}" aria-hidden="true"></span><span class="name">${esc(s.name)}</span>${a.html}<span class="dot ${st.dot || 'off'}" aria-hidden="true"></span></a>`
+    + `<span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}<span class="name">${esc(s.name)}</span>${a.html}<span class="dot ${st.dot || 'off'}" aria-hidden="true"></span></a>`
 }
 
 function teamBlock({ coord, workers }, r) {

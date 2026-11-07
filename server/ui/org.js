@@ -2,7 +2,7 @@ import { store, $ } from './dom.js'
 import { T } from './i18n.js'
 import { state, sessions, hosts, linksOf, linkListeners, companyPref, can } from './state.js'
 import { now, esc } from './format.js'
-import { sortedSessions, byPresence, status } from './content.js'
+import { sortedSessions, byPresence, status, agentMark } from './content.js'
 import { setHtml, soon } from './nav.js'
 import { currentRoute } from './router.js'
 import { roleTag, renderTop, personaTag } from './topbar.js'
@@ -124,7 +124,7 @@ function orgAgent(s, kind) {
   const pct = s.activity?.context_pct
   const persona = personaOf(s)
   return `<div class="org-agent ${kind}" data-orgtip="agent:${esc(s.name)}" tabindex="0">
-      <span class="role ${kind === 'coord' ? 'coord' : 'worker'}" aria-hidden="true"></span><span class="n">${esc(s.name)}</span><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${persona ? `<span class="org-persona">${esc(persona)}</span>` : ''}
+      <span class="role ${kind === 'coord' ? 'coord' : 'worker'}" aria-hidden="true"></span>${agentMark(s)}<span class="n">${esc(s.name)}</span><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${persona ? `<span class="org-persona">${esc(persona)}</span>` : ''}
       <span class="org-ctx">${Number.isFinite(pct) ? `<span class="ctx ${pct >= 80 ? 'hot' : pct >= 60 ? 'warm' : ''}">${Math.round(pct)}%</span>` : ''}</span>
       <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}" aria-haspopup="menu">${icon('more')}</button></div>`
 }

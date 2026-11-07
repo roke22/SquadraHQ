@@ -140,3 +140,12 @@ export function sortedSessions({ archived = false } = {}) {
 
 // Which squads are unfolded in the sidebar (remembered per browser).
 export const squadOpen = (() => { try { return JSON.parse(store.get(companyPref('squadraSquads')) || '{}') } catch { return {} } })()
+
+// Which agent a session runs (Claude Code, Codex CLI or Grok CLI): a small mark
+// beside its role, its name on hover. Our own marks, not the labs' logos.
+const AGENT_MARK = { claude: 'A', codex: 'O', grok: 'X' }
+export function agentMark(who) {
+  const s = typeof who === 'string' ? sessions.get(who) : who
+  const a = Object.hasOwn(AGENT_MARK, s?.agent) ? s.agent : 'claude'
+  return `<span class="agent ${a}" role="img" title="${esc(T.agentName[a])}" aria-label="${esc(T.agentName[a])}">${AGENT_MARK[a]}</span>`
+}

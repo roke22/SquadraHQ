@@ -28,7 +28,7 @@ import { startMcp, deliver, givePermission, takePermissionReply } from './claude
 process.on('unhandledRejection', err => log(`unhandled rejection: ${err}`))
 process.on('uncaughtException', err => log(`uncaught exception: ${err}`))
 
-useAgent({ deliver, givePermission, takePermissionReply })
+useAgent({ kind: 'claude', deliver, givePermission, takePermissionReply })
 startMcp()
 
 // When Claude Code closes the MCP connection, stdin gets EOF. Without this the

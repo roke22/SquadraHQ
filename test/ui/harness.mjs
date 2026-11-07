@@ -80,11 +80,11 @@ export async function startServer({ tokenApi = true } = {}) {
 }
 
 // A session as a plugin keeps it: logged in, long polling.
-export async function startSession(server, name, role, coordinator, secret) {
+export async function startSession(server, name, role, coordinator, secret, { agent } = {}) {
   secret ??= (await server.call('register', { name })).secret
   const instance = `inst-${name}-0001`
   const opts = { auth: secret, instance }
-  await server.call('claimSession', { instance, role, coordinator }, opts)
+  await server.call('claimSession', { instance, role, coordinator, ...(agent ? { agent } : {}) }, opts)
   let stopped = false
   const stop = new AbortController()
   const polling = (async () => {

@@ -3,7 +3,7 @@ import { $ } from './dom.js'
 import { T, COLLATOR } from './i18n.js'
 import { sessions, hosts, state, can } from './state.js'
 import { esc, dur, now } from './format.js'
-import { status } from './content.js'
+import { status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 import { sessionOn, personaTag } from './topbar.js'
@@ -104,7 +104,7 @@ export function renderHosts(only) {
     const rows = terms.map(t => {
       const s = sessionOn(h.id, t.id)
       return `<div class="term-row">
-          <span class="role ${t.role === 'coordinator' ? 'coord' : t.role === 'solo' ? 'solo' : 'worker'}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[t.role] ?? '')}</span><span class="n">${esc(t.name)}</span><span class="dot ${s ? status(s).dot || 'off' : 'off'}" title="${esc(s ? status(s).text : '')}" aria-hidden="true"></span>${personaTag(t.persona)}
+          <span class="role ${t.role === 'coordinator' ? 'coord' : t.role === 'solo' ? 'solo' : 'worker'}" aria-hidden="true"></span>${agentMark(sessions.get(t.id) ?? t)}<span class="sr-only">${esc(T.roleName[t.role] ?? '')}</span><span class="n">${esc(t.name)}</span><span class="dot ${s ? status(s).dot || 'off' : 'off'}" title="${esc(s ? status(s).text : '')}" aria-hidden="true"></span>${personaTag(t.persona)}
           <span class="m" title="${esc(t.folder ?? '')}">${esc(t.folder ?? '')}${t.role === 'worker' && t.coordinator ? ` · ${esc(T.coordinatorOf(t.coordinator))}` : ''}</span>
           <span class="acts">
             ${h.online && can('operator') ? `<button class="btn" data-go="#/t/${encodeURIComponent(h.id)}/${encodeURIComponent(t.id)}">${T.terminal}</button>` : ''}

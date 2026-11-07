@@ -171,6 +171,7 @@ export function openDatabase(dir) {
     ['identities', 'epoch', 'TEXT'],                     // random, per registration: what sessions pin (a name registered again gets a new one)
     ['identities', 'opened_role', 'TEXT'],               // the role the dashboard opened it with (on a machine)
     ['identities', 'opened_persona', 'TEXT'],            // and the persona (skill or agent id on that machine)
+    ['identities', 'agent', 'TEXT'],                     // which agent runs it: claude, codex or grok (null: claude)
     ['identities', 'persona', 'TEXT'],                   // the persona it says it follows, set at login (JSON: kind, name, description)
     ['identities', 'description', 'TEXT'],               // what it is for, written in the dashboard (org chart)
     ['messages', 'fyi', 'INTEGER NOT NULL DEFAULT 0'],   // information only: no report expected
