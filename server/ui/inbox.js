@@ -251,7 +251,7 @@ $('inbox').addEventListener('click', async e => {
   // The open one, clicked again, closes.
   const on = e.target.closest('.ibx-item.on')
   if (on && !e.metaKey && !e.ctrlKey) { e.preventDefault(); location.hash = '#/inbox'; return }
-  if (e.target.closest('[data-addmachine]')) { location.hash = '#/hosts'; return (await import('./machines.js')).addMachineDialog() }
+  if (e.target.closest('[data-addmachine]')) { location.hash = '#/hosts/new'; return }
   if (e.target.closest('[data-newteam]')) { location.hash = '#/new'; return }
   const opt = e.target.closest('[data-option]')
   if (opt) return choose(Number(opt.dataset.option))

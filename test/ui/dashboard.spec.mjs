@@ -348,10 +348,28 @@ test('disconnecting a machine: it offers to end the sessions opened there, ticke
   await expect(page.locator('.modal')).toHaveCount(0)
 })
 
-test('adding a machine: the dialog gives a command to run', async ({ page }) => {
+test('adding a machine: one page, from its command to the machine connected and where it may work', async ({ page }) => {
   await signIn(page, '#/hosts')
   await page.locator('#addHostBtn').click()
-  await expect(page.locator('.modal-bg')).toBeVisible()
+  await expect(page).toHaveURL(/#\/hosts\/new$/)
+  const box = page.locator('#addmachine')
+  // The whole way in sight: what isn't due yet, dimmed.
+  await expect(box.locator('.nt-sec.later')).toHaveCount(3)
+  await box.locator('[name=amname]').fill('studio')
+  const enrolled = page.waitForResponse(r => r.url().includes('/hosts/enroll'))
+  await box.locator('[data-gen]').click()
+  const { result } = await (await enrolled).json()
+  await expect(box.locator('.cmd').first()).toBeVisible()
+  await expect(box).toContainText('Waiting for the machine to connect')
+  // Going elsewhere and back keeps it.
+  await page.evaluate(() => { location.hash = '#/hosts' })
+  await page.evaluate(() => { location.hash = '#/hosts/new' })
+  await expect(box.locator('.cmd').first()).toBeVisible()
+  // The machine that runs it connects: the page follows by itself.
+  await startMachine(server, 'studio', { id: 'studio-w', role: 'worker' }, { code: result.code })
+  await expect(box).toContainText('studio is connected')
+  await expect(box.locator('.nt-sec.later')).toHaveCount(0)
+  await expect(box.locator('.am-folders')).toContainText('/srv/squad')
 })
 
 test('adding a machine for a company: its command says which, and it can have its own system user', async ({ page }) => {
@@ -363,9 +381,10 @@ test('adding a machine for a company: its command says which, and it can have it
   await page.locator('#addHostBtn').click()
   await page.locator('[data-gen]').click()
   await page.locator('[data-os=linux]').click()
-  const cmd = page.locator('.steps .cmd').first()
+  const cmd = page.locator('#addmachine .cmd').first()
   await expect(cmd).toContainText(`--company=${other.id}`)
   await expect(cmd).not.toContainText('sudo')
+  await page.locator('.am-adv > summary').click()
   await page.locator('[data-osuser]').fill('empresa-1')
   await page.locator('[data-osuser]').blur()
   await expect(cmd).toContainText('&& sudo bash install.sh')
@@ -374,7 +393,6 @@ test('adding a machine for a company: its command says which, and it can have it
   await page.locator('[data-osuser]').fill('x; rm -rf /')
   await page.locator('[data-osuser]').blur()
   await expect(cmd).not.toContainText('--os-user')
-  await page.keyboard.press('Escape')
   await page.locator('#settingsBtn').click()
   await page.locator('[data-tab=machines]').click()
   await expect(page.locator('#settings')).toContainText('machine1')

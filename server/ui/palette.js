@@ -66,7 +66,7 @@ function candidates() {
     { group: 'actions', label: T.actNewTeam, lead: icon('plus'), go: '#/new' },
   )
   if (can('manager')) items.push(
-    { group: 'actions', label: T.actAddMachine, lead: icon('machines'), run: async () => { if (location.hash !== '#/hosts') location.hash = '#/hosts'; (await import('./machines.js')).addMachineDialog() } },
+    { group: 'actions', label: T.actAddMachine, lead: icon('machines'), go: '#/hosts/new' },
     { group: 'actions', label: T.actInvite, lead: icon('teams'), run: async () => (await import('./people.js')).openSettings('members') },
   )
   items.push({ group: 'actions', label: T.actTheme, lead: icon('settings'), run: toggleTheme })

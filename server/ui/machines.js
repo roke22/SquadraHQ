@@ -1,8 +1,8 @@
 import { inCompany } from './api.js'
 import { $ } from './dom.js'
 import { T, COLLATOR } from './i18n.js'
-import { sessions, hosts, state, hostListeners, can } from './state.js'
-import { esc, dur, now, hhmm } from './format.js'
+import { sessions, hosts, state, can } from './state.js'
+import { esc, dur, now } from './format.js'
 import { status } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
@@ -50,7 +50,7 @@ export function hostLine(h) {
 
 // A machine's allowed folders: removable, and one more can be added, when
 // the machine lets the dashboard change them (squadra-host 0.0.3+).
-function folderChips(h) {
+export function folderChips(h) {
   const i = h.info ?? {}
   const editable = h.online && i.folders_from_dashboard === true
   const chips = (i.folders ?? []).map(f => {
@@ -212,79 +212,5 @@ export function addFolderDialog(hostId, done) {
   input.addEventListener('keydown', e => { if (e.key === 'Enter') save() })
 }
 
-export function addMachineDialog() {
-  const d = dialog(`<h3>${T.addTitle}</h3><p>${T.addIntro}</p>
-      <div data-step="1">
-        <label class="field"><span>${T.machineName}</span><input type="text" maxlength="40" placeholder="${esc(T.machineNameHint)}"></label>
-        <label class="check"><input type="checkbox"> <span>${T.configurePlugin}</span></label>
-        <div class="err" style="color:var(--err);font-size:13px;min-height:1.2em"></div>
-        <div class="actions"><button class="btn" data-cancel>${T.cancel}</button><button class="btn primary" data-gen>${T.generate}</button></div>
-      </div>
-      <div data-step="2" hidden>
-        <div class="os-pick"><span>${T.osPick}</span><span class="seg">${['linux', 'macos', 'windows'].map(o => `<button type="button" data-os="${o}">${{ linux: 'Linux', macos: 'macOS', windows: 'Windows' }[o]}</button>`).join('')}</span></div>
-        <div class="steps"></div>
-        <div class="wait"><span class="dot info pulse"></span><span class="w">${T.waitingMachine}</span></div>
-        <div class="actions"><button class="btn" data-cancel>${T.done}</button><button class="btn primary" data-newsession hidden>${T.newSession}</button></div>
-      </div>`, { wide: true })
-  const input = d.el.querySelector('input[type=text]')
-  input.focus()
-  let joined = null
-  let ticket = null // this dialog's code: only the machine that used it counts
-  const listener = h => {
-    if (h.removed || !h.online || !ticket || h.enrollment !== ticket) return
-    joined = h
-    d.el.querySelector('.wait').innerHTML = `<span class="dot ok"></span><span>${T.machineJoined(esc(h.name))}</span>`
-    d.el.querySelector('[data-newsession]').hidden = false
-  }
-  d.el.onclose = () => hostListeners.delete(listener)
-  d.el.querySelector('[data-gen]').addEventListener('click', async e => {
-    e.target.disabled = true
-    try {
-      const r = await postJson('/api/hosts/enroll', { name: input.value.trim(), configure_plugin: d.el.querySelector('input[type=checkbox]').checked })
-      ticket = r.enrollment ?? null
-      d.el.querySelector('[data-step="1"]').hidden = true
-      d.el.querySelector('[data-step="2"]').hidden = false
-      // One command for the machine's system, with its copy button.
-      const guess = /Mac/i.test(navigator.platform) ? 'macos' : /Win/i.test(navigator.platform) ? 'windows' : 'linux'
-      let os = guess, home = false, root = false, osUser = ''
-      const cmd = text => `<div class="cmdrow"><pre class="cmd">${esc(text)}</pre><button class="btn" data-copy>${T.copy}</button></div>`
-      const insecure = /^http:\/\//.test(r.server_url) && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(r.server_url)
-      const draw = () => {
-        for (const b of d.el.querySelectorAll('[data-os]')) b.classList.toggle('on', b.dataset.os === os)
-        const extra = (home ? ' --allow-home' : '') + (root && os !== 'macos' ? ' --allow-root' : '') + (insecure ? ' --insecure' : '')
-        // (A new system user needs root: the installer does the rest as that user.)
-        const withUser = text => (os === 'linux' && osUser ? `${text.replace('&& bash install.sh', '&& sudo bash install.sh')} --os-user=${osUser}` : text)
-        d.el.querySelector('.steps').innerHTML = `<p>${T.runOn(os)}</p>${cmd(withUser(String(r.install?.[os] ?? '') + extra))}
-            ${os === 'linux' ? `<label class="field"><span>${T.osUser}</span><input type="text" data-osuser value="${esc(osUser)}" maxlength="32" autocomplete="off"><span class="hint">${T.osUserHint}</span></label>` : ''}
-            <label class="check"><input type="checkbox" data-home ${home ? 'checked' : ''}> <span>${T.allowHome}</span></label>
-            ${os === 'macos' ? '' : `<label class="check"><input type="checkbox" data-root ${root ? 'checked' : ''}> <span>${T.allowRoot}</span></label>`}
-            <p class="note">${T.runWhat}${os === 'windows' ? ` ${T.windowsNote}` : ''}</p>
-            ${insecure ? `<p class="note" style="color:var(--err);font-size:13px">${esc(T.httpWarn)}</p>` : ''}
-            <p class="note valid">${esc(T.codeValid(hhmm(r.expires_at)))}</p>
-            <p class="note">${T.afterJoin}</p>
-            ${os === 'windows' ? '' : `<details class="manual"><summary>${T.manualCmd}</summary>${cmd(String(r.command ?? '') + extra)}</details>`}`
-      }
-      draw()
-      d.el.querySelector('.os-pick').addEventListener('click', ev => { const b = ev.target.closest('[data-os]'); if (b) { os = b.dataset.os; draw() } })
-      d.el.querySelector('.steps').addEventListener('change', ev => {
-        if (ev.target.matches('[data-home]')) { home = ev.target.checked; draw() }
-        if (ev.target.matches('[data-root]')) { root = ev.target.checked; draw() }
-        if (ev.target.matches('[data-osuser]')) { osUser = /^[a-z_][a-z0-9_-]{0,31}$/.test(ev.target.value) ? ev.target.value : ''; draw() }
-      })
-      hostListeners.add(listener)
-      d.el.querySelector('.steps').addEventListener('click', async ev => {
-        const b = ev.target.closest('[data-copy]')
-        if (!b) return
-        const pre = b.parentElement.querySelector('.cmd')
-        try { await navigator.clipboard.writeText(pre.textContent); b.textContent = T.copied } catch {
-          const range = document.createRange(); range.selectNodeContents(pre)
-          getSelection().removeAllRanges(); getSelection().addRange(range)
-        }
-      })
-      d.el.querySelector('[data-newsession]').addEventListener('click', () => { d.close(); location.hash = '#/hosts'; newSessionDialog(joined?.id) })
-    } catch (err) {
-      d.el.querySelector('.err').textContent = err.message
-      e.target.disabled = false
-    }
-  })
-}
+// Adding a machine is a page of its own now (addmachine.js).
+export const addMachineDialog = () => { location.hash = '#/hosts/new' }

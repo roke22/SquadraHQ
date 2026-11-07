@@ -114,8 +114,9 @@ export async function startSession(server, name, role, coordinator, secret) {
 // A machine that shows one terminal, opens more when asked, and answers what is
 // typed in a terminal the way a program there would: by writing it back.
 // (screens: what a terminal shows when watched, by its name; the screenshots give it one.)
-export async function startMachine(server, name, terminal, { screens = {} } = {}) {
-  const { code } = await server.call('api/hosts/enroll', { name })
+export async function startMachine(server, name, terminal, { screens = {}, code: given = null } = {}) {
+  // (With a code the dashboard made, it joins as the machine that ran its command.)
+  const { code } = given ? { code: given } : await server.call('api/hosts/enroll', { name })
   const { id, secret } = await server.call('host/enroll', { code, info: { hostname: name } })
   const typed = []
   const answers = [] // what the inbox had it type, as { term, text }

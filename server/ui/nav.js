@@ -48,7 +48,7 @@ function patch(a, b) {
 // permission waiting (warn) or messages not read yet (accent).
 
 const isTeams = r => r.view === 'teams' || r.view === 'team' || r.view === 'newteam' || r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
-const isMachines = r => r.view === 'hosts' || r.view === 'terminal'
+const isMachines = r => r.view === 'hosts' || r.view === 'terminal' || r.view === 'addmachine'
 const here = on => (on ? ' class="rail-item on" aria-current="page"' : ' class="rail-item"')
 
 // What a session's row says on its right, and what it reads aloud.
@@ -140,7 +140,6 @@ $('nav').addEventListener('click', e => {
   }
   if (e.target.closest('#addHostBtn')) {
     openRail(false)
-    if (!isMachines(currentRoute())) location.hash = '#/hosts'
     return addMachineDialog()
   }
   if (e.target.closest('[data-newteam]')) {

@@ -59,6 +59,12 @@ export function renderTop() {
     setHtml($('topRight'), can('operator') ? `<button class="btn primary" data-newteam>${esc(T.newTeam)}</button>` : '')
     return
   }
+  if (r.view === 'addmachine') {
+    setHtml($('topTitle'), esc(T.addTitle))
+    $('topSub').textContent = ''
+    setHtml($('topRight'), `<a class="btn plain" href="#/hosts" data-amcancel>${esc(T.cancel)}</a>`)
+    return
+  }
   if (r.view === 'newteam') {
     setHtml($('topTitle'), esc(T.newTeam))
     $('topSub').textContent = ''

@@ -12,6 +12,7 @@ import { renderTeams } from './teams.js'
 import { renderTeam } from './team.js'
 import { renderSessionAside } from './session.js'
 import { renderNewTeam } from './newteam.js'
+import { renderAddMachine } from './addmachine.js'
 import { closeMenu } from './dialogs.js'
 import { renderHosts } from './machines.js'
 import { hideOrgTip, renderOrg } from './org.js'
@@ -46,6 +47,7 @@ export function currentRoute() {
   if (location.hash === '#/mosaic') return { view: 'mosaic' }
   if (location.hash === '#/archived') return { view: 'archived' }
   if (location.hash === '#/hosts') return { view: 'hosts' }
+  if (location.hash === '#/hosts/new') return { view: 'addmachine' }
   if (location.hash === '#/c') return { view: 'leads' }
   if (location.hash === '#/org') return { view: 'org' }
   // A team: its page, or every session of it live.
@@ -129,6 +131,7 @@ export function route() {
   $('teams').hidden = r.view !== 'teams'
   $('team').hidden = r.view !== 'team'
   $('newteam').hidden = r.view !== 'newteam'
+  $('addmachine').hidden = r.view !== 'addmachine'
   $('org').hidden = r.view !== 'org'
   hideOrgTip()
   $('hosts').hidden = r.view !== 'hosts'
@@ -157,12 +160,12 @@ export function route() {
     $('session').hidden = true
     $('mosaic').hidden = false
     buildMosaic()
-  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams' || r.view === 'team' || r.view === 'newteam') {
+  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams' || r.view === 'team' || r.view === 'newteam' || r.view === 'addmachine') {
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }
     clearMosaic()
     $('session').hidden = true
     $('mosaic').hidden = true
-    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else if (r.view === 'team') renderTeam(); else if (r.view === 'newteam') renderNewTeam(); else renderArchived()
+    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else if (r.view === 'team') renderTeam(); else if (r.view === 'newteam') renderNewTeam(); else if (r.view === 'addmachine') renderAddMachine(); else renderArchived()
   } else if (st) {
     // The session's live terminal, as in Machines: watch it and type to it.
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }
