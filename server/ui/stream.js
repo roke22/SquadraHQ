@@ -15,6 +15,7 @@ import { renderHosts, terminalOf } from './machines.js'
 import { noteLinkMessage } from './squads.js'
 import { renderOrg } from './org.js'
 import { renderInbox, refreshInbox } from './inbox.js'
+import { refreshTeams } from './teams.js'
 import { setVersion, showLogin } from './app.js'
 
 // live stream
@@ -55,7 +56,7 @@ function onStream(type, data) {
       const terms = r.view === 'leads' || state.mosaicMode === 'terms'
       if ([...mosaicPanes].some(([name, p]) => (terms && !!terminalOf(name)) !== (p.kind === 'term'))) soon(buildMosaic)
     }
-    soon(renderNav); soon(refreshInbox)
+    soon(renderNav); soon(refreshInbox); soon(refreshTeams)
     return
   }
   if (type === 'session') {
@@ -70,7 +71,7 @@ function onStream(type, data) {
     if (r.view === 'org') { soon(renderOrg); soon(renderTop) }
     if (r.view === 'session' && r.name === data.name && data.deleted) { location.hash = '#/'; return }
     for (const v of views) if (v.name === data.name) { v.renderStatus(); v.scheduleRender() }
-    soon(renderNav); soon(refreshInbox)
+    soon(renderNav); soon(refreshInbox); soon(refreshTeams)
     // The top bar shows one session (or one squad): only its changes matter.
     if ((r.view === 'session' && r.name === data.name) || r.view === 'terminal' || r.squad) soon(renderTop)
     return
@@ -83,7 +84,7 @@ function onStream(type, data) {
   if (type === 'inbox') {
     state.inbox = Array.isArray(data) ? data : []
     if (currentRoute().view === 'inbox') soon(renderInbox)
-    soon(renderNav); soon(refreshInbox)
+    soon(renderNav); soon(refreshInbox); soon(refreshTeams)
     return
   }
   if (type === 'links') {
@@ -91,7 +92,7 @@ function onStream(type, data) {
     for (const fn of linkListeners) fn()
     if (currentRoute().squad || currentRoute().view === 'org') soon(renderTop)
     if (currentRoute().view === 'org') soon(renderOrg)
-    soon(renderNav); soon(refreshInbox)
+    soon(renderNav); soon(refreshInbox); soon(refreshTeams)
     return
   }
   if (type === 'squads') {
@@ -104,7 +105,7 @@ function onStream(type, data) {
     if (s) s.cleared_at = data.at
     for (const v of views) if (v.name === data.session) v.reset()
     unread.delete(data.session)
-    soon(renderNav); soon(refreshInbox)
+    soon(renderNav); soon(refreshInbox); soon(refreshTeams)
     return
   }
   if (type === 'edited') {
@@ -127,7 +128,7 @@ function onStream(type, data) {
       const owners = it.t === 'event' ? [it.session] : [it.from, it.target].filter(n => sessions.has(n))
       let changed = false
       for (const n of owners) if (n !== r.name) { unread.set(n, (unread.get(n) ?? 0) + 1); changed = true }
-      if (changed) soon(renderNav); soon(refreshInbox)
+      if (changed) soon(renderNav); soon(refreshInbox); soon(refreshTeams)
     }
     void shown
   }
@@ -230,4 +231,5 @@ setInterval(() => {
   if (r.view === 'mosaic' || r.view === 'leads') for (const [name, p] of mosaicPanes) { const s = sessions.get(name); if (s) p.pane.querySelector('.pane-head .dot').className = `dot ${status(s).dot}` }
   refreshLeads()
   refreshInbox()
+  refreshTeams()
 }, 1000)

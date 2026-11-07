@@ -8,6 +8,7 @@ import { setHtml, renderNav } from './nav.js'
 import { personaTag, sessionTerm, renderTop } from './topbar.js'
 import { buildMosaic, renderArchived } from './mosaic.js'
 import { renderInbox } from './inbox.js'
+import { renderTeams } from './teams.js'
 import { closeMenu } from './dialogs.js'
 import { renderHosts } from './machines.js'
 import { hideOrgTip, renderOrg } from './org.js'
@@ -35,7 +36,8 @@ export function currentRoute() {
   // One entry of it picked: a question or result (i12), a permission (p<name>), a name to approve (a<name>).
   const ib = location.hash.match(/^#\/inbox\/([ipa][A-Za-z0-9_-]{1,64})$/)
   if (ib) return { view: 'inbox', item: ib[1] }
-  if (location.hash === '#/teams') return { view: 'mosaic' }
+  if (location.hash === '#/teams') return { view: 'teams' }
+  if (location.hash === '#/mosaic') return { view: 'mosaic' }
   if (location.hash === '#/archived') return { view: 'archived' }
   if (location.hash === '#/hosts') return { view: 'hosts' }
   if (location.hash === '#/c') return { view: 'leads' }
@@ -102,6 +104,7 @@ export function route() {
   if (c && squadOpen[c] === false) { squadOpen[c] = true; store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen)) }
   $('archived').hidden = r.view !== 'archived'
   $('inbox').hidden = r.view !== 'inbox'
+  $('teams').hidden = r.view !== 'teams'
   $('org').hidden = r.view !== 'org'
   hideOrgTip()
   $('hosts').hidden = r.view !== 'hosts'
@@ -124,12 +127,12 @@ export function route() {
     $('session').hidden = true
     $('mosaic').hidden = false
     buildMosaic()
-  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox') {
+  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams') {
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }
     clearMosaic()
     $('session').hidden = true
     $('mosaic').hidden = true
-    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else renderArchived()
+    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else renderArchived()
   } else if (st) {
     // The session's live terminal, as in Machines: watch it and type to it.
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }

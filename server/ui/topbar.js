@@ -8,7 +8,7 @@ import { currentRoute } from './router.js'
 import { applyCols, buildMosaic } from './mosaic.js'
 import { runAction } from './dialogs.js'
 import { terminalOf, hostLine, hostAction } from './machines.js'
-import { reopenable, reopen, addWorkerTo, saveTemplateDialog } from './squads.js'
+import { reopenable, reopen, addWorkerTo, saveTemplateDialog, newSessionDialog } from './squads.js'
 import { orgSquads, orgZoom, linksDialog } from './org.js'
 
 // The terminal a session view shows (null: its chat).
@@ -40,17 +40,23 @@ export function personaTag(p) {
 
 // Teams can be seen three ways: every session, the coordinators with their
 // teams, or the org chart.
-const teamsSeg = view => `<nav class="seg" aria-label="${esc(T.teams)}">${[['mosaic', '#/teams', T.allSessions], ['leads', '#/c', T.leads], ['org', '#/org', T.org]]
+const teamsSeg = view => `<nav class="seg" aria-label="${esc(T.teams)}">${[['teams', '#/teams', T.viewList], ['org', '#/org', T.org], ['mosaic', '#/mosaic', T.viewMosaic]]
   .map(([v, href, label]) => `<a href="${href}"${v === view ? ' class="on" aria-current="page"' : ''}>${esc(label)}</a>`).join('')}</nav>`
 
 export function renderTop() {
   const r = currentRoute()
   // (Only the teams views have a selector; a squad's own view is one team.)
-  if (!['org', 'leads'].includes(r.view) && !(r.view === 'mosaic' && !r.squad)) setHtml($('topTabs'), '')
+  if (!['org', 'teams'].includes(r.view) && !(r.view === 'mosaic' && !r.squad)) setHtml($('topTabs'), '')
   if (r.view === 'inbox') {
     // (Its subtitle, how many wait on you, is the inbox's own: see renderInbox.)
     setHtml($('topTitle'), esc(T.inbox))
     setHtml($('topRight'), '')
+    return
+  }
+  if (r.view === 'teams') {
+    // (Its subtitle, how many teams and sessions, is the list's own: see renderTeams.)
+    setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('teams'))
+    setHtml($('topRight'), can('operator') ? `<button class="btn primary" data-newteam>${esc(T.newTeam)}</button>` : '')
     return
   }
   if (r.view === 'org') {
@@ -63,7 +69,7 @@ export function renderTop() {
   if (r.view === 'leads') {
     const cs = sortedSessions().filter(s => s.role === 'coordinator')
     const ws = sortedSessions().filter(s => s.role !== 'coordinator' && cs.some(c => c.name === s.coordinator))
-    setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('leads'))
+    setHtml($('topTitle'), esc(T.leads))
     $('topSub').textContent = T.leadsSub(cs.length, ws.length)
     setHtml($('topRight'), `<span>${T.columns}</span><span class="seg" id="colsSeg">${['auto', '1', '2', '3', '4'].map(n => `<button data-c="${n}" class="${n === state.cols ? 'on' : ''}">${n === 'auto' ? T.auto : n}</button>`).join('')}</span>`)
     return
@@ -149,6 +155,7 @@ $('topRight').addEventListener('click', e => {
   if (act) runAction(act.dataset.act, act.dataset.s)
   const hact = e.target.closest('[data-hact]')
   if (hact) hostAction(hact.dataset.hact, hact.dataset.h)
+  if (e.target.closest('[data-newteam]')) return newSessionDialog(undefined, { role: 'coordinator' })
   const aw = e.target.closest('[data-addworker]')
   if (aw) addWorkerTo(aw.dataset.addworker)
   const stp = e.target.closest('[data-savetpl]')

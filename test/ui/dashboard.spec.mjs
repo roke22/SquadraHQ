@@ -201,6 +201,12 @@ test('the shell on a phone: the sidebar slides in, and goes when you pick a plac
 test('the sessions: they are listed with their squad', async ({ page }) => {
   await signIn(page)
   await expect(page.locator('#nav')).toContainText('coord')
+  // Teams: a card per team, its coordinator first and its workers under it.
+  await page.goto(`${server.url}/?company=default#/teams`)
+  const team = page.locator('#teams .tm-card').filter({ hasText: 'coord' }).first()
+  await expect(team.locator('.tm-person').first()).toContainText('coord')
+  await expect(team.locator('.tm-person.sub')).toContainText('worker1')
+  await expect(page.locator('#topTabs a[aria-current=page]')).toHaveText('List')
   await page.goto(`${server.url}/#/c`)
   await expect(page.locator('#mosaic')).toContainText('coord')
 })

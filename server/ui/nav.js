@@ -48,7 +48,7 @@ function patch(a, b) {
 // coordinator and workers. What needs you is on the right of each row: a
 // permission waiting (warn) or messages not read yet (accent).
 
-const isTeams = r => r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
+const isTeams = r => r.view === 'teams' || r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
 const isMachines = r => r.view === 'hosts' || r.view === 'terminal'
 const here = on => (on ? ' class="rail-item on" aria-current="page"' : ' class="rail-item"')
 
