@@ -1505,7 +1505,9 @@ test('fresh start: a coordinator\'s reply with fresh, and what a worker is told 
 
   // A worker not opened from the dashboard can't be cleared: the task goes anyway, and that is said.
   const r = await coord.tool('reply', { chat_id: 'frw', text: 'Task 2: the invoices page', fresh: true })
-  assert.match(r, /^sent \(id: \d+\)\nNot cleared \("frw" was not opened from the dashboard, or its machine is not connected: nobody can type \/clear in its terminal\): it got the task with its earlier context\.$/)
+  // (The first task a coordinator hands out also reminds it to send its plan.)
+  assert.match(r, /\nThe user follows the work on the team's page: once you have split it, send the whole list of tasks with update_plan/)
+  assert.match(r, /^sent \(id: \d+\)\n[^\n]*\nNot cleared \("frw" was not opened from the dashboard, or its machine is not connected: nobody can type \/clear in its terminal\): it got the task with its earlier context\.$/)
   await wk.waitChannel(p => p.content === 'Task 2: the invoices page', 'task 2')
   // Only a coordinator clears; never a group.
   await assert.rejects(wk.tool('reply', { chat_id: 'frc', text: 'x', fresh: true }), /only a coordinator clears/)

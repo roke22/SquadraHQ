@@ -41,6 +41,7 @@ export function newSession({ name, role, coordinator, staticAccess, seedAllow })
     recent: [], // last messages received, restored to Claude after a compaction
     tasks: new Map(), // worker: its coordinator's messages awaiting a final report (id -> {at, started})
     stopAsked: false, // the Stop hook already asked for that report once
+    planSent: false, // a coordinator that has sent its plan (update_plan) isn't reminded to
     joinedGroups: new Set(),
     relayIds: new Set(), // message ids of the permission requests this session sent
     toolInputs: [], // the last tool calls' exact inputs (from the hooks), for the relay

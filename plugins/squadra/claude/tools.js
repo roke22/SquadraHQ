@@ -390,6 +390,9 @@ export async function callTool(name, args) {
       } else if (!report && !fyi && S.role === 'worker' && chat_id === S.coordinator && pendingTasks(S).length && REPORT_IN_TEXT_RE.test(text)) {
         // Models write "done: …" in the text and leave the argument out.
         stillOpen = `\nNOT taken as your final report: the report argument was not set. If this was it, send it once more with report: "${REPORT_IN_TEXT_RE.exec(text)[1].toLowerCase()}".`
+      } else if (S.role === 'coordinator' && !fyi && !S.planSent && !GROUP_ID_RE.test(chat_id)) {
+        // (Said where it matters, handing out work: the rules alone weren't enough for every model.)
+        stillOpen = '\nThe user follows the work on the team\'s page: once you have split it, send the whole list of tasks with update_plan (each with who has it and its state), and update it as tasks finish.'
       }
       const result = (sentIds.length === 1 ? `sent (id: ${sentIds[0]})` : `sent ${sentIds.length} parts (ids: ${sentIds.join(', ')})`) +
         (masked ? ` (${masked} secret${masked > 1 ? 's' : ''} masked as [REDACTED])` : '') + stillOpen
@@ -430,13 +433,14 @@ export async function callTool(name, args) {
         ...(name === 'ask_user' ? { recommended: clean(args.recommended), options: Array.isArray(args.options) ? args.options.map(clean) : undefined } : {}),
       })
       return name === 'ask_user'
-        ? `It is in the user's inbox (#${id}). They answer when they can: go on with whatever doesn't depend on it. If you learn something that changes it, edit_inbox.`
+        ? `It is in the user's inbox (#${id}). They answer when they can: go on with whatever doesn't depend on it. If you learn something that changes it, edit_inbox. In your plan (update_plan), that task waits on the user.`
         : `It is in the user's inbox (#${id}).`
     }
     case 'update_plan': {
       const clean = v => (v == null || v === '' ? undefined : maskOutgoing(String(v)).text)
       const tasks = Array.isArray(args.tasks) ? args.tasks.map(t => (t && typeof t === 'object' ? { title: clean(t.title), state: t.state, who: t.who == null ? undefined : String(t.who), ref: clean(t.ref), note: clean(t.note) } : t)) : args.tasks
       const r = await call('setPlan', { title: clean(args.title), tasks })
+      S.planSent = true
       return r.tasks ? `Plan updated: ${r.done} of ${r.tasks} done, ${r.doing} in progress${r.blocked ? `, ${r.blocked} blocked` : ''}${r.waiting ? `, ${r.waiting} waiting on the user` : ''}.` : 'Plan cleared.'
     }
     case 'edit_inbox': {
