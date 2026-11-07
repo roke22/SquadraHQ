@@ -109,7 +109,13 @@ export function renderNav() {
   const archivedCount = sortedSessions({ archived: true }).length
   if (archivedCount || r.view === 'archived') html += `<div class="rail-group"><a href="#/archived"${here(r.view === 'archived')}>${icon('archive')}<span class="name">${esc(T.archived)}</span><span class="rail-count">${archivedCount}</span></a></div>`
   setHtml($('nav'), html)
+  // On a phone, the three places and Ctrl+K at the bottom, within the thumb's reach.
+  setHtml($('tabbar'), `<a href="#/"${here(r.view === 'inbox')}>${icon('inbox')}<span>${esc(T.inbox)}</span>${inboxN ? `<span class="badge">${inboxN}</span>` : ''}</a>
+    <a href="#/teams"${here(isTeams(r) || r.view === 'session')}>${icon('teams')}<span>${esc(T.teams)}</span></a>
+    <a href="#/hosts"${here(isMachines(r))}>${icon('machines')}<span>${esc(T.machines)}</span></a>
+    <button type="button" class="rail-item" data-palette>${icon('search')}<span>${esc(T.goToShort)}</span></button>`)
 }
+$('tabbar').addEventListener('click', async e => { if (e.target.closest('[data-palette]')) (await import('./palette.js')).openPalette() })
 
 // --- the drawer on narrow screens -----------------------------------------------
 export function openRail(open) {
