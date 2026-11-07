@@ -1,9 +1,11 @@
-import { T, LOCALE } from './i18n.js'
+import { $, store } from './dom.js'
+import { T, LOCALE, LANG } from './i18n.js'
 import { state, can } from './state.js'
 import { call, inCompany } from './api.js'
 import { esc } from './format.js'
-import { dialog } from './dialogs.js'
 import { alertBox } from './mosaic.js'
+import { icon } from './icons.js'
+import { themeChoice, setTheme, onTheme } from './theme.js'
 
 const ROLES = ['observer', 'operator', 'manager', 'owner']
 // Only owners give or take the role of owner.
@@ -12,20 +14,63 @@ const roleSelect = (value, attrs = '') => `<select ${attrs}>${grantable().map(r 
 const fmtTime = ms => new Date(ms).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })
 const linkBox = l => `<div class="cmdrow"><pre class="cmd">${esc(l.link)}</pre><button class="btn" data-copy>${esc(T.copy)}</button></div><p class="note">${esc(T.linkOnce)}</p>`
 
-// The dashboard's people: who is in this company, and (for an administrator of
-// the server) the companies and users.
-export function openPeople() {
+// Settings: over the whole dashboard, without its sidebar, in three groups by
+// whom they affect: you, this company, the whole server. Only what this
+// user's role allows is there. Esc, or the button at the top, closes them.
+let closeOpen = null
+export function openSettings(start) {
+  closeOpen?.()
   const admin = state.me?.user.is_platform_admin
   const manager = can('manager')
-  const tabs = [
-    ...(manager ? [['members', T.tabMembers], ['company', T.tabCompany]] : []),
-    ...(admin ? [['companies', T.tabCompanies], ['users', T.tabUsers], ['machines', T.tabMachines]] : []),
-    ['account', T.tabAccount],
+  const here = state.me?.companies.find(c => c.id === state.company)
+  const groups = [
+    [T.setMine, [['account', T.setProfile], ['appearance', T.setAppearance]]],
+    ...(manager && here ? [[here.name, [['members', T.people], ['company', T.tabCompany]]]] : []),
+    ...(admin ? [[T.setServer, [['companies', T.tabCompanies], ['users', T.tabUsers], ['machines', T.tabMachines]]]] : []),
   ]
-  const d = dialog(`<h3>${esc(T.people)}</h3>
-    <nav class="tabs people-tabs">${tabs.map(([k, label]) => `<button type="button" class="tab" data-tab="${k}">${esc(label)}</button>`).join('')}</nav>
-    <div class="err"></div><div data-body></div>
-    <div class="actions"><button class="btn" data-cancel>${esc(T.close)}</button></div>`, { wide: true })
+  const tabs = groups.flatMap(g => g[1])
+  const root = $('settings')
+  const opener = document.activeElement
+  root.innerHTML = `<div class="settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <aside class="settings-side"><nav class="settings-nav" aria-label="${esc(T.settingsSections)}">
+        ${groups.map(([title, items]) => `<div class="settings-group"><div class="settings-group-h">${esc(title)}</div>${items.map(([k, label]) => `<button type="button" data-tab="${k}">${esc(label)}</button>`).join('')}</div>`).join('')}
+        <div class="settings-sep"></div>
+        <button type="button" class="settings-out" data-logout>${icon('logout')}${esc(T.logout)}</button>
+      </nav></aside>
+      <div class="settings-body"><div class="settings-content">
+        <h2 class="settings-title" id="settingsTitle"></h2>
+        <div class="err" role="alert"></div><div data-body></div>
+      </div></div>
+      <button type="button" class="settings-close" data-close aria-label="${esc(T.closeSettings)}"><span class="x">${icon('close')}</span><kbd>Esc</kbd></button>
+    </div>`
+  root.hidden = false
+  $('app').inert = true
+  const d = { el: root }
+  const stopTheme = onTheme(() => { if (current === 'appearance') { current = null; show('appearance') } })
+  function close() {
+    root.hidden = true
+    root.innerHTML = ''
+    $('app').inert = false
+    stopTheme()
+    document.removeEventListener('keydown', keys, true)
+    closeOpen = null
+    if (opener?.isConnected) opener.focus()
+  }
+  closeOpen = close
+  // Esc closes it, unless a dialog or menu is open over it; Tab stays inside.
+  function keys(e) {
+    if (root.hidden) return
+    if (e.key === 'Escape' && !document.querySelector('.modal-bg, .menu') && $('palette').hidden) { e.preventDefault(); close() }
+    if (e.key === 'Tab' && !document.querySelector('.modal-bg')) {
+      const f = [...root.querySelectorAll('button, [href], input, select, textarea')].filter(x => !x.disabled && x.offsetParent)
+      if (!f.length) return
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus() }
+      else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus() }
+    }
+  }
+  document.addEventListener('keydown', keys, true)
+  root.querySelector('[data-close]').onclick = close
+  root.querySelector('[data-logout]').onclick = async () => { close(); (await import('./app.js')).logOut() }
   const body = d.el.querySelector('[data-body]')
   const fail = err => { d.el.querySelector('.err').textContent = err.status === 429 ? T.tooManyTries : err.message.replace(/^(Unauthorized|Bad Request|Not Found|Conflict|Forbidden): /, '') }
   const ok = () => { d.el.querySelector('.err').textContent = '' }
@@ -38,8 +83,24 @@ export function openPeople() {
     if (tab === current) return
     current = tab
     ok()
-    for (const b of d.el.querySelectorAll('[data-tab]')) b.classList.toggle('on', b.dataset.tab === tab)
-    try { await ({ members, company, companies, users, machines, account })[tab]() } catch (err) { fail(err) }
+    for (const b of d.el.querySelectorAll('[data-tab]')) {
+      b.classList.toggle('on', b.dataset.tab === tab)
+      if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current')
+    }
+    root.querySelector('#settingsTitle').textContent = tabs.find(t => t[0] === tab)?.[1] ?? ''
+    try { await ({ members, company, companies, users, machines, account, appearance })[tab]() } catch (err) { fail(err) }
+  }
+
+  // How the dashboard looks to you, in this browser.
+  function appearance() {
+    drawing++
+    const choice = themeChoice()
+    const seg = (name, value, label, on) => `<button type="button" data-${name}="${value}" aria-pressed="${on}"${on ? ' class="on"' : ''}>${esc(label)}</button>`
+    body.innerHTML = `<div class="settings-row"><b id="themeLbl">${esc(T.theme)}</b><div class="seg" role="group" aria-labelledby="themeLbl">${[['system', T.themeSystem], ['light', T.themeLight], ['dark', T.themeDark]].map(([v, l]) => seg('theme', v, l, v === choice)).join('')}</div></div>
+      <div class="settings-row"><b id="langLbl">${esc(T.language)}</b><div class="seg" role="group" aria-labelledby="langLbl">${[['en', 'English'], ['es', 'Español']].map(([v, l]) => seg('lang', v, l, v === LANG)).join('')}</div></div>
+      <p class="note settings-ver">${esc(document.querySelector('.ver')?.textContent ?? '')}</p>`
+    for (const b of body.querySelectorAll('[data-theme]')) b.onclick = () => setTheme(b.dataset.theme)
+    for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('squadraLang', b.dataset.lang); location.reload() } }
   }
 
   async function members() {
@@ -210,5 +271,7 @@ export function openPeople() {
     } catch (err) { fail(err) }
   })
   for (const b of d.el.querySelectorAll('[data-tab]')) b.onclick = () => show(b.dataset.tab)
-  show(tabs[0][0])
+  const first = tabs.some(t => t[0] === start) ? start : manager && here ? 'members' : admin && !here ? 'companies' : tabs[0][0]
+  show(first).then(() => root.querySelector(`[data-tab="${first}"]`)?.focus())
 }
+export const openPeople = openSettings

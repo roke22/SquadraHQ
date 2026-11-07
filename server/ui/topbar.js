@@ -38,11 +38,24 @@ export function personaTag(p) {
   return p?.name ? `<span class="persona-tag" title="${esc(`${p.kind === 'agent' ? T.personaAgent : T.personaSkill} ${p.name}${p.description ? ` — ${p.description}` : ''}`)}">🎭 ${esc(p.name)}</span>` : ''
 }
 
+// Teams can be seen three ways: every session, the coordinators with their
+// teams, or the org chart.
+const teamsSeg = view => `<nav class="seg" aria-label="${esc(T.teams)}">${[['mosaic', '#/teams', T.allSessions], ['leads', '#/c', T.leads], ['org', '#/org', T.org]]
+  .map(([v, href, label]) => `<a href="${href}"${v === view ? ' class="on" aria-current="page"' : ''}>${esc(label)}</a>`).join('')}</nav>`
+
 export function renderTop() {
   const r = currentRoute()
+  // (Only the teams views have a selector; a squad's own view is one team.)
+  if (!['org', 'leads'].includes(r.view) && !(r.view === 'mosaic' && !r.squad)) setHtml($('topTabs'), '')
+  if (r.view === 'inbox') {
+    setHtml($('topTitle'), esc(T.inbox))
+    $('topSub').textContent = T.inboxSub
+    setHtml($('topRight'), '')
+    return
+  }
   if (r.view === 'org') {
     const { squads } = orgSquads()
-    setHtml($('topTitle'), `🏢 ${T.org}`)
+    setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('org'))
     $('topSub').textContent = T.orgSub(squads.length, squads.reduce((t, q) => t + 1 + q.workers.length, 0), state.links.length)
     setHtml($('topRight'), `<span class="seg"><button data-orgzoom="-" aria-label="${esc(T.orgZoomOut)}">−</button><button data-orgzoom="1" title="${esc(T.orgZoomReset)}">${Math.round(orgZoom * 100)}%</button><button data-orgzoom="+" aria-label="${esc(T.orgZoomIn)}">+</button></span>${can('manager') ? `<button class="btn" data-orgact="arrange" title="${esc(T.orgArrangeTitle)}">${T.orgArrange}</button>` : ''}${can('operator') ? `<button class="btn primary" data-orgact="newsquad">${T.orgNewSquad}</button>` : ''}`)
     return
@@ -50,7 +63,7 @@ export function renderTop() {
   if (r.view === 'leads') {
     const cs = sortedSessions().filter(s => s.role === 'coordinator')
     const ws = sortedSessions().filter(s => s.role !== 'coordinator' && cs.some(c => c.name === s.coordinator))
-    setHtml($('topTitle'), `🧭 ${T.leads}`)
+    setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('leads'))
     $('topSub').textContent = T.leadsSub(cs.length, ws.length)
     setHtml($('topRight'), `<span>${T.columns}</span><span class="seg" id="colsSeg">${['auto', '1', '2', '3', '4'].map(n => `<button data-c="${n}" class="${n === state.cols ? 'on' : ''}">${n === 'auto' ? T.auto : n}</button>`).join('')}</span>`)
     return
@@ -65,10 +78,10 @@ export function renderTop() {
       setHtml($('topTitle'), `<span class="dot ${c ? status(c).dot : ''}"></span>👥 ${esc(T.squadOf(r.squad))}`)
       const linked = linksOf(r.squad)
       $('topSub').textContent = [T.squadCount(ws.filter(w => w.online).length, ws.length), linked.length ? T.linkedWith(linked.join(', ')) : ''].filter(Boolean).join(' · ')
-      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}" title="${esc(T.addWorkerTo(r.squad))}">${T.addWorker}</button>` : ''}${can('manager') ? `<button class="btn" data-links="${esc(r.squad)}" title="${esc(T.linksTitle(r.squad))}">${T.links(linked.length)}</button><button class="btn" data-savetpl="${esc(r.squad)}" title="${esc(T.saveTemplateTitle(r.squad))}">${T.saveTemplate}</button>` : ''}<button class="btn" data-go="#/">${T.backAll}</button>`)
+      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}" title="${esc(T.addWorkerTo(r.squad))}">${T.addWorker}</button>` : ''}${can('manager') ? `<button class="btn" data-links="${esc(r.squad)}" title="${esc(T.linksTitle(r.squad))}">${T.links(linked.length)}</button><button class="btn" data-savetpl="${esc(r.squad)}" title="${esc(T.saveTemplateTitle(r.squad))}">${T.saveTemplate}</button>` : ''}<button class="btn" data-go="#/teams">${T.backAll}</button>`)
       return
     }
-    setHtml($('topTitle'), T.allSessions)
+    setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('mosaic'))
     $('topSub').textContent = ''
     setHtml($('topRight'), colsSeg)
   } else if (r.view === 'hosts') {
@@ -88,13 +101,10 @@ export function renderTop() {
     if (t && h?.online) acts.push(`<button class="btn danger" data-tact="kill">${T.closeSession}</button>`)
     acts.push(`<button class="btn" data-go="#/h/${encodeURIComponent(r.host)}">${T.back}</button>`)
     setHtml($('topRight'), acts.join(''))
-  } else if (r.view === 'inbox') {
-    setHtml($('topTitle'), T.inboxTitle)
-    $('topSub').textContent = T.inboxSub
   } else if (r.view === 'archived') {
     setHtml($('topTitle'), T.archivedTitle)
     $('topSub').textContent = T.archivedSub
-    setHtml($('topRight'), `<button class="btn" data-go="#/">${T.backAll}</button>`)
+    setHtml($('topRight'), `<button class="btn" data-go="#/teams">${T.backAll}</button>`)
   } else {
     const s = sessions.get(r.name)
     const a = s?.activity ?? {}
@@ -107,7 +117,7 @@ export function renderTop() {
       acts.push(`<button class="btn" data-go="#/s/${encodeURIComponent(r.name)}/chat">${T.chat}</button>`)
       acts.push(`<button class="btn" data-tact="redraw">${T.redraw}</button>`)
       acts.push(`<button class="btn danger" data-tact="kill">${T.closeSession}</button>`)
-      acts.push(`<button class="btn" data-go="${s?.archived_at ? '#/archived' : '#/'}">${s?.archived_at ? T.backArchived : T.backAll}</button>`)
+      acts.push(`<button class="btn" data-go="${s?.archived_at ? '#/archived' : '#/teams'}">${s?.archived_at ? T.backArchived : T.backAll}</button>`)
       setHtml($('topRight'), acts.join(''))
       return
     }
@@ -121,7 +131,7 @@ export function renderTop() {
         : `<button class="btn" data-act="archive" data-s="${esc(s.name)}">${T.archive}</button>`)
       if (!s.online && can('manager')) acts.push(`<button class="btn danger" data-act="delete" data-s="${esc(s.name)}">${T.delete}</button>`)
     }
-    acts.push(`<button class="btn" data-go="${s?.archived_at ? '#/archived' : '#/'}">${s?.archived_at ? T.backArchived : T.backAll}</button>`)
+    acts.push(`<button class="btn" data-go="${s?.archived_at ? '#/archived' : '#/teams'}">${s?.archived_at ? T.backArchived : T.backAll}</button>`)
     setHtml($('topRight'), acts.join(''))
   }
 }

@@ -887,7 +887,7 @@ async function eventsOf(session, pred, what) {
 test('observation: hooks + transcript reach the dashboard live', async () => {
   // Dashboard page is public; its API needs the server token.
   const page = await fetch(`${URL_}/`).then(r => r.text())
-  assert.match(page, /<title>Squadra<\/title>/)
+  assert.match(page, /<title>SquadraHQ<\/title>/)
   assert.equal((await fetch(`${URL_}/api/state`)).status, 401)
   assert.equal((await fetch(`${URL_}/api/state`, { headers: { Authorization: 'Bearer nope' } })).status, 401)
 

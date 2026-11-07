@@ -3,7 +3,10 @@ import { T, LANG } from './i18n.js'
 import { state, sessions, hosts } from './state.js'
 import { esc } from './format.js'
 import { begin, loginScreen, noCompany, signOut } from './signin.js'
-import { openPeople } from './people.js'
+import { openSettings } from './people.js'
+import { openPalette } from './palette.js'
+import { themeNow, toggleTheme, onTheme } from './theme.js'
+import { icon } from './icons.js'
 import { clearMosaic } from './router.js'
 import { closeMenu } from './dialogs.js'
 import { termLink } from './terminal.js'
@@ -19,11 +22,6 @@ import './squads.js'
 import './org.js'
 
 export let serverVersion = null // (from /health and the stream)
-
-// Light or dark: the system's, unless chosen with the 🌙/☀️ button
-// (remembered per browser). The page sets it first thing, so it doesn't flash.
-const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)') ?? { matches: false, addEventListener() {} }
-const themeNow = () => document.documentElement.dataset.theme || (darkQuery.matches ? 'dark' : 'light')
 
 // The dashboard is only built after the server says the sign-in is finished.
 function show(id) { for (const x of ['splash', 'login', 'app']) $(x).hidden = x !== id }
@@ -57,7 +55,7 @@ function enter(me) {
       if (!me.user.is_platform_admin && !me.deleting?.length) { show('login'); return noCompany() }
       state.me = me
       show('app')
-      return openPeople()
+      return openSettings()
     }
     store.set('squadraCompany', first.id)
     location.replace(`?company=${encodeURIComponent(first.id)}${location.hash}`)
@@ -67,11 +65,13 @@ function enter(me) {
   state.role = here.role
   store.set('squadraCompany', here.id)
   document.body.dataset.role = here.role
+  // The company: a choice when there are several, its name otherwise.
   const select = $('companySelect')
-  select.hidden = me.companies.length < 2
+  $('companyBox').hidden = me.companies.length < 2
   select.innerHTML = me.companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')
   select.value = here.id
-  $('addHostBtn').hidden = !['manager', 'owner'].includes(here.role)
+  $('companyName').hidden = me.companies.length > 1
+  $('companyName').textContent = here.name ?? ''
   show('app')
   connect()
 }
@@ -81,23 +81,27 @@ $('companySelect').addEventListener('change', e => {
   location.href = `?company=${encodeURIComponent(e.target.value)}`
 })
 
-$('logoutBtn').addEventListener('click', async () => {
+export async function logOut() {
   await signOut()
   store.set('squadraSignedOut', String(Date.now()))
   showLogin()
-})
-$('peopleBtn').addEventListener('click', () => openPeople())
+}
+$('settingsBtn').addEventListener('click', () => openSettings())
+$('searchBtn').addEventListener('click', () => openPalette())
 
-// static texts, version footer and language switch
+// static texts
+const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
 $('splash').textContent = T.connecting
 $('connText').textContent = T.connecting
-$('logoutBtn').textContent = T.logout
-$('peopleBtn').textContent = T.people
-$('menuBtn').setAttribute('aria-label', T.sessionsMenu)
-$('addHostBtn').title = T.addTitle
-$('addHostBtn').setAttribute('aria-label', T.addTitle)
+$('rail').setAttribute('aria-label', T.railLabel)
+$('nav').setAttribute('aria-label', T.mainNav)
+$('companyLabel').textContent = T.company
+$('searchBtn').innerHTML = `${icon('search')}<span>${esc(T.goTo)}</span><kbd>${esc(T.searchShortcut(mac))}</kbd>`
+$('settingsBtn').innerHTML = `${icon('settings')}<span>${esc(T.settings)}</span>`
+$('menuBtn').innerHTML = icon('menu')
+$('menuBtn').setAttribute('aria-label', T.openMenu)
 
-// The button shows the mode it switches to.
+// The sign-in page's own switches. (The button shows the mode it switches to.)
 function themeButtons() {
   const dark = themeNow() === 'dark'
   for (const b of document.querySelectorAll('[data-theme-toggle]')) {
@@ -106,20 +110,21 @@ function themeButtons() {
     b.setAttribute('aria-label', b.title)
   }
 }
-for (const b of document.querySelectorAll('[data-theme-toggle]')) {
-  b.addEventListener('click', () => {
-    const next = themeNow() === 'dark' ? 'light' : 'dark'
-    document.documentElement.dataset.theme = next
-    store.set('squadraTheme', next)
-    themeButtons()
-  })
-}
-darkQuery.addEventListener('change', themeButtons)
+for (const b of document.querySelectorAll('[data-theme-toggle]')) b.addEventListener('click', toggleTheme)
+onTheme(themeButtons)
 themeButtons()
 for (const b of document.querySelectorAll('[data-lang]')) {
   b.classList.toggle('on', b.dataset.lang === LANG)
   b.addEventListener('click', () => { store.set('squadraLang', b.dataset.lang); location.reload() })
 }
+
+// Ctrl+K (⌘K on a Mac) from anywhere in the dashboard.
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k' && state.me && !$('app').hidden) {
+    e.preventDefault()
+    openPalette()
+  }
+})
 
 // "0.0.2" < "0.0.3" (numeric parts).
 export const olderThan = (a, b) => {
@@ -130,7 +135,7 @@ export const olderThan = (a, b) => {
 }
 export function setVersion(v) {
   serverVersion = v
-  for (const el of document.querySelectorAll('.ver')) el.textContent = `Squadra v${v}`
+  for (const el of document.querySelectorAll('.ver')) el.textContent = T.version(v)
 }
 fetch('/health').then(r => r.json()).then(j => { if (j.version) setVersion(j.version) }).catch(() => {})
 

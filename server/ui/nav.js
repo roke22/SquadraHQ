@@ -1,24 +1,12 @@
 import { $, store } from './dom.js'
-import { T, COLLATOR } from './i18n.js'
-import { hosts, state, unread, companyPref } from './state.js'
+import { T } from './i18n.js'
+import { hosts, state, unread, companyPref, can } from './state.js'
 import { esc } from './format.js'
 import { sortedSessions, status, squadsOf, squadOpen } from './content.js'
 import { currentRoute } from './router.js'
-import { sessionOn } from './topbar.js'
-import { hostState, addMachineDialog } from './machines.js'
-import { orgSquads } from './org.js'
-
-// sidebar
-const isMachines = r => r.view === 'hosts' || r.view === 'terminal'
-
-function renderTabs() {
-  const r = currentRoute()
-  const list = sortedSessions()
-  const hostList = [...hosts.values()]
-  const tab = (on, go, icon, label, count) => `<button role="tab" aria-selected="${on}" class="${on ? 'on' : ''}" data-go="${go}"><span>${icon}</span>${label}<span class="count">${count}</span></button>`
-  setHtml($('tabs'), tab(!isMachines(r), '#/', '▦', T.tabSessions, `${list.filter(s => s.online).length}/${list.length}`) +
-    tab(isMachines(r), '#/hosts', '🖥️', T.machines, `${hostList.filter(h => h.online).length}/${hostList.length}`))
-}
+import { addMachineDialog } from './machines.js'
+import { newSessionDialog } from './squads.js'
+import { icon } from './icons.js'
 
 // What a burst of stream changes redraws, once per frame (hundreds of
 // sessions changing at once would otherwise redraw the sidebar hundreds of
@@ -54,96 +42,104 @@ function patch(a, b) {
   }
   return true
 }
+
+// --- the sidebar ---------------------------------------------------------------
+// The three places (inbox, teams, machines), then every team with its
+// coordinator and workers. What needs you is on the right of each row: a
+// permission waiting (warn) or messages not read yet (accent).
+
+const isTeams = r => r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
+const isMachines = r => r.view === 'hosts' || r.view === 'terminal'
+const here = on => (on ? ' class="rail-item on" aria-current="page"' : ' class="rail-item"')
+
+// What a session's row says on its right, and what it reads aloud.
+function attention(s) {
+  if (status(s).waiting) return { html: '<span class="badge attn" aria-hidden="true">!</span>', say: T.waitingOnYou }
+  const n = unread.get(s.name) ?? 0
+  return n ? { html: `<span class="badge" aria-hidden="true">${n > 99 ? '99+' : n}</span>`, say: T.unreadN(n) } : { html: '', say: '' }
+}
+
+function sessionRow(s, r) {
+  const st = status(s)
+  const role = s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'
+  const a = attention(s)
+  const on = r.view === 'session' && r.name === s.name
+  const say = [T.roleName[s.role] ?? T.roleName.worker, s.name, st.text, a.say].filter(Boolean).join(' · ')
+  return `<a href="#/s/${encodeURIComponent(s.name)}" class="rail-item rail-sess ${role}${on ? ' on' : ''}${s.online ? '' : ' offline'}"${on ? ' aria-current="page"' : ''} title="${esc(st.text)}" aria-label="${esc(say)}">`
+    + `<span class="role ${role}" aria-hidden="true"></span><span class="name">${esc(s.name)}</span>${a.html}<span class="dot ${st.dot || 'off'}" aria-hidden="true"></span></a>`
+}
+
+function teamBlock({ coord, workers }, r) {
+  // Unfolded unless folded here (remembered per browser and company).
+  const open = squadOpen[coord.name] !== false
+  const name = state.squadMeta.get(coord.name)?.title || coord.name
+  // Folded, its name carries what needs attention inside.
+  const inside = [coord, ...workers]
+  const waiting = inside.some(s => status(s).waiting)
+  const unseen = inside.reduce((t, s) => t + (unread.get(s.name) ?? 0), 0)
+  const alert = open ? '' : waiting ? '<span class="badge attn" aria-hidden="true">!</span>' : unseen ? `<span class="badge" aria-hidden="true">${unseen > 99 ? '99+' : unseen}</span>` : ''
+  const squadOn = r.view === 'mosaic' && r.squad === coord.name
+  return `<div class="rail-team${open ? ' open' : ''}">
+      <div class="rail-team-h"><button type="button" class="rail-fold" data-squad="${esc(coord.name)}" aria-expanded="${open}" aria-label="${esc(T.foldTeam(name, open))}">${icon('chevron')}</button><a href="#/q/${encodeURIComponent(coord.name)}" class="rail-team-name${squadOn ? ' on' : ''}"${squadOn ? ' aria-current="page"' : ''}>${esc(name)}</a>${alert}</div>
+      <div class="rail-team-body">${sessionRow(coord, r)}${workers.length ? `<div class="rail-workers">${workers.map(w => sessionRow(w, r)).join('')}</div>` : ''}</div>
+    </div>`
+}
+
 export function renderNav() {
-  const route = currentRoute()
-  renderTabs()
-  if (isMachines(route)) return renderMachinesNav(route)
+  const r = currentRoute()
   const list = sortedSessions()
-  const online = list.filter(s => s.online).length
-  let html = `<button class="nav-item ${route.view === 'mosaic' && !route.squad ? 'sel' : ''}" data-go="#/"><span>▦</span><span class="n">${T.allSessions}</span><span class="badge" hidden></span><span class="s">${T.activeOf(online, list.length)}</span></button>`
-  // Names waiting for the user: their ⋯ menu has the button.
-  for (const s of list.filter(x => x.approval_pending)) {
-    html += `<button class="nav-item" data-go="#/s/${encodeURIComponent(s.name)}" title="${esc(T.approveNote)}"><span>⚠️</span><span class="n">${esc(s.name)}</span><span></span><span class="s">${esc(T.approveNote)}</span></button>`
-  }
   const inboxN = state.inbox.filter(i => !i.resolved_at).length
-  html += `<button class="nav-item ${route.view === 'inbox' ? 'sel' : ''}" data-go="#/inbox"><span>📥</span><span class="n">${T.inbox}</span>${inboxN ? `<span class="badge">${inboxN}</span>` : '<span></span>'}</button>`
-  const leadsN = list.filter(s => s.role === 'coordinator').length
-  html += `<button class="nav-item ${route.view === 'leads' ? 'sel' : ''}" data-go="#/c"><span>🧭</span><span class="n">${T.leads}</span><span class="badge" hidden></span><span class="s">${T.leadsCount(leadsN)}</span></button>`
-  html += `<button class="nav-item ${route.view === 'org' ? 'sel' : ''}" data-go="#/org"><span>🏢</span><span class="n">${T.org}</span><span class="badge" hidden></span><span class="s">${T.orgNavSub(orgSquads().squads.length, state.links.length)}</span></button>`
-  const item = s => {
-    const st = status(s)
-    const n = unread.get(s.name) ?? 0
-    const badge = st.waiting ? '<span class="badge perm">🔐</span>' : n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : '<span></span>'
-    return `<button class="nav-item ${s.role ?? ''} ${route.view === 'session' && route.name === s.name ? 'sel' : ''}" data-go="#/s/${encodeURIComponent(s.name)}" title="${esc(st.text)}">
-        <span class="dot ${st.dot}"></span><span class="n">${esc(s.name)}</span>${badge}<span class="s">${esc(st.text)}</span></button>`
-  }
+  const machineList = [...hosts.values()]
+  const machinesOn = machineList.filter(h => h.online).length
+  let html = `<div class="rail-group" role="group" aria-label="${esc(T.mainNav)}">
+      <a href="#/"${here(r.view === 'inbox')}>${icon('inbox')}<span class="name">${esc(T.inbox)}</span>${inboxN ? `<span class="badge">${inboxN}</span>` : ''}</a>
+      <a href="#/teams"${here(isTeams(r) && !r.squad)}>${icon('teams')}<span class="name">${esc(T.teams)}</span></a>
+      <div class="rail-row"><a href="#/hosts"${here(isMachines(r))}>${icon('machines')}<span class="name">${esc(T.machines)}</span>${machineList.length ? `<span class="rail-count">${esc(T.ofTotal(machinesOn, machineList.length))}</span>` : ''}</a>${can('manager') ? `<button type="button" class="icon-btn" id="addHostBtn" title="${esc(T.addTitle)}" aria-label="${esc(T.addTitle)}">${icon('plus')}</button>` : ''}</div>
+    </div>`
+
+  // Names waiting for the user: their ⋯ menu has the button.
+  const pendingApproval = list.filter(x => x.approval_pending)
+  if (pendingApproval.length) html += `<div class="rail-group"><div class="rail-label"><span>${esc(T.approveNote)}</span></div>${pendingApproval.map(s => sessionRow(s, r)).join('')}</div>`
+
   const { squads, orphans, solos } = squadsOf(list)
-  if (squads.length) html += `<div class="nav-label">${T.squads}</div>`
-  for (const { coord, workers } of squads) {
-    const here = route.view === 'session' && workers.some(w => w.name === route.name)
-    // (Opened when you go to one of its workers — see route() —, and then
-    // folded or unfolded as you like.)
-    const open = Object.hasOwn(squadOpen, coord.name) && squadOpen[coord.name] === true
-    const on = workers.filter(w => w.online).length
-    // Folded: the count chip also carries what needs attention inside.
-    const waiting = workers.some(w => status(w).waiting)
-    const unseen = workers.reduce((t, w) => t + (unread.get(w.name) ?? 0), 0)
-    const alert = open ? '' : waiting ? '<span class="badge perm">🔐</span>' : unseen ? `<span class="badge">${unseen > 99 ? '99+' : unseen}</span>` : ''
-    const squadOn = route.view === 'mosaic' && route.squad === coord.name
-    html += `<div class="squad ${open ? 'open' : ''} ${here || squadOn || (route.view === 'session' && route.name === coord.name) ? 'sel-in' : ''}">
-        <div class="squad-head">${item(coord)}<button class="squad-mosaic ${squadOn ? 'on' : ''}" data-go="#/q/${encodeURIComponent(coord.name)}" title="${esc(T.viewSquadTitle(coord.name))}" aria-label="${esc(T.viewSquadTitle(coord.name))}">▦</button><button class="squad-toggle" data-squad="${esc(coord.name)}" title="${esc(`${T.squadToggle(workers.length, open)} · ${T.squadCount(on, workers.length)}`)}" aria-expanded="${open}"><span>👥 ${workers.length ? `${on}/${workers.length}` : '0'}</span>${alert}<span class="chev">▸</span></button></div>
-        <div class="squad-body">${workers.length ? workers.map(item).join('') : `<div class="squad-empty">${T.noWorkers}</div>`}</div>
-      </div>`
-  }
-  if (orphans.length) html += `<div class="nav-label">${squads.length ? T.noCoordinator : T.workers}</div>${orphans.map(item).join('')}`
-  if (solos.length) html += `<div class="nav-label">${T.standalone}</div>${solos.map(item).join('')}`
+  html += `<div class="rail-group"><div class="rail-label"><span>${esc(T.yourTeams)}</span>${can('operator') ? `<button type="button" class="icon-btn" data-newteam title="${esc(T.newTeam)}" aria-label="${esc(T.newTeam)}">${icon('plus')}</button>` : ''}</div>`
+    + (squads.length ? squads.map(q => teamBlock(q, r)).join('') : `<div class="rail-empty">${esc(T.noTeams)}</div>`) + '</div>'
+  if (orphans.length) html += `<div class="rail-group"><div class="rail-label"><span>${esc(squads.length ? T.noCoordinator : T.workers)}</span></div>${orphans.map(s => sessionRow(s, r)).join('')}</div>`
+  if (solos.length) html += `<div class="rail-group"><div class="rail-label"><span>${esc(T.standalone)}</span></div>${solos.map(s => sessionRow(s, r)).join('')}</div>`
+
   const archivedCount = sortedSessions({ archived: true }).length
-  html += `<div class="nav-sep"></div><button class="nav-item ${route.view === 'archived' ? 'sel' : ''}" data-go="#/archived"><span>🗄️</span><span class="n">${T.archived}</span><span class="badge" style="background:var(--idle)" ${archivedCount ? '' : 'hidden'}>${archivedCount}</span><span class="s">${T.archivedCount(archivedCount)}</span></button>`
+  if (archivedCount || r.view === 'archived') html += `<div class="rail-group"><a href="#/archived"${here(r.view === 'archived')}>${icon('archive')}<span class="name">${esc(T.archived)}</span><span class="rail-count">${archivedCount}</span></a></div>`
   setHtml($('nav'), html)
 }
 
-// Machines sidebar: every machine, with the sessions opened on it.
-function renderMachinesNav(route) {
-  const list = [...hosts.values()].sort((a, b) => (b.online - a.online) || COLLATOR.compare(a.name, b.name))
-  let html = `<button class="nav-item ${route.view === 'hosts' && !route.host ? 'sel' : ''}" data-go="#/hosts"><span>🖥️</span><span class="n">${T.allMachines}</span><span></span><span class="s">${T.machinesCount(list.filter(h => h.online).length, list.length)}</span></button>`
-  if (list.length) html += `<div class="nav-label">${T.machines}</div>`
-  for (const h of list) {
-    const terms = h.info?.terminals ?? []
-    const sub = h.online ? `${T.hostOnline} · ${T.hostSessions(terms.length)}` : hostState(h)
-    html += `<button class="nav-item ${route.view === 'hosts' && route.host === h.id ? 'sel' : ''}" data-go="#/h/${encodeURIComponent(h.id)}" title="${esc(sub)}">
-        <span class="dot ${h.online ? 'ok' : ''}"></span><span class="n">${esc(h.name)}</span><span></span><span class="s">${esc(sub)}</span></button>`
-    if (!h.online) continue
-    for (const t of terms) {
-      const s = sessionOn(h.id, t.id)
-      const st = s ? status(s) : { dot: '', text: '' }
-      html += `<button class="nav-item sub ${t.role ?? ''} ${route.view === 'terminal' && route.host === h.id && route.term === t.id ? 'sel' : ''}" data-go="#/t/${encodeURIComponent(h.id)}/${encodeURIComponent(t.id)}" title="${esc(st.text)}">
-          <span class="dot ${st.dot}"></span><span class="n">⌨ ${esc(t.name)}</span>${st.waiting ? '<span class="badge perm">🔐</span>' : '<span></span>'}</button>`
-    }
-  }
-  setHtml($('nav'), html)
+// --- the drawer on narrow screens -----------------------------------------------
+export function openRail(open) {
+  $('rail').classList.toggle('open', open)
+  $('railScrim').hidden = !open
+  $('menuBtn').setAttribute('aria-expanded', String(open))
+  if (open) $('rail').querySelector('.rail-item.on, .rail-item')?.focus()
 }
-
-$('tabs').addEventListener('click', e => {
-  const b = e.target.closest('[data-go]')
-  if (b) location.hash = b.dataset.go
-})
-$('addHostBtn').addEventListener('click', () => {
-  $('side').classList.remove('open')
-  if (!isMachines(currentRoute())) location.hash = '#/hosts'
-  addMachineDialog()
-})
+const railOpen = () => $('rail').classList.contains('open')
+$('menuBtn').addEventListener('click', () => openRail(!railOpen()))
+$('railScrim').addEventListener('click', () => openRail(false))
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && railOpen()) { openRail(false); $('menuBtn').focus() } })
+window.addEventListener('hashchange', () => { if (railOpen()) openRail(false) })
 
 $('nav').addEventListener('click', e => {
-  const t = e.target.closest('[data-squad]')
-  if (t) {
-    const name = t.dataset.squad
-    squadOpen[name] = !t.closest('.squad').classList.contains('open')
+  const fold = e.target.closest('[data-squad]')
+  if (fold) {
+    const name = fold.dataset.squad
+    squadOpen[name] = !fold.closest('.rail-team').classList.contains('open')
     store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen))
     return renderNav()
   }
-  const b = e.target.closest('[data-go]')
-  if (!b) return
-  location.hash = b.dataset.go
-  $('side').classList.remove('open')
+  if (e.target.closest('#addHostBtn')) {
+    openRail(false)
+    if (!isMachines(currentRoute())) location.hash = '#/hosts'
+    return addMachineDialog()
+  }
+  if (e.target.closest('[data-newteam]')) {
+    openRail(false)
+    return newSessionDialog(undefined, { role: 'coordinator' })
+  }
 })
-$('menuBtn').addEventListener('click', () => $('side').classList.toggle('open'))

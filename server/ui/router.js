@@ -1,6 +1,6 @@
 import { $, store } from './dom.js'
 import { T, COLLATOR } from './i18n.js'
-import { state, sessions, unread, can } from './state.js'
+import { state, sessions, unread, can, companyPref } from './state.js'
 import { dur, now, esc } from './format.js'
 import { sortedSessions, squadOpen } from './content.js'
 import { ChatView } from './chat.js'
@@ -30,8 +30,10 @@ for (const ev of ['click', 'keydown']) document.addEventListener(ev, e => { if (
 const ROUTE_NAME = /^[A-Za-z0-9_-]{1,32}$/
 const ROUTE_ID = /^[A-Za-z0-9_-]{1,64}$/
 export function currentRoute() {
+  // The inbox is home: what needs you comes first.
+  if (location.hash === '' || location.hash === '#' || location.hash === '#/' || location.hash === '#/inbox') return { view: 'inbox' }
+  if (location.hash === '#/teams') return { view: 'mosaic' }
   if (location.hash === '#/archived') return { view: 'archived' }
-  if (location.hash === '#/inbox') return { view: 'inbox' }
   if (location.hash === '#/hosts') return { view: 'hosts' }
   if (location.hash === '#/c') return { view: 'leads' }
   if (location.hash === '#/org') return { view: 'org' }
@@ -60,7 +62,7 @@ export function clearMosaic() {
 function workerState(w) {
   const a = w.activity ?? {}
   if (!w.online) return { k: 'offline', dot: '', text: T.wOffline }
-  if (a.state === 'waiting') return { k: 'waiting', dot: 'err pulse', text: T.wWaiting }
+  if (a.state === 'waiting') return { k: 'waiting', dot: 'warn pulse', text: T.wWaiting }
   if (a.state === 'compacting') return { k: 'working', dot: 'info pulse', text: T.compacting }
   if (a.state === 'tool' || a.state === 'working') return { k: 'working', dot: 'ok pulse', text: T.wWorking(dur(now() - ((a.state === 'tool' ? a.tool?.since : a.since) ?? now()))), since: a.since }
   return { k: 'idle', dot: 'ok', text: T.wIdle(a.since ? dur(now() - a.since) : '—'), since: a.since ?? now() }
@@ -94,7 +96,7 @@ export function route() {
   closeMenu()
   // Going to a worker unfolds its squad in the sidebar, so it shows where you are.
   const c = r.view === 'session' && sessions.get(r.name)?.role === 'worker' ? sessions.get(r.name).coordinator : null
-  if (c && squadOpen[c] !== true) { squadOpen[c] = true; store.set('squadraSquads', JSON.stringify(squadOpen)) }
+  if (c && squadOpen[c] === false) { squadOpen[c] = true; store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen)) }
   $('archived').hidden = r.view !== 'archived'
   $('inbox').hidden = r.view !== 'inbox'
   $('org').hidden = r.view !== 'org'

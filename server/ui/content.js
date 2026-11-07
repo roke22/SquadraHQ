@@ -107,9 +107,9 @@ export function status(s) {
   const a = s.activity ?? {}
   if (!s.online) return { dot: '', text: T.offline(s.last_seen_at ? dur(now() - s.last_seen_at * 1000) : '—') }
   switch (a.state) {
-    case 'tool': return { dot: 'warn pulse', text: `${a.tool?.name ?? T.tool} · ${dur(now() - (a.tool?.since ?? now()))} · ${a.tool?.summary ?? ''}` }
+    case 'tool': return { dot: 'ok pulse', text: `${a.tool?.name ?? T.tool} · ${dur(now() - (a.tool?.since ?? now()))} · ${a.tool?.summary ?? ''}` }
     case 'working': return { dot: 'ok pulse', text: T.working(dur(now() - (a.since ?? now()))) }
-    case 'waiting': return { dot: 'err pulse', waiting: true, text: a.tool?.name ? T.waitingTool(a.tool.name, a.tool.summary ?? '') : T.waitingInput(a.waiting) }
+    case 'waiting': return { dot: 'warn pulse', waiting: true, text: a.tool?.name ? T.waitingTool(a.tool.name, a.tool.summary ?? '') : T.waitingInput(a.waiting) }
     case 'compacting': return { dot: 'info pulse', text: T.compacting }
     case 'idle': return { dot: 'ok', text: T.idle(dur(now() - (a.since ?? now()))) }
     case 'ended': return { dot: '', text: T.ended }

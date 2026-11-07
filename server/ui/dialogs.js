@@ -116,7 +116,7 @@ export function runAction(action, name) {
       danger: true,
       run: async () => {
         await post('delete', name)
-        if (currentRoute().name === name) location.hash = s?.archived_at ? '#/archived' : '#/'
+        if (currentRoute().name === name) location.hash = s?.archived_at ? '#/archived' : '#/teams'
       },
     })
   }
