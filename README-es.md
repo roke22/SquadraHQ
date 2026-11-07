@@ -64,8 +64,9 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Partir un trabajo grande en piezas en paralelo:** una migración, una refactorización o más tests, un worker por módulo.
 - **Dejarlo trabajando solo:** los workers deciden los detalles técnicos y el coordinador aprueba sus acciones seguras, así el equipo sigue mientras no estás.
 - **Vigilarlo desde cualquier sitio:** todos los equipos y agentes en directo en tu navegador, también en el móvil, y todo lo que te espera arriba en la bandeja.
-- **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal; respondes desde el panel con una tecla numérica o con tus palabras.
+- **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal; respondes desde el panel con una tecla numérica o con tus palabras, o descartas una pregunta y a su coordinador se le dice que no espere.
 - **Seguir el plan de cada equipo:** el coordinador mantiene en la página del equipo la lista de tareas en las que trabaja, quién lleva cada una y en qué estado está.
+- **Ver qué ha hecho cada agente sin leerlo todo:** junto a su terminal y su conversación, qué hace ahora y una línea de tiempo con lo importante (sus órdenes, los ficheros que editó, pruebas y commits, permisos e informes), sacada de lo que ya informa, así que no gasta tokens.
 - **Usar todos tus ordenadores y cuentas:** cada agente funciona en cualquier máquina que añadas, con la sesión de Claude Code de esa máquina.
 - **Montar equipos con tus propias skills:** dale a cada agente una skill o un agente de su proyecto (diseño, marketing, RR. HH., revisión de código…) como persona, y guarda todo el equipo como plantilla para volver a abrirlo de un clic.
 - **Enlazar equipos:** enlaza los coordinadores de dos equipos (por ejemplo, diseño y marketing) para que se repartan trabajo, y cada uno lo pase a sus propios workers.
@@ -142,11 +143,11 @@ Consigue y renueva su certificado HTTPS solo, y el panel queda en `https://squad
 
 ## 2. Añade tus ordenadores
 
-En el panel, abre **Máquinas → Añadir máquina** (o el **+** junto a *Máquinas* en la barra lateral), elige el sistema del ordenador (Linux, macOS o Windows) y **sigue las instrucciones que te muestra**: es un único comando para ejecutar en ese ordenador. Instala todo lo que necesita y lo conecta a tu panel.
+En el panel, abre **Máquinas → Añadir máquina** (o el **+** junto a *Máquinas* en la barra lateral). La página te guía: elige el sistema del ordenador (Linux, macOS o Windows) y ejecuta en ese ordenador el único comando que te muestra. Instala todo lo que necesita y lo conecta a tu panel; la página te dice cuándo se ha conectado y te deja elegir allí mismo sus carpetas.
 
 Después, desde el panel:
 
-1. **Añadir carpeta** debajo de la máquina, en la página *Máquinas*: elige las carpetas donde pueden trabajar los agentes (tus proyectos).
+1. **Añadir carpeta**, en esa misma página cuando se haya conectado o debajo de la máquina en la página *Máquinas*: elige las carpetas donde pueden trabajar los agentes (tus proyectos).
 2. **Abre tu primer equipo** ([paso 3](#3-monta-tus-equipos)), o una sesión suelta con **Máquinas → Nueva sesión**. Cada una se abre en una terminal en directo en tu navegador. La primera vez, acepta los avisos de Claude Code (para el canal de desarrollo, elige *"I am using this for local development"*).
 3. **Habla con el coordinador** en su terminal (**Dar una orden** en la página de su equipo te lleva allí) y dile lo que quieres hacer.
 

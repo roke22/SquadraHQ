@@ -83,6 +83,7 @@
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Responde con un toque.</b> Elige una opción y añade un detalle si quieres, desde tu mesa o desde el móvil.</span></li>
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>Nunca con información vieja.</b> Si un coordinador descubre algo nuevo, actualiza la pregunta y ves que ha cambiado.</span></li>
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l3-8h10l3 8v6H4z"/><path d="M4 13h5l1.5 2.5h3L15 13h5"/></svg><span><b>También los permisos.</b> Un worker que espera para ejecutar un comando aparece aquí, con lo que quiere ejecutar exactamente.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span><b>O apártala.</b> Descarta una pregunta y a su coordinador se le dice que no espere respuesta.</span></li>
       </ul>
     </div>
     <div class="phone"><picture><source srcset="../screenshots/phone-decision-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/phone-decision-light-es.jpg" alt="Una decisión en el móvil: la pregunta, dos opciones con la recomendada marcada y sitio para responder con tus palabras" width="780" height="1688" loading="lazy"></picture></div>
@@ -114,6 +115,22 @@
   </div>
 </section>
 
+<section id="timeline">
+  <div class="wrap split">
+    <div>
+      <p class="kicker">Cada agente</p>
+      <h2>Lo que ha hecho, sin leerlo todo.</h2>
+      <p class="sub">Junto a la terminal de cada agente, qué hace ahora y una línea de tiempo con lo importante. La terminal sigue exactamente igual.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>Ahora, de un vistazo.</b> Su estado, cuánto contexto lleva y su tarea del plan.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Lo importante.</b> Sus órdenes, los ficheros que editó, pruebas y commits, permisos y sus informes, lo último primero.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg><span><b>Sin gastar tokens.</b> Sale de lo que cada sesión ya informa: no se le pide nada al modelo.</span></li>
+      </ul>
+    </div>
+    <div class="window" style="margin: 0"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="../screenshots/timeline-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/timeline-light-es.jpg" alt="La terminal de un worker y a su lado lo que hace ahora y su línea de tiempo: un informe, pruebas en verde, un fichero editado y la orden que recibió" width="2350" height="1116" loading="lazy"></picture></div>
+  </div>
+</section>
+
 <section>
   <div class="wrap center">
     <p class="kicker">Todo lo demás</p>
@@ -135,7 +152,7 @@
     <h2>En marcha en tres pasos.</h2>
     <div class="steps">
       <div class="step"><h3>Arranca el panel</h3><p>En cualquier ordenador con Node.js 22, o con Docker. La primera vez, su token te convierte en propietario.</p></div>
-      <div class="step"><h3>Añade tus máquinas</h3><p>Máquinas → Añadir máquina te da un comando para ejecutar en cada ordenador donde trabajarán los agentes.</p></div>
+      <div class="step"><h3>Añade tus máquinas</h3><p>Máquinas → Añadir máquina te guía: un comando para cada ordenador donde trabajarán los agentes, y te dice cuándo se ha conectado.</p></div>
       <div class="step"><h3>Abre un equipo</h3><p>Nuevo equipo: para qué es, quiénes lo forman y dónde trabaja. Después dale a su coordinador la primera orden.</p></div>
     </div>
     <pre class="code"><code>git clone https://github.com/roke22/Squadra.git squadra &amp;&amp; cd squadra

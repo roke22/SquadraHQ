@@ -83,6 +83,7 @@
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Answer in one tap.</b> Pick an option, add a detail if you want, from your desk or your phone.</span></li>
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>Never on old information.</b> When a coordinator learns something new, it updates the question; you see it changed.</span></li>
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l3-8h10l3 8v6H4z"/><path d="M4 13h5l1.5 2.5h3L15 13h5"/></svg><span><b>Permissions too.</b> A worker waiting to run a command shows up here, with exactly what it wants to run.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span><b>Or put it away.</b> Dismiss a question and its coordinator is told not to wait for an answer.</span></li>
       </ul>
     </div>
     <div class="phone"><picture><source srcset="screenshots/phone-decision-dark-en.jpg" media="(prefers-color-scheme: dark)"><img src="screenshots/phone-decision-light-en.jpg" alt="A decision on a phone: the question, two options with the recommended one marked, and room to answer in your own words" width="780" height="1688" loading="lazy"></picture></div>
@@ -114,6 +115,22 @@
   </div>
 </section>
 
+<section id="timeline">
+  <div class="wrap split">
+    <div>
+      <p class="kicker">Each agent</p>
+      <h2>What it did, without reading it all.</h2>
+      <p class="sub">Beside each agent&rsquo;s terminal, what it is doing now and a timeline of what mattered. The terminal stays exactly as it is.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>Now, at a glance.</b> Its state, how full its context is and its task in the plan.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>What mattered.</b> Its orders, the files it edited, tests and commits, permissions and its reports, newest first.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg><span><b>No tokens spent.</b> Read from what each session already reports: nothing is asked of the model.</span></li>
+      </ul>
+    </div>
+    <div class="window" style="margin: 0"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="screenshots/timeline-dark-en.jpg" media="(prefers-color-scheme: dark)"><img src="screenshots/timeline-light-en.jpg" alt="A worker&rsquo;s terminal and beside it what it is doing now and its timeline: a report, tests passed, a file edited and the order it was given" width="2350" height="1116" loading="lazy"></picture></div>
+  </div>
+</section>
+
 <section>
   <div class="wrap center">
     <p class="kicker">Everything else</p>
@@ -135,7 +152,7 @@
     <h2>Up and running in three steps.</h2>
     <div class="steps">
       <div class="step"><h3>Start the dashboard</h3><p>On any computer with Node.js 22, or with Docker. The first time, its token makes you the owner.</p></div>
-      <div class="step"><h3>Add your machines</h3><p>Machines → Add machine gives one command to run on each computer where agents will work.</p></div>
+      <div class="step"><h3>Add your machines</h3><p>Machines → Add machine walks you through it: one command for each computer where agents will work, and it tells you when it has connected.</p></div>
       <div class="step"><h3>Open a team</h3><p>New team: what it is for, who is in it and where it runs. Then give its coordinator its first order.</p></div>
     </div>
     <pre class="code"><code>git clone https://github.com/roke22/Squadra.git squadra &amp;&amp; cd squadra

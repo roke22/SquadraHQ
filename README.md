@@ -64,8 +64,9 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Split a big job into parallel pieces:** a migration, a refactor or more tests, one worker per module.
 - **Leave it working unattended:** workers decide the technical details and the coordinator approves their safe actions, so the team keeps going while you are away.
 - **Keep watch from anywhere:** every team and agent live in your browser, on a phone too, and everything that waits on you at the top of the inbox.
-- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong; you answer from the dashboard with a number key or in your own words.
+- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong; you answer from the dashboard with a number key or in your own words, or dismiss a question and its coordinator is told not to wait.
 - **Follow each team's plan:** the coordinator keeps the list of tasks it is working through, who has each one and its state, on the team's page.
+- **See what each agent did without reading it all:** beside its terminal and its conversation, what it is doing now and a timeline of what mattered (its orders, the files it edited, tests and commits, permissions and reports), read from what it already reports, so it costs no tokens.
 - **Use all your computers and accounts:** each agent runs on any machine you add, with that machine's Claude Code login.
 - **Build teams with your own skills:** give each agent a skill or agent from its project (design, marketing, HR, code review…) as its persona, and save the whole team as a template to open it again in one click.
 - **Link teams:** link the coordinators of two teams (design and marketing, say) so they share work, each handing what it takes on to its own workers.
@@ -142,11 +143,11 @@ It gets and renews its HTTPS certificate by itself, and the dashboard is at `htt
 
 ## 2. Add your computers
 
-In the dashboard, open **Machines → Add machine** (or the **+** next to *Machines* in the sidebar), choose the computer's system (Linux, macOS or Windows) and **follow the instructions it shows**: it's a single command to run on that computer. It installs everything it needs and connects it to your dashboard.
+In the dashboard, open **Machines → Add machine** (or the **+** next to *Machines* in the sidebar). The page walks you through it: choose the computer's system (Linux, macOS or Windows) and run the single command it shows on that computer. It installs everything it needs and connects it to your dashboard; the page says when it has connected and lets you choose its folders right there.
 
 Then, still in the dashboard:
 
-1. **Add folder** under the machine, on the *Machines* page: choose the folders where agents may work (your projects).
+1. **Add folder**, on that page once it has connected or under the machine on the *Machines* page: choose the folders where agents may work (your projects).
 2. **Open your first team** ([step 3](#3-build-your-teams)), or a single session with **Machines → New session**. Each one opens in a live terminal in your browser. The first time, accept Claude Code's prompts (for the development channel, choose *"I am using this for local development"*).
 3. **Talk to the coordinator** in its terminal (**Give an order** on its team's page takes you there) and tell it what you want done.
 
