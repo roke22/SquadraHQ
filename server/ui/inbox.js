@@ -9,8 +9,8 @@ import { alertBox } from './mosaic.js'
 import { currentRoute } from './router.js'
 import { icon } from './icons.js'
 
-// The inbox: everything that waits on you, in one list, and the one picked
-// on the right. Decisions coordinators left (ask_user), permission prompts
+// The inbox: everything that waits on you, in one list across the page; the
+// one picked opens on the right, and closes again (✕ or Esc) to the list. Decisions coordinators left (ask_user), permission prompts
 // waiting in a session, names to approve; then what they wanted you to know
 // (tell_user); then what is done. It says what they wrote and nothing more:
 // what it is about, a ticket or anything else, is theirs.
@@ -111,10 +111,13 @@ function firstSteps() {
     <p class="fs-hint">${T.fsLogin}</p></div>`
 }
 
+const emptyState = () => `<div class="empty">${icon('inbox', 'empty-ic')}<b>${esc(T.inboxEmpty)}</b><span>${esc(T.ibxEmptyHint)}</span></div>`
+
 function detail(e) {
   if (!e && !sortedSessions().length) return firstSteps()
-  if (!e) return `<div class="empty">${icon('inbox', 'empty-ic')}<b>${esc(T.inboxEmpty)}</b><span>${esc(T.ibxEmptyHint)}</span></div>`
+  if (!e) return emptyState()
   const back = `<a class="ibx-back" href="#/inbox">${icon('chevron', 'flip')}<span>${esc(T.inbox)}</span></a>`
+    + `<a class="icon-btn ibx-close" href="#/inbox" aria-label="${esc(T.close)}" title="${esc(T.close)} (Esc)">${icon('close')}</a>`
   if (e.kind === 'perm') {
     const s = e.s
     return `${back}<div class="ibx-meta">${who(s.name)}<span>${esc(teamOf(s.name))}</span></div>
@@ -159,13 +162,14 @@ function detail(e) {
 }
 
 let doneOpen = false
+let hadPick = null // the key of the one open at the last draw
 export function renderInbox() {
   const r = currentRoute()
   const groups = entries()
   const all = groups.flatMap(g => g.list)
   const waiting = groups[0].list.length
-  // What is picked: the one in the address, or the first that waits.
-  const picked = all.find(e => e.key === r.item) ?? (r.item ? null : groups.find(g => !g.folded && g.list.length)?.list[0] ?? null)
+  // What is picked: only the one in the address; without one, the list has the page.
+  const picked = all.find(e => e.key === r.item) ?? null
   if (picked?.kind === 'done') doneOpen = true
   const focus = document.activeElement?.closest?.('#inbox') ? document.activeElement : null
   const focusKey = focus?.closest('[data-key]')?.dataset.key
@@ -174,10 +178,14 @@ export function renderInbox() {
     ? `<details class="ibx-group"${doneOpen ? ' open' : ''} data-folded><summary class="ibx-group-h"><span>${esc(g.label)}</span><span class="badge soft">${g.list.length}</span></summary><ul>${g.list.map(e => row(e, e === picked)).join('')}</ul></details>`
     : `<section class="ibx-group"><h2 class="ibx-group-h"><span>${esc(g.label)}</span><span class="badge soft">${g.list.length}</span></h2><ul>${g.list.map(e => row(e, e === picked)).join('')}</ul></section>`).join('')
   const fresh = !all.length && !sortedSessions().length
-  setHtml($('inbox'), `<div class="ibx${r.item ? ' has-pick' : ''}${fresh ? ' fresh' : ''}">
-      <nav class="ibx-list" aria-label="${esc(T.inbox)}">${list || `<p class="ibx-none">${esc(T.ibxNothingListed)}</p>`}</nav>
-      <section class="ibx-detail" aria-live="polite">${detail(picked)}</section>
+  const caughtUp = !groups[0].list.length && !groups[1].list.length
+  const pick = !!picked
+  setHtml($('inbox'), `<div class="ibx${pick ? ' has-pick' : ''}${fresh ? ' fresh' : ''}${!all.length && !fresh ? ' none' : ''}">
+      <nav class="ibx-list" aria-label="${esc(T.inbox)}"><div class="ibx-col">${caughtUp && all.length ? emptyState() : ''}${list || `<p class="ibx-none">${esc(T.ibxNothingListed)}</p>`}</div></nav>
+      <section class="ibx-detail${pick && !hadPick ? ' enter' : ''}" aria-live="polite">${detail(picked)}</section>
     </div>`)
+  const closed = !pick && hadPick
+  hadPick = picked?.key ?? null
   $('topSub').textContent = waiting ? T.ibxWaiting(waiting) : ''
   // Back where the user was: the answer they were typing, the row they were on.
   for (const f of $('inbox').querySelectorAll('[data-answer]')) {
@@ -187,12 +195,17 @@ export function renderInbox() {
     if (typing && document.activeElement !== input) input.focus()
   }
   if (focusKey && !typing && document.activeElement !== focus) $('inbox').querySelector(`[data-key="${CSS.escape(focusKey)}"]`)?.focus()
+  // Just closed: the keyboard goes back to its row.
+  else if (closed) $('inbox').querySelector(`[data-key="${CSS.escape(closed)}"]`)?.focus({ preventScroll: true })
 }
 export const refreshInbox = () => { if (currentRoute().view === 'inbox' && !$('inbox').hidden) renderInbox() }
 
-// After an answer, the next one that waits.
+// After an answer, the next decision that waits; after a note, the next note.
+// With none left, back to the whole list.
 function next(id) {
-  const list = entries()[0].list.filter(e => e.i?.id !== id)
+  const [decide, know] = entries()
+  const wasNote = know.list.some(e => e.i?.id === id)
+  const list = [...decide.list, ...(wasNote ? know.list : [])].filter(e => e.i?.id !== id)
   location.hash = list.length ? `#/inbox/${list[0].key}` : '#/inbox'
 }
 
@@ -221,6 +234,9 @@ function choose(n) {
 }
 
 $('inbox').addEventListener('click', async e => {
+  // The open one, clicked again, closes.
+  const on = e.target.closest('.ibx-item.on')
+  if (on && !e.metaKey && !e.ctrlKey) { e.preventDefault(); location.hash = '#/inbox'; return }
   if (e.target.closest('[data-addmachine]')) { location.hash = '#/hosts'; return (await import('./machines.js')).addMachineDialog() }
   if (e.target.closest('[data-newteam]')) { location.hash = '#/new'; return }
   const opt = e.target.closest('[data-option]')
@@ -250,8 +266,16 @@ $('inbox').addEventListener('keydown', e => {
     e.preventDefault()
     const items = [...$('inbox').querySelectorAll('.ibx-item')].filter(x => x.offsetParent)
     const to = items[items.indexOf(item) + (e.key === 'ArrowDown' ? 1 : -1)]
-    if (to) { to.focus(); to.click() }
+    // With one open, the next opens too; with the list alone, it only moves.
+    if (to) { to.focus(); if (currentRoute().item) location.hash = to.getAttribute('href') }
   }
+})
+// Esc closes the one open, back to the list and to its row.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || $('inbox').hidden || !currentRoute().item) return
+  if (!$('palette').hidden || !$('settings').hidden || document.querySelector('.modal-bg')) return
+  if (e.target.closest?.('textarea, input') && e.target.value) return
+  location.hash = '#/inbox'
 })
 // 1–9 picks an option, from anywhere in the inbox but a text field.
 document.addEventListener('keydown', e => {

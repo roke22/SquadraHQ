@@ -271,11 +271,21 @@ test('the inbox: what a coordinator left is there, with what it wrote kept as te
   await signIn(page, '#/inbox')
   const box = page.locator('#inbox')
   await expect(page.locator('#nav a[href="#/"] .badge')).toHaveText('2')
-  await expect(box).toContainText('Migrate the <b>column</b>?')
+  // Nothing is open until one is picked: the list has the page.
+  await expect(box.locator('.ibx-item').first()).toContainText('Migrate the <b>column</b>?')
+  await expect(box.locator('.ibx-detail')).toBeHidden()
+  await box.locator('.ibx-item').first().click()
   await expect(box.locator('a[href="https://example.com/issues/421"]')).toBeVisible()
-  await expect(box.locator('a[href^="javascript"]')).toHaveCount(0)
+  // Esc closes it, and clicking it again opens it.
+  await page.keyboard.press('Escape')
+  await expect(box.locator('.ibx-detail')).toBeHidden()
+  await box.locator('.ibx-item').first().click()
   await box.locator('[data-resolve]').first().click()
   await expect(page.locator('#nav a[href="#/"] .badge')).toHaveText('1')
+  // No decision left: back to the list, where the note is.
+  await expect(page).toHaveURL(/#\/inbox$/)
+  await box.locator('.ibx-item', { hasText: 'The cart is done' }).click()
+  await expect(box.locator('a[href^="javascript"]')).toHaveCount(0)
   await box.locator('[data-resolve]').first().click()
   await expect(box).toContainText('Nothing is waiting for you')
 })
@@ -306,7 +316,8 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id3} ("Which name for the release?"), the user answers from their inbox: 2.0.0`)
   // Changed by its coordinator while open here: refused once, and it says so.
   page.expectedErrors = [/status of 409/]
-  await page.locator(`[data-key="i${id2}"]`).click()
+  // The last that waits opens by itself; clicked again, it would close.
+  await expect(page).toHaveURL(new RegExp(`#/inbox/i${id2}$`))
   await expect(detail).toContainText('Drop the column?')
   await c.call('editInbox', { id: String(id2), text: 'Drop the column? It holds data in all 1240 rows' })
   await expect(detail).toContainText('1240 rows')
@@ -319,7 +330,7 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await expect(detail.locator('textarea[name=answer]')).toHaveValue('Keep it')
   await detail.locator('button.primary').click()
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id2} ("Drop the column? It holds data in all 1240 rows"), the user answers from their inbox: Keep it`)
-  await expect(detail).toContainText('Nothing is waiting for you')
+  await expect(page.locator('#inbox')).toContainText('Nothing is waiting for you')
 })
 
 test('disconnecting a machine: it offers to end the sessions opened there, ticked', async ({ page }) => {

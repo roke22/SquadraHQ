@@ -108,6 +108,7 @@ async function company(lang) {
 const SHOTS = [
   // name, address, what to wait for, phone?
   ['inbox', '#/inbox/i1', '.ibx-opts'],
+  ['inbox-list', '#/inbox', '.ibx-item'],
   ['teams', '#/teams', '.tm-card'],
   ['team', '#/q/coord-dev', '.pl-table'],
   ['session', '#/s/web/chat', '.sv-aside .sv-member'],
