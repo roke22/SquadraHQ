@@ -1120,7 +1120,7 @@ const I18N = {
     templates: 'Plantillas',
     saveTemplate: 'Plantilla',
     saveTemplateTitle: n => `Guardar el equipo ${n} como plantilla`,
-    saveTemplateHint: 'Guarda el coordinador y sus workers con la carpeta, la persona y el auto-compact con que se abrió cada uno, para volver a abrir toda el equipo de una vez.',
+    saveTemplateHint: 'Guarda el coordinador y sus workers con la carpeta, la persona y el auto-compact con que se abrió cada uno, para volver a abrir todo el equipo de una vez.',
     templateName: 'Nombre de la plantilla',
     templateSaved: n => `Plantilla "${n}" guardada. Ábrela desde Máquinas → Plantillas.`,
     tplNoFolder: '(carpeta desconocida: se queda fuera)',

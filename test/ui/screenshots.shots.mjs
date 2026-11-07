@@ -51,10 +51,28 @@ const DATA = {
   },
 }
 
+// What Claude Code shows in a terminal, near enough, for the live view.
+const E = '\x1b[', dim = s => `${E}2m${s}${E}0m`, ok = s => `${E}32m${s}${E}0m`, acc = s => `${E}38;5;173m${s}${E}0m`, b = s => `${E}1m${s}${E}0m`
+const term = lines => lines.join('\r\n') + '\r\n'
+function screens(d) {
+  return {
+    'coord-dev': term([acc('╭─────────────────────────────────────────────────╮'), `${acc('│')} ${acc('✻')} ${b('Claude Code')}  ${dim('/srv/shop')}                       ${acc('│')}`, acc('╰─────────────────────────────────────────────────╯'), '',
+      `${dim('>')} ${d.order.slice(0, 60)}…`, '', `${ok('⏺')} ${d.said.slice(0, 70)}…`, '',
+      `${ok('⏺')} ${b('squadra - reply')} ${dim('(MCP)')}(chat_id: "web", text: "GH-18…")`, `  ${dim('⎿')}  sent (id: 41)`, '',
+      `${ok('⏺')} ${b('squadra - update_plan')} ${dim('(MCP)')}(title: "${d.plan[0].slice(0, 28)}…")`, `  ${dim('⎿')}  Plan updated: 3 of 7 done, 1 in progress, 1 blocked, 1 waiting on the user.`, '',
+      `${ok('⏺')} ${b('squadra - ask_user')} ${dim('(MCP)')}(text: "${d.asks[0][0].slice(0, 34)}…")`, `  ${dim('⎿')}  It is in the user's inbox (#1).`, '',
+      `${acc('✻')} ${dim('Waiting for the workers’ reports…')}`, '', dim('─'.repeat(60)), `${dim('>')} `]),
+    web: term([`${dim('>')} ${d.webPrompt}`, '', `${ok('⏺')} ${b('Read')}(src/checkout.js)`, `  ${dim('⎿')}  Read 214 lines`, '',
+      `${ok('⏺')} ${b('Update')}(src/checkout.js)`, `  ${dim('⎿')}  Updated with 6 additions and 1 removal`, `     ${dim('118')} ${ok('+    const total = round(lines.reduce(sum, 0))')}`, '',
+      `${ok('⏺')} ${b('Bash')}(npm test)`, `  ${dim('⎿')}  ${ok('✓')} 27 passed ${dim('(1.9 s)')}`, '', `${ok('⏺')} ${d.webText2}`, '',
+      `${ok('⏺')} ${b('Bash')}(npm run lint)`, `  ${dim('⎿')}  ${acc('Running…')}`, '', dim('─'.repeat(60)), `${dim('>')} `]),
+  }
+}
+
 async function company(lang) {
   const d = DATA[lang]
   const server = await startServer()
-  const machine = await startMachine(server, 'mac-mini', { id: 'api', role: 'worker', coordinator: 'coord-dev' })
+  const machine = await startMachine(server, 'mac-mini', { id: 'api', role: 'worker', coordinator: 'coord-dev' }, { screens: screens(d) })
   const open = async (name, role, coordinator) => {
     await server.call('api/terminals/open', { host: machine.id, spec: { name, role, ...(coordinator ? { coordinator } : {}) } })
     return startSession(server, name, role, coordinator, machine.identities.get(name))

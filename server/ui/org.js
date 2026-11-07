@@ -133,7 +133,7 @@ function orgCard(q, p) {
   const shown = orgOpen.has(c.name) ? q.workers : q.workers.slice(0, ORG_FOLD)
   const on = q.workers.filter(w => w.online).length
   return `<div class="org-card" data-squad="${esc(c.name)}" style="left:${p.x}px;top:${p.y}px">
-      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self" title="${esc(T.orgSelfWorking)}"></span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}" aria-haspopup="menu">${icon('more')}</button></div>
+      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self role worker" role="img" title="${esc(T.orgSelfWorking)}" aria-label="${esc(T.orgSelfWorking)}"></span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}" aria-haspopup="menu">${icon('more')}</button></div>
       ${m.goal ? `<div class="org-goal">${esc(m.goal)}</div>` : ''}
       ${orgAgent(c, 'coord')}${shown.map(w => orgAgent(w, 'worker')).join('')}
       ${q.workers.length > ORG_FOLD ? `<button class="org-fold" data-orgfold="${esc(c.name)}">${orgOpen.has(c.name) ? T.orgLess : T.orgMore(q.workers.length - shown.length)}</button>` : ''}

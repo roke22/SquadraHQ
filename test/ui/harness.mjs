@@ -113,7 +113,8 @@ export async function startSession(server, name, role, coordinator, secret) {
 
 // A machine that shows one terminal, opens more when asked, and answers what is
 // typed in a terminal the way a program there would: by writing it back.
-export async function startMachine(server, name, terminal) {
+// (screens: what a terminal shows when watched, by its name; the screenshots give it one.)
+export async function startMachine(server, name, terminal, { screens = {} } = {}) {
   const { code } = await server.call('api/hosts/enroll', { name })
   const { id, secret } = await server.call('host/enroll', { code, info: { hostname: name } })
   const typed = []
@@ -141,7 +142,7 @@ export async function startMachine(server, name, terminal) {
         send({ t: 'info', info })
         send({ t: 'reply', req: m.req, ok: true, result: { id: m.spec.name } })
       }
-      if (m.t === 'attach') send({ t: 'screen', term: m.term, data: b64('screen from the machine\r\n'), cols: m.cols, rows: m.rows })
+      if (m.t === 'attach') send({ t: 'screen', term: m.term, data: b64(screens[m.term] ?? 'screen from the machine\r\n'), cols: m.cols, rows: m.rows })
       if (m.t === 'in') { typed.push(m.data); send({ t: 'out', term: m.term, data: b64(m.data) }) }
     }
   })
