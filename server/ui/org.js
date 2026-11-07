@@ -12,6 +12,7 @@ import { terminalOf, postJson, hostAction } from './machines.js'
 import {
   personaName, newSessionDialog, addWorkerTo, saveTemplateDialog, reopenable, reopen, personaOptions,
 } from './squads.js'
+import { icon } from './icons.js'
 
 // org chart: each squad as a card (its coordinator and workers), the links
 // between squads as lines, and what each one is for on hover. From here
@@ -123,16 +124,16 @@ function orgAgent(s, kind) {
   const pct = s.activity?.context_pct
   const persona = personaOf(s)
   return `<div class="org-agent ${kind}" data-orgtip="agent:${esc(s.name)}" tabindex="0">
-      <span class="dot ${status(s).dot}"></span><span class="n">${esc(s.name)}</span>${persona ? `<span class="org-persona">${esc(persona)}</span>` : ''}
+      <span class="role ${kind === 'coord' ? 'coord' : 'worker'}" aria-hidden="true"></span><span class="n">${esc(s.name)}</span><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${persona ? `<span class="org-persona">${esc(persona)}</span>` : ''}
       <span class="org-ctx">${Number.isFinite(pct) ? `<span class="ctx ${pct >= 80 ? 'hot' : pct >= 60 ? 'warm' : ''}">${Math.round(pct)}%</span>` : ''}</span>
-      <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}">⋯</button></div>`
+      <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}" aria-haspopup="menu">${icon('more')}</button></div>`
 }
 function orgCard(q, p) {
   const c = q.coord, m = state.squadMeta.get(c.name) ?? {}
   const shown = orgOpen.has(c.name) ? q.workers : q.workers.slice(0, ORG_FOLD)
   const on = q.workers.filter(w => w.online).length
   return `<div class="org-card" data-squad="${esc(c.name)}" style="left:${p.x}px;top:${p.y}px">
-      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self" title="${esc(T.orgSelfWorking)}"></span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}">⋯</button></div>
+      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self" title="${esc(T.orgSelfWorking)}"></span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}" aria-haspopup="menu">${icon('more')}</button></div>
       ${m.goal ? `<div class="org-goal">${esc(m.goal)}</div>` : ''}
       ${orgAgent(c, 'coord')}${shown.map(w => orgAgent(w, 'worker')).join('')}
       ${q.workers.length > ORG_FOLD ? `<button class="org-fold" data-orgfold="${esc(c.name)}">${orgOpen.has(c.name) ? T.orgLess : T.orgMore(q.workers.length - shown.length)}</button>` : ''}
@@ -326,7 +327,7 @@ $('org').addEventListener('dblclick', e => {
 document.addEventListener('click', e => {
   const act = e.target.closest('[data-orgact]')
   if (act) {
-    if (act.dataset.orgact === 'newsquad') newSessionDialog(undefined, { role: 'coordinator' })
+    if (act.dataset.orgact === 'newsquad') location.hash = '#/new'
     if (act.dataset.orgact === 'addagent') addWorkerTo(act.dataset.name)
     if (act.dataset.orgact === 'arrange') arrangeOrg()
   }
