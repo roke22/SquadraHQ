@@ -65,9 +65,11 @@ function milestones(name, items) {
         case 'session_end': flush(); add(it.ts, 'end', 'muted', T.tlEnd); break
       }
     } else if (it.t === 'message' && !it.system) {
-      // Its coordinator's orders, and its own reports.
+      // Its coordinator's orders, its own reports, and (a coordinator) its workers'.
+      const tone = it.report === 'done' ? 'ok' : it.report === 'question' ? 'warn' : 'err'
       if (it.target === name && s?.coordinator && it.from === s.coordinator && !it.fyi) add(it.ts, 'order', 'info', T.tlOrder(it.from), firstLine(it.text))
-      else if (it.from === name && it.report) add(it.ts, 'report', it.report === 'done' ? 'ok' : it.report === 'question' ? 'warn' : 'err', T.tlReport[it.report] ?? it.report, firstLine(it.text))
+      else if (it.from === name && it.report) add(it.ts, 'report', tone, T.tlReport[it.report] ?? it.report, firstLine(it.text))
+      else if (it.target === name && it.report && sessions.get(it.from)?.coordinator === name) add(it.ts, 'report', tone, T.tlReportFrom(it.from, it.report), firstLine(it.text))
     }
   }
   flush()
