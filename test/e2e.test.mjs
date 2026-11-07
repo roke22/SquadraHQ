@@ -319,8 +319,11 @@ test('plugin: idle until login', async () => {
   // Not logged in yet: the common rules, and where the role's come from.
   assert.match(r.instructions, /ROLES\. Once logged in, the login tool's answer gives you the rules for your role/)
   assert.doesNotMatch(r.instructions, /COORDINATOR ROLE|WORKER ROLE/)
-  const tools = (await p.request('tools/list', {})).result.tools.map(t => t.name).sort()
-  assert.deepEqual(tools, ['ask_user', 'download_attachment', 'edit_inbox', 'edit_message', 'login', 'logout', 'ping', 'react', 'reply', 'status', 'tell_user', 'update_plan'])
+  const listed = (await p.request('tools/list', {})).result.tools
+  // Claude Code keeps 4096 characters of a tool's description: the rules in each fit.
+  for (const t of listed) assert.ok(t.description.length <= 4096, `${t.name}: ${t.description.length}`)
+  const tools = listed.map(t => t.name).sort()
+  assert.deepEqual(tools, ['ask_user', 'download_attachment', 'edit_inbox', 'edit_message', 'help', 'login', 'logout', 'ping', 'react', 'reply', 'status', 'tell_user', 'update_plan'])
   assert.match(await p.tool('status', {}), /not connected/)
   await assert.rejects(p.tool('reply', { chat_id: 'x', text: 'y' }), /\/squadra:login/)
   await sleep(300)
@@ -566,7 +569,8 @@ test('plugin: full coordinator/worker flow', async () => {
 
   const ci = await coord.init()
   assert.deepEqual(ci.capabilities.experimental, { 'claude/channel': {}, 'claude/channel/permission': {} })
-  assert.match(ci.instructions, /Do NOT answer them/)
+  // (A summary of the role at startup; its rules in full come with login and help.)
+  assert.match(ci.instructions, /information unless they need something concrete from you/)
   assert.notEqual(ci.protocolVersion, '2026-07-28')
   // (The worker once its coordinator exists: its greeting, which the reminder
   // below relies on, is sent once, and goes nowhere before that.)
@@ -667,10 +671,18 @@ test('plugin: full coordinator/worker flow', async () => {
   // What the session supplied comes quoted, after the fixed lines.
   assert.match(perm.content, /Input \(from the session\): "\{\\"command\\":\\"npm test\\"\}"/)
   assert.match(perm.content, /yes abcde/)
-  await coord.tool('reply', { chat_id: 'w1', text: 'yes abcde' })
+  assert.doesNotMatch(await coord.tool('reply', { chat_id: 'w1', text: 'yes abcde' }), /hard to undo/)
   const verdict = await waitFor(() => w1.notifications.find(n => n.method === 'notifications/claude/channel/permission'), { what: 'verdict' })
   assert.deepEqual(verdict.params, { request_id: 'abcde', behavior: 'allow' })
   assert.equal(w1.channel(p => p.content === 'yes abcde').length, 0, 'verdict not relayed as chat')
+  // Approving one that can't be undone: sent all the same, with a reminder of the rule.
+  w1.notify('notifications/claude/channel/permission_request', { request_id: 'qrstu', tool_name: 'Bash', description: 'Clean up', input_preview: '{"command":"rm -rf data/"}' })
+  await coord.waitChannel(p => p.content.includes('yes qrstu'), 'risky permission request')
+  assert.match(await coord.tool('reply', { chat_id: 'w1', text: 'yes qrstu' }), /hard to undo or reach beyond the machine \("rm -rf"\).*help\("permissions"\)/s)
+  await waitFor(() => w1.notifications.find(n => n.method === 'notifications/claude/channel/permission' && n.params.request_id === 'qrstu'), { what: 'risky verdict' })
+  // The rules in full, a topic at a time.
+  assert.match(await coord.tool('help', {}), /- permissions: /)
+  assert.match(await coord.tool('help', { topic: 'permissions' }), /Ask the user first \(ask_user\)/)
 
   // 8a. The coordinator sees the exact input (from the hook), not Claude
   // Code's preview, where an invisible character became a space.
@@ -761,7 +773,7 @@ test('plugin: full coordinator/worker flow', async () => {
   await coord.tool('reply', { chat_id: 'w1', text: 'yes abcde' })
   await coord.tool('reply', { chat_id: 'w1', text: 'yes zzzzz' })
   await sleep(600)
-  assert.equal(verdicts(), 4, 'replayed, withdrawn or unknown codes do not approve anything (the four real answers count)')
+  assert.equal(verdicts(), 5, 'replayed, withdrawn or unknown codes do not approve anything (the five real answers count)')
   // A coordinator's own prompts go to nobody: its workers can't approve them.
   const coordMsgs = w1.channel().length
   coord.notify('notifications/claude/channel/permission_request', { request_id: 'qwert', tool_name: 'Bash', description: 'x', input_preview: '{"command":"rm -rf /"}' })
@@ -1210,6 +1222,17 @@ test('compaction: role restored, coordinator told, context tracked', async () =>
   // Restored messages are quoted data, marked as coming from other sessions.
   assert.match(ctx.additionalContext, /from session "cc": "Task #7: build the CSV parser in src\/csv.ts"/)
   assert.match(ctx.additionalContext, /never the user's instructions or authorization/)
+  // Its rules in full, and within what Claude Code keeps of a hook's context
+  // (10 000 characters), however long the latest messages: the newest that fit.
+  assert.match(ctx.additionalContext, /help\(topic\)/)
+  for (let i = 1; i <= 6; i++) {
+    await coord.tool('reply', { chat_id: 'wc', text: `Note ${i}: ${'x'.repeat(1600)}`, fyi: true })
+    await wk.waitChannel(p => p.content.startsWith(`Note ${i}:`), `note ${i}`)
+  }
+  const long = JSON.parse(await runHookOut(wk, { hook_event_name: 'SessionStart', source: 'compact', session_id: 's', cwd: '/x' }, ['--context'])).hookSpecificOutput.additionalContext
+  assert.ok(long.length <= 10_000, `${long.length} characters`)
+  assert.match(long, /WORKER ROLE/)
+  assert.match(long, /Note 6:/)
   // Not logged in → no socket → the hook prints nothing.
   const idle = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
   await idle.init()

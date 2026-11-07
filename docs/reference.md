@@ -475,7 +475,10 @@ That way a worker behaves correctly in its repository whoever coordinates it.
 | `tell_user(text, ref?)` | Coordinator: leave a result or a problem in your inbox |
 | `edit_inbox(id, …)` | Coordinator: change or close something it left there that is still open |
 | `update_plan(tasks, title?)` | Coordinator: keep its plan on the team's page, the whole list of tasks each time |
+| `help(topic?)` | Squadra's rules in full, with examples: roles, permissions, decisions, reports, inbox, plan, linked teams, access, messages |
 | `login` · `logout` · `status` | Used by the `/squadra:*` commands |
+
+The rules reach Claude in layers, since Claude Code keeps only 4096 characters of a server's instructions: those hold the core and a summary of the role; the role's rules in full come with `login` and again after each compaction or `/clear`; each tool's description carries the rules for using it; and `help` has all of them with examples. Some are also said at the moment they matter, in a tool's answer: when a coordinator hands out work without a plan, leaves a question in the inbox, or approves a permission that looks hard to undo (a reminder, never a refusal).
 
 ## Companies and people
 

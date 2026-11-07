@@ -475,7 +475,10 @@ Así un worker se comporta bien en su repositorio sea quien sea su coordinador.
 | `tell_user(text, ref?)` | Coordinador: deja un resultado o un problema en tu bandeja |
 | `edit_inbox(id, …)` | Coordinador: cambia o cierra algo que dejó ahí y sigue abierto |
 | `update_plan(tasks, title?)` | Coordinador: lleva su plan en la página del equipo, la lista entera de tareas cada vez |
+| `help(topic?)` | Las reglas de Squadra completas, con ejemplos: roles, permisos, decisiones, informes, bandeja, plan, equipos enlazados, acceso, mensajes |
 | `login` · `logout` · `status` | Las usan los comandos `/squadra:*` |
+
+Las reglas llegan a Claude por capas, porque Claude Code solo guarda 4096 caracteres de las instrucciones de un servidor: ahí van el núcleo y un resumen del rol; las reglas completas del rol llegan con `login` y otra vez tras cada compactación o `/clear`; la descripción de cada herramienta lleva las reglas para usarla; y `help` las tiene todas con ejemplos. Algunas se dicen además en el momento justo, en la respuesta de una herramienta: cuando un coordinador reparte trabajo sin plan, deja una pregunta en la bandeja o aprueba un permiso que parece difícil de deshacer (un aviso, nunca un bloqueo).
 
 ## Empresas y personas
 

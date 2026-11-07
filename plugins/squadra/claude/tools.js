@@ -9,6 +9,7 @@ import {
 } from '../core/index.js'
 import { closeTasks, pendingTasks } from './tasks.js'
 import { login, logout, status } from './login.js'
+import { help, HELP_TOPICS } from './help.js'
 
 // Long replies are split, preferring paragraph boundaries when chunkMode is 'newline'.
 // What this session writes to others (reply, edit_message): recognisable
@@ -47,6 +48,19 @@ function planHint() {
   return ''
 }
 
+// What, in a permission request, may be hard to undo or reach beyond the
+// machine: approving it gets a reminder of the rule (never a refusal: the
+// user decides how their team works). A guess from the text; one missed is
+// left to the rules, one flagged wrongly costs one line.
+const RISKY_RE = /\brm\s+-[a-z]*[rf]|\bgit\s+push\b[^\n]*(?:--force|\s-f\b)|\bgit\s+reset\s+--hard|\bgit\s+clean\s+-[a-z]*f|\b(?:drop|truncate)\s+(?:table|database|schema)\b|\bdelete\s+from\b|\bmigrat\w*\b[^\n]*\b(?:reset|fresh|rollback|down|deploy|prod\w*)\b|\b(?:terraform\s+(?:apply|destroy)|kubectl\s+(?:apply|delete|scale)|helm\s+(?:install|upgrade|uninstall))\b|\b(?:npm|pnpm|yarn|cargo|gem|twine)\s+publish\b|\bdocker\s+push\b|\bdeploy\w*\b|\b(?:passwd|chpasswd|useradd|userdel|chmod\s+-R\s+777)\b|\b(?:password|passwd|secret|token|api[_-]?key|credential)s?\b/i
+function riskyApproval(chat_id, text) {
+  const code = /^\s*yes\s+([A-Za-z]{5})\s*$/i.exec(text)?.[1]
+  if (!code || S.role !== 'coordinator') return ''
+  const req = [...(S.recent ?? [])].reverse().find(m => m.from === chat_id && m.text.includes('🔐 Permission') && m.text.includes(code))
+  const hit = req && RISKY_RE.exec(req.text.split('\n').filter(l => /^(?:Description|Input|Its "description")/.test(l)).join('\n'))
+  return hit ? `\n⚠️ Approved. It looks like it could be hard to undo or reach beyond the machine ("${hit[0].trim()}"): if the user hasn't approved it, the rules say ask_user first (help("permissions")). This is only a reminder.` : ''
+}
+
 // A text that opens like a report ("done: …", "✅ report: blocked …").
 const REPORT_IN_TEXT_RE = new RegExp(`^[^\\p{L}]*(?:report\\W*)?(${REPORTS.join('|')})\\b`, 'iu')
 
@@ -78,7 +92,7 @@ export const TOOLS = [
   {
     name: 'reply',
     _meta: ALWAYS_LOAD,
-    description: 'Send a message to another Squadra session (or a #group). Pass chat_id from the inbound message, or the session name to start a conversation with an allowlisted session. Optionally pass reply_to (message_id) for threading, and files (absolute paths) to attach images or documents.',
+    description: 'Send a message to another Squadra session (or a #group). Pass chat_id from the inbound message, or the session name to start a conversation with an allowlisted session. Optionally pass reply_to (message_id) for threading, and files (absolute paths) to attach images or documents. The other session can\'t see your terminal: only what you send here reaches it. Don\'t send acknowledgements ("ok", "received", "thanks"), nor answer them. Worker: every task from your coordinator ends with ONE reply with report set (see report). Coordinator: to answer a worker\'s "🔐 Permission" request, send exactly "yes <code>" or "no <code>" in its chat. Approve what has no side effects (reads, searches, tests, local builds); anything destructive, irreversible, with effects outside the machine or about credentials goes to the user first (ask_user), and if it says characters were NOT SHOWN, ask the user too. If this answers NOT SENT, nobody has that task: give it to another active worker. More: help("messages"), help("permissions"), help("reports").',
     inputSchema: {
       type: 'object',
       properties: {
@@ -167,6 +181,15 @@ export const TOOLS = [
         ref: { type: 'string', description: 'Where it can be looked at, if anywhere: a link, a ticket, a path.' },
       },
       required: ['text'],
+    },
+  },
+  {
+    name: 'help',
+    _meta: ALWAYS_LOAD,
+    description: `Squadra's rules in full, with examples: look one up whenever you are unsure what to do (who decides what, answering a permission, ending a task, the inbox, the plan). Topics: ${HELP_TOPICS.join(', ')}. Without a topic, the list.`,
+    inputSchema: {
+      type: 'object',
+      properties: { topic: { type: 'string', enum: HELP_TOPICS, description: 'What to look up.' } },
     },
   },
   {
@@ -304,6 +327,8 @@ export async function callTool(name, args) {
       return await logout({ ask: true })
     case 'status':
       return await status()
+    case 'help':
+      return help(args.topic)
   }
 
   requireReady()
@@ -322,7 +347,7 @@ export async function callTool(name, args) {
       if (report && fyi) throw new Error('a message is either a report or fyi, not both')
       if (report && !text) throw new Error('a report needs its text')
       // A coordinator's message to its worker is a task, never a report.
-      if (report && (S.role !== 'worker' || chat_id !== S.coordinator)) throw new Error(`NOT SENT: report is only for a worker's final report to its coordinator. Send it again without report${S.role === 'coordinator' ? ': your messages to a worker are already tasks it must report on' : ''}.`)
+      if (report && (S.role !== 'worker' || chat_id !== S.coordinator)) throw new Error(`NOT SENT: report is only for a worker's final report to its coordinator. Send it again without report${S.role === 'coordinator' ? ': your messages to a worker are already tasks it must report on' : ''} (help("reports")).`)
       assertAllowedChat(chat_id)
       await assertPeerIsPinned(chat_id)
 
@@ -401,7 +426,7 @@ export async function callTool(name, args) {
         stillOpen = `\nNOT taken as your final report: the report argument was not set. If this was it, send it once more with report: "${REPORT_IN_TEXT_RE.exec(text)[1].toLowerCase()}".`
       } else if (S.role === 'coordinator' && !fyi && !GROUP_ID_RE.test(chat_id)) {
         // (Said where it matters, handing out work: the rules alone weren't enough for every model.)
-        stillOpen = planHint()
+        stillOpen = riskyApproval(chat_id, text) || planHint()
       }
       const result = (sentIds.length === 1 ? `sent (id: ${sentIds[0]})` : `sent ${sentIds.length} parts (ids: ${sentIds.join(', ')})`) +
         (masked ? ` (${masked} secret${masked > 1 ? 's' : ''} masked as [REDACTED])` : '') + stillOpen
@@ -442,7 +467,7 @@ export async function callTool(name, args) {
         ...(name === 'ask_user' ? { recommended: clean(args.recommended), options: Array.isArray(args.options) ? args.options.map(clean) : undefined } : {}),
       })
       return name === 'ask_user'
-        ? `It is in the user's inbox (#${id}). They answer when they can: go on with whatever doesn't depend on it. If you learn something that changes it, edit_inbox. In your plan (update_plan), that task waits on the user.`
+        ? `It is in the user's inbox (#${id}). They answer when they can: go on with whatever doesn't depend on it. Until they answer, nobody does that part, not even written and left unapplied. If you learn something that changes it, edit_inbox. In your plan (update_plan), that task waits on the user.`
         : `It is in the user's inbox (#${id}).${planHint()}`
     }
     case 'update_plan': {
