@@ -17,7 +17,7 @@ function member(s, here) {
 }
 
 export function renderSessionAside() {
-  const box = $('session').querySelector('.sv-aside')
+  const box = $('session').querySelector('.sv-info')
   const r = currentRoute()
   if (!box || r.view !== 'session') return
   const s = sessions.get(r.name)

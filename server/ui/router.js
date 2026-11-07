@@ -133,6 +133,8 @@ export function route() {
   hideOrgTip()
   $('hosts').hidden = r.view !== 'hosts'
   const st = sessionTerm(r)
+  // (The timeline beside a conversation goes with it.)
+  if (state.chatTimeline && !(r.view === 'session' && !st && state.chatTimeline.name === r.name)) { state.chatTimeline.destroy(); state.chatTimeline = null }
   const termMode = r.view === 'terminal' || !!st
   $('terminal').hidden = !termMode
   if (!termMode && state.termView) { state.termView.destroy(); state.termView = null; $('terminal').innerHTML = '' }
@@ -177,9 +179,11 @@ export function route() {
       state.sessionView?.destroy()
       state.sessionView = new ChatView(r.name, { full: true })
       // The conversation, and beside it the team and where it runs.
-      $('session').innerHTML = '<div class="sv"><div class="sv-thread"></div><aside class="sv-aside"></aside></div>'
+      $('session').innerHTML = '<div class="sv"><div class="sv-thread"></div><aside class="sv-aside"><div class="sv-info"></div><div class="sv-tl"></div></aside></div>'
       $('session').querySelector('.sv-thread').appendChild(state.sessionView.el)
       $('session').querySelector('.sv-aside').setAttribute('aria-label', r.name)
+      state.chatTimeline?.destroy()
+      state.chatTimeline = new Timeline(r.name, $('session').querySelector('.sv-tl'), { now: false })
     }
     renderSessionAside()
     unread.delete(r.name)

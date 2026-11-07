@@ -547,4 +547,7 @@ test('beside a session terminal: what it is doing, and what mattered, read from 
   await page.locator('[data-tvfold]').click()
   await page.goto(`${server.url}/#/t/${machine.id}/tlw`)
   await expect(page.locator('.tv-aside .tl-list')).toContainText('Round the total')
+  // And beside its conversation, under its team and details.
+  await page.goto(`${server.url}/#/s/tlw/chat`)
+  await expect(page.locator('.sv-aside .tl-list')).toContainText('Round the total')
 })

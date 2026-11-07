@@ -6,7 +6,9 @@
 .sv { flex: 1; min-height: 0; display: flex; }
 .sv-thread { flex: 3 1 480px; min-width: 0; display: flex; flex-direction: column; }
 .sv-aside { flex: 0 1 300px; min-width: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding: 20px; border-left: 1px solid var(--line); }
-.sv-aside section + section { padding-top: 16px; border-top: 1px solid var(--line); }
+.sv-info { display: flex; flex-direction: column; gap: 18px; }
+.sv-info:empty { display: none; }
+.sv-aside section + section, .sv-info:not(:empty) + .sv-tl { padding-top: 16px; border-top: 1px solid var(--line); }
 .sv-aside:empty { display: none; }
 .sv-members { list-style: none; margin: 0 0 8px; padding: 0; }
 .sv-member { display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 0 -8px; padding: 4px 8px; border-radius: var(--r); color: inherit; text-decoration: none; }
@@ -16,7 +18,7 @@
 .sv-mwhat { flex: 1; min-width: 0; text-align: right; font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sv-small { font-size: var(--fs-sm); }
 .sv-quiet { color: var(--muted); margin: 0; }
-.sv-facts { border-top: 0; padding-top: 0; margin-top: 0; }
+.sv-facts { margin: 0; padding: 0; border-top: 0; border-radius: 0; background: none; }
 .sv-mono { font-family: var(--mono); font-size: 12px; }
 
 /* The conversation, as in a document: who said it over what was said. */

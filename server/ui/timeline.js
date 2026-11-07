@@ -85,9 +85,12 @@ function milestones(name, items) {
 const day = ts => new Date(ts).toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' })
 
 export class Timeline {
-  constructor(name, box) {
+  // now: false leaves out what it is doing now (beside its conversation,
+  // the team and the details already say it).
+  constructor(name, box, { now = true } = {}) {
     this.name = name
     this.box = box
+    this.showNow = now
     this.items = []
     this.loaded = false
     this.timer = null
@@ -141,7 +144,7 @@ export class Timeline {
       lastDay = d
       return `${head}<li class="tl-item ${m.tone}" data-kind="${m.kind}"><time datetime="${new Date(m.ts).toISOString()}">${esc(hhmm(m.ts))}</time><span class="tl-mark" aria-hidden="true"></span><div><b>${esc(m.title)}</b>${m.detail ? `<span title="${esc(m.full)}">${esc(m.detail)}</span>` : ''}</div></li>`
     }).join('')
-    this.box.innerHTML = `${now}<section class="tl-past"><h2 class="tq-label">${esc(T.tlImportant)}</h2>
+    this.box.innerHTML = `${this.showNow ? now : ''}<section class="tl-past"><h2 class="tq-label">${esc(T.tlImportant)}</h2>
       ${!this.loaded ? `<p class="sv-small sv-quiet">${esc(T.termLoading)}</p>` : rows ? `<ol class="tl-list">${rows}</ol>` : `<p class="sv-small sv-quiet">${esc(T.tlEmpty)}</p>`}
       ${a.observe === 'off' ? `<p class="sv-small sv-quiet">${esc(T.svNotObserved)}</p>` : `<p class="tl-kept">${esc(T.tlKept)}</p>`}</section>`
   }
