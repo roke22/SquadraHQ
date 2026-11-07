@@ -23,7 +23,7 @@ export function createInbox(platform, { sessions }) {
   const view = r => ({
     id: r.id, session: r.session, kind: r.kind, text: r.text, options: r.options ? JSON.parse(r.options) : [],
     recommended: r.recommended, ref: r.ref, created_at: r.created_at, resolved_at: r.resolved_at,
-    version: r.version, updated_at: r.updated_at, answer: r.answer, answered_by: r.answered_by, closed_reason: r.closed_reason,
+    version: r.version, updated_at: r.updated_at, answer: r.answer, answered_by: r.answered_by, closed_reason: r.closed_reason, dismissed_by: r.dismissed_by,
   })
   // What is open, and the last ones done.
   function list() {
@@ -79,7 +79,7 @@ export function createInbox(platform, { sessions }) {
     const id = Number(p.id)
     const row = Number.isSafeInteger(id) ? db.prepare('SELECT * FROM inbox WHERE id = ? AND session = ?').get(id, name) : null
     if (!row) throw bad(`nothing of yours in the user's inbox with id ${p.id}`)
-    if (row.resolved_at) throw bad(`#${id} is no longer open (${row.answer != null ? 'the user answered it' : 'it was closed'}): if you still need something, ask again`)
+    if (row.resolved_at) throw bad(`#${id} is no longer open (${row.answer != null ? 'the user answered it' : row.dismissed_by ? 'the user dismissed it without answering: don\'t wait for an answer' : 'it was closed'}): if you still need something, ask again`)
     if (!allow('inbox-edit', name, EDITS_PER_HOUR, 3600_000)) throw new ApiError(429, `Too Many Requests: at most ${EDITS_PER_HOUR} changes an hour`)
     if (p.close != null) {
       const reason = short(p.close, MAX_OPTION, 'close')
@@ -107,6 +107,18 @@ export function createInbox(platform, { sessions }) {
     if (!db.prepare('UPDATE inbox SET resolved_at = ? WHERE id = ? AND resolved_at IS NULL').run(now(), id).changes) throw bad('nothing open with that id')
     broadcast('inbox', list())
     return { id, resolved: true }
+  }
+
+  // The user puts a question away without answering it: closed, and the
+  // dashboard tells its coordinator not to wait for an answer.
+  function dismiss(id, by) {
+    const row = Number.isSafeInteger(id) ? db.prepare('SELECT * FROM inbox WHERE id = ?').get(id) : null
+    if (!row || row.kind !== 'ask') throw bad('no question with that id')
+    if (!db.prepare('UPDATE inbox SET resolved_at = ?, dismissed_by = ? WHERE id = ? AND resolved_at IS NULL').run(now(), by, id).changes) {
+      throw new ApiError(409, 'Conflict: it is no longer open', { parameters: { reason: 'closed' } })
+    }
+    broadcast('inbox', list())
+    return { id, session: row.session, text: row.text }
   }
 
   // The user answers a question from the dashboard, as they read it: if its
@@ -142,5 +154,5 @@ export function createInbox(platform, { sessions }) {
     tellUser: (name, p) => add(name, 'tell', { text: p.text, ref: p.ref }),
     editInbox: (name, p) => edit(name, p),
   }
-  return { inboxMethods, list, resolve, takeAnswer, giveBack, cleanupInbox }
+  return { inboxMethods, list, resolve, dismiss, takeAnswer, giveBack, cleanupInbox }
 }

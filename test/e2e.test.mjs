@@ -2790,6 +2790,16 @@ test('the inbox: a coordinator leaves a question or a result for the user, and n
   list = (await dash('/api/inbox')).result
   assert.ok(list.find(i => i.id === ask.id).resolved_at)
   assert.equal((await dashPost('/api/inbox/resolve', { id: ask.id })).ok, false)
+  // A question dismissed: closed, though nobody could be told here (not opened
+  // from the dashboard), and its coordinator learns it if it tries to change it.
+  await coord.tool('ask_user', { text: 'Rename the release?', options: ['Yes', 'No'] })
+  const id0 = (await dash('/api/inbox')).result.find(i => i.text === 'Rename the release?').id
+  const d = await dashPost('/api/inbox/dismiss', { id: id0 })
+  assert.deepEqual([d.ok, d.result.dismissed, d.result.told, d.result.reason], [true, true, false, 'no_machine'])
+  assert.equal((await dash('/api/inbox')).result.find(i => i.id === id0).dismissed_by, 'server token')
+  await assert.rejects(coord.tool('edit_inbox', { id: String(id0), text: 'Rename it to 2.0?' }), /dismissed it without answering/)
+  assert.equal((await dashPost('/api/inbox/dismiss', { id: id0 })).parameters?.reason, 'closed')
+  assert.equal((await dashPost('/api/inbox/dismiss', { id: list.find(i => i.ref === 'ACME-12').id })).ok, false)
   // A worker, or a name nobody approved, doesn't write in it.
   const w = new Plugin('inbw', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_COORDINATOR: 'inb1', SQUADRA_ALLOW_FROM: 'inb1' })
   await w.init(); await w.waitConnected()

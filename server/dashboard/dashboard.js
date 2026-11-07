@@ -272,20 +272,38 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     return sessionView(name)
   }
 
+  // (Said to come from the inbox: typed in the coordinator's terminal, it would
+  // look as if the user were following that session now, and the next question
+  // went to the chat.)
+  const fromInbox = (taken, what) => {
+    const asked = taken.text.replace(/\s+/g, ' ')
+    return `Inbox #${taken.id} ("${asked.length > 80 ? `${asked.slice(0, 80)}…` : asked}"), ${what} [They are not following this session: anything else for them goes to ask_user or tell_user. Update your plan with update_plan.]`
+  }
+
   // An answer from the inbox: closed as answered, then typed in the
   // coordinator's terminal. If it can't be typed, it is open again.
   async function answerFromInbox(p, actor) {
     const taken = inbox.takeAnswer(p, actor?.email ?? 'server token')
-    const asked = taken.text.replace(/\s+/g, ' ')
     try {
-      // (Said to come from the inbox: typed here, it would look as if the user
-      // were following this session now, and the next question went to the chat.)
-      await typeAnswer(taken.session, `Inbox #${taken.id} ("${asked.length > 80 ? `${asked.slice(0, 80)}…` : asked}"), the user answers from their inbox: ${taken.answer} [They are not following this session: anything else for them goes to ask_user or tell_user. Update your plan with update_plan.]`)
+      await typeAnswer(taken.session, fromInbox(taken, `the user answers from their inbox: ${taken.answer}`))
     } catch (err) {
       inbox.giveBack(taken.id)
       throw err
     }
     return { id: taken.id, answered: true }
+  }
+
+  // A question put away without an answer: closed, and its coordinator told
+  // not to wait for one. If that can't be typed it stays closed, and the
+  // dashboard says who wasn't told (it also learns if it tries to change it).
+  async function dismissFromInbox(p, actor) {
+    const taken = inbox.dismiss(Number(p.id), actor?.email ?? 'server token')
+    try {
+      await typeAnswer(taken.session, fromInbox(taken, 'the user dismissed it from their inbox without answering. Don\'t wait for an answer to it: carry on with the rest, or ask again differently if you still need a decision.'))
+    } catch (err) {
+      return { id: taken.id, dismissed: true, told: false, reason: err.extra?.parameters?.reason ?? null }
+    }
+    return { id: taken.id, dismissed: true, told: true }
   }
 
   const dashboardActions = {
@@ -319,6 +337,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     'terminal/ticket': (p, req) => newTerminalTicket(req.actor ?? null),
     'inbox/resolve': p => inbox.resolve(Number(p.id)),
     'inbox/answer': (p, req) => answerFromInbox(p, req.actor),
+    'inbox/dismiss': (p, req) => dismissFromInbox(p, req.actor),
   }
 
   // Who may do each thing, at least. Whatever isn't here nobody may do, and the
@@ -326,7 +345,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   const dashboardRoles = {
     reads: { inbox: 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer' },
     actions: {
-      'inbox/resolve': 'operator', 'inbox/answer': 'operator', kick: 'operator', clear: 'operator', archive: 'operator', unarchive: 'operator',
+      'inbox/resolve': 'operator', 'inbox/answer': 'operator', 'inbox/dismiss': 'operator', kick: 'operator', clear: 'operator', archive: 'operator', unarchive: 'operator',
       'terminals/open': 'operator', 'terminals/kill': 'operator', 'terminal/ticket': 'operator', 'hosts/personas': 'operator',
       approve: 'manager', delete: 'manager',
       'hosts/enroll': 'manager', 'hosts/rename': 'manager', 'hosts/remove': 'manager', 'hosts/folders': 'manager',

@@ -810,6 +810,12 @@ test('an answer from the inbox is typed in its coordinator\'s terminal, as the u
   assert.deepEqual([!!item.resolved_at, item.answer, item.answered_by], [true, 'Stack, with a 25 % cap\nand tell support', 'server token'])
   // Answered already: not again.
   assert.equal((await dash('inbox/answer', { id, version: 1, answer: 'Biggest' })).parameters?.reason, 'closed')
+  // Dismissed without an answer: closed, and its coordinator told not to wait.
+  const id0 = await ask('Rename the release?')
+  const d = await dash('inbox/dismiss', { id: id0 })
+  assert.deepEqual([d.ok, d.result?.told], [true, true], JSON.stringify(d))
+  await waitFor(() => screen('ia1').includes(`GOT:Inbox #${id0} ("Rename the release?"), the user dismissed it from their inbox without answering`), { what: 'the dismissal typed' })
+  assert.equal((await dash('inbox')).result.find(i => i.id === id0).dismissed_by, 'server token')
 
   // On a question on its screen, Enter would answer that: not typed, and the
   // question stays open for the user.

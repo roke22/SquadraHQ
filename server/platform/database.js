@@ -187,6 +187,7 @@ export function openDatabase(dir) {
     ['inbox', 'answer', 'TEXT'],                         // what the user answered from the dashboard
     ['inbox', 'answered_by', 'TEXT'],                    // and who
     ['inbox', 'closed_reason', 'TEXT'],                  // why its coordinator closed it
+    ['inbox', 'dismissed_by', 'TEXT'],                   // who put a question away without answering it
   ]) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name)
     if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)

@@ -148,10 +148,11 @@ function detail(e) {
     ${i.options.length ? (answering ? `<div class="ibx-opts" role="group" aria-label="${esc(T.inboxOptions)}">${opts}</div>` : `<ul class="ibx-optlist">${opts}</ul>`) : ''}
     ${i.recommended && recIndex < 0 ? `<p class="ibx-rec"><span class="tag">${esc(T.inboxRecommended)}</span> ${esc(i.recommended)}</p>` : ''}
     ${answering ? `<form class="ibx-answer" data-answer="${i.id}"><label class="field"><span>${esc(i.options.length ? T.ibxOwnWordsOr : T.ibxOwnWords)}</span><textarea name="answer" rows="3" maxlength="2000" placeholder="${esc(T.ibxReachesTo(i.session))}"></textarea></label>
-        <div class="ibx-actions"><span class="ibx-note">${esc(i.options.length ? T.ibxOptionDetail : T.ibxGoesOn)}</span><span class="row">${can('operator') ? `<button type="button" class="btn quiet" data-resolve="${i.id}">${esc(T.inboxResolve)}</button>` : ''}<button class="btn primary">${esc(T.inboxSend)}</button></span></div></form>` : ''}
+        <div class="ibx-actions"><span class="ibx-note">${esc(i.options.length ? T.ibxOptionDetail : T.ibxGoesOn)}</span><span class="row"><button type="button" class="btn quiet" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button><button class="btn primary">${esc(T.inboxSend)}</button></span></div></form>` : ''}
     ${why ? `<p class="ibx-note">${esc(why)}</p>` : ''}
-    ${open && !answering && can('operator') ? `<div class="ibx-actions">${why ? `<a class="btn" href="#/s/${encodeURIComponent(i.session)}">${esc(T.inboxAnswer)}</a>` : ''}<button type="button" class="btn${why ? '' : ' primary'}" data-resolve="${i.id}">${esc(T.inboxResolve)}</button></div>` : ''}
+    ${open && !answering && can('operator') ? `<div class="ibx-actions">${why ? `<a class="btn" href="#/s/${encodeURIComponent(i.session)}">${esc(T.inboxAnswer)}</a>` : ''}${ask ? `<button type="button" class="btn" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button>` : `<button type="button" class="btn${why ? '' : ' primary'}" data-resolve="${i.id}">${esc(T.inboxResolve)}</button>`}</div>` : ''}
     ${i.answer != null ? `<p class="ibx-result">${esc(T.inboxAnswered(i.answered_by ?? '', i.answer))}</p>` : ''}
+    ${i.dismissed_by ? `<p class="ibx-result">${esc(T.inboxDismissed(i.dismissed_by))}</p>` : ''}
     ${i.closed_reason ? `<p class="ibx-result">${esc(T.inboxClosed(i.closed_reason))}</p>` : ''}
     <dl class="ibx-facts">
       ${i.ref ? `<dt>${esc(T.ibxRef)}</dt><dd>${refHtml(i.ref)}</dd>` : ''}
@@ -241,6 +242,18 @@ $('inbox').addEventListener('click', async e => {
   if (e.target.closest('[data-newteam]')) { location.hash = '#/new'; return }
   const opt = e.target.closest('[data-option]')
   if (opt) return choose(Number(opt.dataset.option))
+  // A question put away: its coordinator is told not to wait, if it can be.
+  const dm = e.target.closest('[data-dismiss]')
+  if (dm) {
+    const id = Number(dm.dataset.dismiss)
+    const session = state.inbox.find(x => x.id === id)?.session ?? ''
+    try {
+      const r = await postJson('/api/inbox/dismiss', { id })
+      next(id)
+      if (r && r.told === false) alertBox(T.inboxDismissNotTold(session))
+    } catch (err) { alertBox(err.message) }
+    return
+  }
   const b = e.target.closest('[data-resolve]')
   if (b) {
     try { await postJson('/api/inbox/resolve', { id: Number(b.dataset.resolve) }); next(Number(b.dataset.resolve)) } catch (err) { alertBox(err.message) }

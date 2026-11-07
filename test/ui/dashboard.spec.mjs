@@ -280,7 +280,11 @@ test('the inbox: what a coordinator left is there, with what it wrote kept as te
   await page.keyboard.press('Escape')
   await expect(box.locator('.ibx-detail')).toBeHidden()
   await box.locator('.ibx-item').first().click()
-  await box.locator('[data-resolve]').first().click()
+  // A question is dismissed, not done: here its coordinator can't be told, and it says so.
+  await expect(box.locator('.ibx-detail [data-resolve]')).toHaveCount(0)
+  await box.locator('[data-dismiss]').click()
+  await expect(page.locator('.modal')).toContainText("couldn't be told")
+  await page.locator('.modal .actions .btn').first().click()
   await expect(page.locator('#nav a[href="#/"] .badge')).toHaveText('1')
   // No decision left: back to the list, where the note is.
   await expect(page).toHaveURL(/#\/inbox$/)
