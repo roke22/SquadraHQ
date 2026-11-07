@@ -19,7 +19,7 @@
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .btn.primary:hover { background: color-mix(in srgb, var(--accent) 90%, var(--text)); border-color: transparent; }
 .btn.danger { color: var(--err); }
-.btn.primary.danger { background: var(--err); border-color: var(--err); color: #fff; }
+.btn.primary.danger { background: var(--err); border-color: var(--err); color: var(--on-accent); }
 .btn.quiet { border-color: transparent; color: var(--muted); }
 .btn.quiet:hover { color: var(--text); }
 .btn svg, .icon-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
