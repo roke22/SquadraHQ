@@ -186,7 +186,7 @@ export function openSettings(start) {
     if (turn !== drawing) return
     const mine = new Set(state.me.companies.map(c => c.id))
     body.innerHTML = `<table class="people"><tbody>${list.map(c => `<tr><td><b>${esc(c.name)}</b><br><span class="note">${esc(c.id)}${c.status === 'unavailable' ? ` · ${esc(T.unavailable)}` : ''}</span></td>
-        <td>${c.status === 'deleting' ? `<span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span> <button class="btn" data-restore="${esc(c.id)}">${esc(T.restore)}</button>` : mine.has(c.id) ? `<a class="btn" href="?company=${encodeURIComponent(c.id)}">${esc(T.openCompany)}</a>` : `<button class="btn" data-join="${esc(c.id)}">${esc(T.joinCompany)}</button>`}</td></tr>`).join('')}</tbody></table>
+        <td>${c.status === 'deleting' ? `<span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span> <button class="btn ok" data-restore="${esc(c.id)}">${esc(T.restore)}</button>` : mine.has(c.id) ? `<a class="btn" href="?company=${encodeURIComponent(c.id)}">${esc(T.openCompany)}</a>` : `<button class="btn" data-join="${esc(c.id)}">${esc(T.joinCompany)}</button>`}</td></tr>`).join('')}</tbody></table>
       <div class="set-card"><form data-create class="people-form"><label class="field"><span>${esc(T.companyName)}</span><input type="text" name="name" required maxlength="80"></label>
         <button class="btn primary">${esc(T.createCompany)}</button></form><div data-link></div></div>`
     body.querySelector('[data-create]').onsubmit = async e => {
@@ -207,7 +207,7 @@ export function openSettings(start) {
     if (turn !== drawing) return
     body.innerHTML = `<table class="people"><tbody>${list.map(u => `<tr><td><b>${esc(u.name)}</b>${u.is_platform_admin ? ` <span class="note">${esc(T.administrator)}</span>` : ''}<br><span class="note">${esc(u.email)}${u.disabled ? ` · ${esc(T.disabled)}` : ''}</span></td>
         <td><button class="btn" data-reset="${esc(u.id)}">${esc(T.resetLink)}</button>
-        ${u.id === state.me.user.id ? '' : `<button class="btn ${u.disabled ? '' : 'danger'}" data-${u.disabled ? 'enable' : 'disable'}="${esc(u.id)}">${esc(u.disabled ? T.enable : T.disable)}</button>`}</td></tr>`).join('')}</tbody></table><div data-link></div>
+        ${u.id === state.me.user.id ? '' : `<button class="btn ${u.disabled ? 'ok' : 'danger'}" data-${u.disabled ? 'enable' : 'disable'}="${esc(u.id)}">${esc(u.disabled ? T.enable : T.disable)}</button>`}</td></tr>`).join('')}</tbody></table><div data-link></div>
       ${links.length ? `<h4>${esc(T.pendingLinks)}</h4><table class="people"><tbody>${links.map(l => `<tr><td>${esc(l.email)} <span class="note">${esc(l.kind === 'reset' ? T.linkReset : T.linkInvite)} · ${esc(fmtTime(l.expires_at))}</span></td><td><button class="btn danger" data-cancel-link="${esc(l.id)}">${esc(T.cancelInvite)}</button></td></tr>`).join('')}</tbody></table>` : ''}`
   }
 
@@ -226,7 +226,7 @@ export function openSettings(start) {
     const me = state.me.user
     const waiting = state.me.deleting ?? []
     body.innerHTML = `<div class="set-card set-me"><span class="set-avatar" aria-hidden="true">${esc((me.name || me.email || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(me.name)}</b><span class="note">${esc(me.email)}</span></div></div>
-      ${waiting.length ? `<table class="people"><tbody>${waiting.map(c => `<tr><td><b>${esc(c.name)}</b><br><span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span></td><td><button class="btn" data-restore="${esc(c.id)}">${esc(T.restore)}</button></td></tr>`).join('')}</tbody></table>` : ''}
+      ${waiting.length ? `<table class="people"><tbody>${waiting.map(c => `<tr><td><b>${esc(c.name)}</b><br><span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span></td><td><button class="btn ok" data-restore="${esc(c.id)}">${esc(T.restore)}</button></td></tr>`).join('')}</tbody></table>` : ''}
       <h4>${esc(T.passwordTitle)}</h4><div class="set-card"><form data-password class="people-stack"><label class="field"><span>${esc(T.currentPassword)}</span><input type="password" name="current" autocomplete="current-password" required></label>
       <label class="field"><span>${esc(T.newPassword)}</span><input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
       <button class="btn primary">${esc(T.setPassword)}</button></form><p class="note" data-done></p></div>`

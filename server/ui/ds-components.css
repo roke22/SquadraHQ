@@ -11,27 +11,28 @@
 .ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 
 /* --- buttons --------------------------------------------------------------- */
-/* What can be pressed wears the accent, so it reads as something to do: filled
-   for the main action of a place, tinted for the others, red for what stops or
-   removes; grey only for stepping back (cancel). */
+/* A button's colour says what it does: blue for the neutral (go somewhere,
+   open, add), green for what settles something (answer, done, approve), red
+   for what stops, removes or dismisses; grey only to cancel. Filled for the
+   main action of a place, tinted for the others. (The brand's own colour is
+   for the brand, never for an action, so nothing reads as red that isn't.) */
 .btn {
+  --tone: var(--info);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 30px; padding: 4px 11px; border: 1px solid transparent; border-radius: var(--r);
-  background: color-mix(in srgb, var(--accent) 11%, transparent); color: var(--accent); font: 500 var(--fs-md)/1.2 var(--sans);
+  background: color-mix(in srgb, var(--tone) 11%, transparent); color: var(--tone); font: 500 var(--fs-md)/1.2 var(--sans);
   white-space: nowrap; text-decoration: none; cursor: pointer;
   transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
 }
-.btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.btn.ok { --tone: var(--ok); }
+.btn.danger { --tone: var(--err); }
+.btn:hover { background: color-mix(in srgb, var(--tone) 18%, transparent); }
 .btn:active { transform: translateY(.5px); }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: default; pointer-events: none; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.btn.primary:hover { background: color-mix(in srgb, var(--accent) 90%, var(--text)); border-color: transparent; }
-.btn.danger { background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
-.btn.danger:hover { background: color-mix(in srgb, var(--err) 17%, transparent); }
-.btn.primary.danger { background: var(--err); border-color: var(--err); color: var(--on-accent); }
-.btn.quiet { background: transparent; color: var(--accent); }
-.btn.quiet:hover { background: color-mix(in srgb, var(--accent) 11%, transparent); }
-.btn.quiet.danger { color: var(--err); }
+.btn.primary { background: var(--tone); border-color: var(--tone); color: var(--on-accent); }
+.btn.primary:hover { background: color-mix(in srgb, var(--tone) 88%, var(--text)); border-color: transparent; }
+.btn.quiet { background: transparent; }
+.btn.quiet:hover { background: color-mix(in srgb, var(--tone) 11%, transparent); }
 .btn.plain, .btn[data-cancel] { background: var(--raised); color: var(--text); }
 .btn.plain:hover, .btn[data-cancel]:hover { background: color-mix(in srgb, var(--raised) 65%, var(--line-2)); }
 .btn svg, .icon-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -106,10 +107,10 @@ table.people select { width: auto; min-height: 28px; padding: 3px 8px; }
 .input:not(textarea), .field input:not([type=checkbox]):not([type=radio]), .field select { height: 34px; }
 .field textarea { resize: vertical; }
 .input:focus-visible, .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible, table.people select:focus-visible {
-  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: none; border-color: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 22%, transparent);
 }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-md); margin-bottom: var(--s3); }
-.check input { margin-top: 3px; accent-color: var(--accent); }
+.check input { margin-top: 3px; accent-color: var(--info); }
 
 /* --- surfaces -------------------------------------------------------------- */
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); min-width: 0; }

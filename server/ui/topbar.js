@@ -141,7 +141,7 @@ export function renderTop() {
     else setHtml($('topTabs'), '')
     const acts = []
     if (reopenable(s) && can('operator')) acts.push(`<button class="btn primary" data-reopen="${esc(r.name)}">${T.reopen}</button>`)
-    if (s?.approval_pending && can('manager')) acts.push(`<button class="btn primary" data-act="approve" data-s="${esc(s.name)}">${T.approve}</button>`)
+    if (s?.approval_pending && can('manager')) acts.push(`<button class="btn primary ok" data-act="approve" data-s="${esc(s.name)}">${T.approve}</button>`)
     if (termOn) acts.push(`<button class="btn quiet" data-tact="redraw">${esc(T.redraw)}</button><button class="btn quiet danger" data-tact="kill">${esc(T.closeSession)}</button>`)
     if (s && !termOn && !s.online && can('operator')) acts.push(s.archived_at
       ? `<button class="btn" data-act="unarchive" data-s="${esc(s.name)}">${T.unarchive}</button>`

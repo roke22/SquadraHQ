@@ -48,11 +48,11 @@ export function openMenu(anchor, name) {
   })
 }
 
-export function confirmDialog({ title, text, confirm, danger = false, option = null, run }) {
+export function confirmDialog({ title, text, confirm, danger = false, settles = false, option = null, run }) {
   const bg = document.createElement('div')
   bg.className = 'modal-bg'
   bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><p>${text}</p>${option ? `<label class="check"><input type="checkbox" data-option checked> <span>${esc(option)}</span></label>` : ''}<div class="err"></div>
-      <div class="actions"><button class="btn" data-cancel>${T.cancel}</button><button class="btn primary ${danger ? 'danger' : ''}" data-ok>${esc(confirm)}</button></div></div>`
+      <div class="actions"><button class="btn" data-cancel>${T.cancel}</button><button class="btn primary${danger ? ' danger' : settles ? ' ok' : ''}" data-ok>${esc(confirm)}</button></div></div>`
   document.body.appendChild(bg)
   const close = () => bg.remove()
   bg.addEventListener('click', e => { if (e.target === bg) close() })
@@ -85,7 +85,7 @@ export function runAction(action, name) {
   const s = sessions.get(name)
   const who = `<b>${esc(name)}</b>`
   if (action === 'approve') {
-    return confirmDialog({ title: T.approveTitle(name), text: T.approveText(who), confirm: T.approve, run: () => post('approve', name) })
+    return confirmDialog({ title: T.approveTitle(name), text: T.approveText(who), confirm: T.approve, settles: true, run: () => post('approve', name) })
   }
   if (action === 'kick') {
     return confirmDialog({ title: T.kickTitle(name), text: T.kickText(who), confirm: T.kick, danger: true, run: () => post('kick', name) })

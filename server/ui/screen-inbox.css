@@ -71,13 +71,13 @@ details.ibx-group > summary:hover { color: var(--text); }
 }
 .ibx-opt:hover { background: var(--raised); border-color: var(--muted); }
 .ibx-opt:active { transform: scale(.995); }
-.ibx-opt.rec { border-color: var(--accent); }
+.ibx-opt.rec { border-color: var(--ok); }
 .ibx-opt span:not(.tag) { flex: 1; }
-.ibx-opt .tag { color: var(--accent); border-color: currentColor; }
+.ibx-opt .tag { color: var(--ok); border-color: currentColor; }
 .ibx-optlist { margin: 0 0 16px; padding-left: 20px; }
 .ibx-optlist li { margin: 3px 0; }
 .ibx-rec { margin: 0 0 16px; color: var(--muted); }
-.ibx-rec .tag { color: var(--accent); border-color: currentColor; margin-right: 4px; }
+.ibx-rec .tag { color: var(--ok); border-color: currentColor; margin-right: 4px; }
 
 .ibx-answer .field { margin-bottom: 10px; }
 .ibx-answer textarea { min-height: 76px; }
@@ -128,7 +128,7 @@ details.ibx-group > summary:hover { color: var(--text); }
 .fs-mark { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border: 1px solid var(--line-2); border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
 .fs-step.done .fs-mark { border-color: var(--ok); color: var(--ok); }
 .fs-step.done b { color: var(--muted); }
-.fs-step.now .fs-mark { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.fs-step.now .fs-mark { background: var(--info); border-color: var(--info); color: var(--on-accent); }
 .fs-step:not(.done):not(.now) b { color: var(--muted); font-weight: 400; }
 .fs-hint { font-size: var(--fs-sm); color: var(--muted); }
 

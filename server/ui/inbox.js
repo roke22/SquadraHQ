@@ -133,13 +133,13 @@ function detail(e) {
     return `${back}<article class="ibx-card">${head(s.name, T.ibxPermission, e.at, false)}
       <div class="ibx-body"><h2 class="ibx-q">${esc(T.ibxPermTitle(s.name, ''))}</h2><pre class="ibx-perm">${esc(permWhat(s) || status(s).text)}</pre>
       <p class="ibx-note">${esc(T.ibxPermHint)}</p>
-      <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div></div></article>`
+      <div class="ibx-actions"><a class="btn primary ok" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div></div></article>`
   }
   if (e.kind === 'approve') {
     const s = e.s
     return `${back}<article class="ibx-card">${head(s.name, T.approveNote, e.at, false)}
       <div class="ibx-body"><h2 class="ibx-q">${esc(T.ibxApproveTitle(s.name))}</h2><p class="ibx-note">${esc(T.ibxApproveHint)}</p>
-      <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div></div></article>`
+      <div class="ibx-actions"><a class="btn primary ok" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div></div></article>`
   }
   const i = e.i
   const open = !i.resolved_at
@@ -160,9 +160,9 @@ function detail(e) {
     ${i.options.length ? (answering ? `<div class="ibx-opts" role="group" aria-label="${esc(T.inboxOptions)}">${opts}</div>` : `<ul class="ibx-optlist">${opts}</ul>`) : ''}
     ${i.recommended && recIndex < 0 ? `<p class="ibx-rec"><span class="tag">${esc(T.inboxRecommended)}</span> ${esc(i.recommended)}</p>` : ''}
     ${answering ? `<form class="ibx-answer" data-answer="${i.id}"><label class="field"><span>${esc(i.options.length ? T.ibxOwnWordsOr : T.ibxOwnWords)}</span><textarea name="answer" rows="3" maxlength="2000" placeholder="${esc(T.ibxReachesTo(i.session))}"></textarea></label>
-        <div class="ibx-actions"><span class="ibx-note">${esc(i.options.length ? T.ibxOptionDetail : T.ibxGoesOn)}</span><span class="row"><button type="button" class="btn quiet" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button><button class="btn primary">${esc(T.inboxSend)}</button></span></div></form>` : ''}
+        <div class="ibx-actions"><span class="ibx-note">${esc(i.options.length ? T.ibxOptionDetail : T.ibxGoesOn)}</span><span class="row"><button type="button" class="btn danger" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button><button class="btn primary ok">${esc(T.inboxSend)}</button></span></div></form>` : ''}
     ${why ? `<p class="ibx-note">${esc(why)}</p>` : ''}
-    ${open && !answering && can('operator') ? `<div class="ibx-actions">${why ? `<a class="btn" href="#/s/${encodeURIComponent(i.session)}">${esc(T.inboxAnswer)}</a>` : ''}${ask ? `<button type="button" class="btn" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button>` : `<button type="button" class="btn${why ? '' : ' primary'}" data-resolve="${i.id}">${esc(T.inboxResolve)}</button>`}</div>` : ''}
+    ${open && !answering && can('operator') ? `<div class="ibx-actions">${why ? `<a class="btn ok" href="#/s/${encodeURIComponent(i.session)}">${esc(T.inboxAnswer)}</a>` : ''}${ask ? `<button type="button" class="btn danger" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button>` : `<button type="button" class="btn ok${why ? '' : ' primary'}" data-resolve="${i.id}">${esc(T.inboxResolve)}</button>`}</div>` : ''}
     ${i.answer != null ? `<p class="ibx-result">${esc(T.inboxAnswered(i.answered_by ?? '', i.answer))}</p>` : ''}
     ${i.dismissed_by ? `<p class="ibx-result">${esc(T.inboxDismissed(i.dismissed_by))}</p>` : ''}
     ${i.closed_reason ? `<p class="ibx-result">${esc(T.inboxClosed(i.closed_reason))}</p>` : ''}
