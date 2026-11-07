@@ -5,9 +5,10 @@
 #
 #   bash install.sh https://your-server --code-file code [options]
 #
-# It installs what is missing (tmux, Node.js 22, Claude Code), then
-# squadra-host, which joins the machine, installs the Squadra plugin, the
-# "squadra-host" command and a service that keeps it running.
+# It installs what is missing (tmux, Node.js 22, and the agents chosen: Claude
+# Code unless --no-claude, Codex CLI with --codex, Grok CLI with --grok), then
+# squadra-host, which joins the machine, sets Squadra up in each agent, and
+# installs the "squadra-host" command and a service that keeps it running.
 # Options are passed to squadra-host: --allow-home, --insecure, --no-service.
 # --allow-root: install and run it as root (sessions then have full control
 # of this machine, to change the operating system).
@@ -25,6 +26,8 @@ main() {
   SHA=""
   ROOT_OK=""
   OS_USER=""
+  WANT_CLAUDE=1; WANT_CODEX=""; WANT_GROK=""
+  AGENT_ARGS=()
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -35,6 +38,10 @@ main() {
       --os-user) [ $# -ge 2 ] || { echo "--os-user needs a name" >&2; exit 2; }; OS_USER="$2"; shift 2 ;;
       --os-user=*) OS_USER="${1#--os-user=}"; [ -n "$OS_USER" ] || { echo "--os-user needs a name" >&2; exit 2; }; shift ;;
       --allow-root) ROOT_OK=1; shift ;;
+      # The agents to install (each kept for the run as another user, below).
+      --no-claude) WANT_CLAUDE=""; AGENT_ARGS+=("$1"); shift ;;
+      --codex) WANT_CODEX=1; AGENT_ARGS+=("$1"); shift ;;
+      --grok) WANT_GROK=1; AGENT_ARGS+=("$1"); shift ;;
       *) ARGS+=("$1"); shift ;;
     esac
   done
@@ -90,7 +97,7 @@ main() {
     printf %s "$CODE" > "$WORK/code"
     chown -R "$OS_USER" "$WORK"
     RC=0
-    ( cd "$WORK" && "${SWITCH[@]}" env "${AS_USER_ENV[@]}" bash install.sh "$SERVER" --code-file code ${SHA:+--sha256 "$SHA"} ${ARGS[@]+"${ARGS[@]}"} ) || RC=$?
+    ( cd "$WORK" && "${SWITCH[@]}" env "${AS_USER_ENV[@]}" bash install.sh "$SERVER" --code-file code ${SHA:+--sha256 "$SHA"} ${AGENT_ARGS[@]+"${AGENT_ARGS[@]}"} ${ARGS[@]+"${ARGS[@]}"} ) || RC=$?
     rm -rf "$WORK"
     exit $RC
   fi
@@ -125,14 +132,23 @@ main() {
     node_ok || { echo "Node.js 22 could not be installed: install Node.js 22.13 or later, then run this command again." >&2; exit 1; }
   fi
 
-  # 3. Claude Code
+  # 3. The agents chosen, each in this user's home (no sudo), each from its
+  # maker: Claude Code and Grok CLI with their own installers, Codex CLI from npm.
   export PATH="$HOME/.local/bin:$PATH"
-  if ! native claude; then
+  if [ -n "$WANT_CLAUDE" ] && ! native claude; then
     say "Installing Claude Code"
     curl -fsSL https://claude.ai/install.sh | bash
   fi
+  if [ -n "$WANT_CODEX" ] && ! native codex; then
+    say "Installing Codex CLI"
+    npm install -g --prefix "$HOME/.local" @openai/codex
+  fi
+  if [ -n "$WANT_GROK" ] && ! native grok; then
+    say "Installing Grok CLI"
+    curl -fsSL https://x.ai/cli/install.sh | bash
+  fi
 
-  # New terminals find the "claude" and "squadra-host" commands in ~/.local/bin.
+  # New terminals find the agents and "squadra-host" in ~/.local/bin.
   for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
     if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
       # (Managed elsewhere and read-only, as with home-manager: not worth stopping for.)
@@ -154,7 +170,11 @@ main() {
   say "Done"
   case " ${ARGS[*]-} " in
     *" --company="*) ;; # (It has said how: this company has its own login.)
-    *) echo "If you haven't yet: run 'claude' once in a terminal and sign in, so the sessions can start." ;;
+    *)
+      echo "If you haven't yet, sign in to each agent once in a terminal, so its sessions can start:"
+      [ -z "$WANT_CLAUDE" ] || echo "  claude        (then /login if it asks)"
+      [ -z "$WANT_CODEX" ] || echo "  codex login"
+      [ -z "$WANT_GROK" ] || echo "  grok login" ;;
   esac
 }
 

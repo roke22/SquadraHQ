@@ -3,6 +3,7 @@ import { T } from './i18n.js'
 import { hosts, hostListeners, can } from './state.js'
 import { esc, hhmm, now } from './format.js'
 import { postJson, folderChips, addFolderDialog } from './machines.js'
+import { agentMark } from './content.js'
 import { newSessionDialog } from './squads.js'
 import { currentRoute } from './router.js'
 
@@ -12,7 +13,7 @@ import { currentRoute } from './router.js'
 // It survives going elsewhere and coming back: the code it made is kept.
 
 let draft = null // { name, plugin, enroll, os, home, root, osUser, joined, error, generating, slowTimer, slow }
-const fresh = () => ({ name: '', plugin: false, enroll: null, os: /Mac/i.test(navigator.platform) ? 'macos' : /Win/i.test(navigator.platform) ? 'windows' : 'linux', home: false, root: false, osUser: '', joined: null, error: '', generating: false, slow: false })
+const fresh = () => ({ name: '', plugin: false, agents: ['claude'], enroll: null, os: /Mac/i.test(navigator.platform) ? 'macos' : /Win/i.test(navigator.platform) ? 'windows' : 'linux', home: false, root: false, osUser: '', joined: null, error: '', generating: false, slow: false })
 
 const expired = () => draft.enroll && !draft.joined && draft.enroll.expires_at < now()
 const cmdRow = text => `<div class="cmdrow"><pre class="cmd">${esc(text)}</pre><button type="button" class="btn" data-copy>${esc(T.copy)}</button></div>`
@@ -22,11 +23,15 @@ function installHtml() {
   const r = draft.enroll
   const os = draft.os
   const insecure = /^http:\/\//.test(r.server_url) && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(r.server_url)
-  const extra = (draft.home ? ' --allow-home' : '') + (draft.root && os !== 'macos' ? ' --allow-root' : '') + (insecure ? ' --insecure' : '')
+  // The agents to install: Claude Code unless left out, Codex and Grok when chosen.
+  const agents = (draft.agents.includes('claude') ? '' : ' --no-claude') + (draft.agents.includes('codex') ? ' --codex' : '') + (draft.agents.includes('grok') ? ' --grok' : '')
+  const extra = agents + (draft.home ? ' --allow-home' : '') + (draft.root && os !== 'macos' ? ' --allow-root' : '') + (insecure ? ' --insecure' : '')
   // (A new system user needs root: the installer does the rest as that user.)
   const withUser = text => (os === 'linux' && draft.osUser ? `${text.replace('&& bash install.sh', '&& sudo bash install.sh')} --os-user=${draft.osUser}` : text)
   const advanced = draft.home || draft.root || draft.osUser
-  return `<div class="am-os"><span>${esc(T.osPick)}</span><span class="seg" role="group" aria-label="${esc(T.osPick)}">${['linux', 'macos', 'windows'].map(o => `<button type="button" data-os="${o}" aria-pressed="${o === os}"${o === os ? ' class="on"' : ''}>${{ linux: 'Linux', macos: 'macOS', windows: 'Windows' }[o]}</button>`).join('')}</span></div>
+  return `<fieldset class="am-agents"><legend>${esc(T.amAgents)}</legend>${['claude', 'codex', 'grok'].map(a => `<label class="am-agent${draft.agents.includes(a) ? ' on' : ''}"><input type="checkbox" data-agentpick="${a}" ${draft.agents.includes(a) ? 'checked' : ''}>${agentMark({ agent: a })}<span><b>${esc(T.agentName[a])}</b><span>${esc(T.amAgentHint[a])}</span></span></label>`).join('')}</fieldset>
+    ${draft.agents.length ? '' : `<p class="am-note am-warn">${esc(T.amAgentsNone)}</p>`}
+    <div class="am-os"><span>${esc(T.osPick)}</span><span class="seg" role="group" aria-label="${esc(T.osPick)}">${['linux', 'macos', 'windows'].map(o => `<button type="button" data-os="${o}" aria-pressed="${o === os}"${o === os ? ' class="on"' : ''}>${{ linux: 'Linux', macos: 'macOS', windows: 'Windows' }[o]}</button>`).join('')}</span></div>
     <p class="am-run">${T.runOn(os)}</p>${cmdRow(withUser(String(r.install?.[os] ?? '') + extra))}
     <p class="am-note">${T.runWhat}${os === 'windows' ? ` ${T.windowsNote}` : ''}</p>
     ${insecure ? `<p class="am-note am-warn">${esc(T.httpWarn)}</p>` : ''}
@@ -35,7 +40,7 @@ function installHtml() {
       ${os === 'linux' ? `<label class="field"><span>${T.osUser}</span><input type="text" data-osuser value="${esc(draft.osUser)}" maxlength="32" autocomplete="off"><span class="hint">${T.osUserHint}</span></label>` : ''}
       <label class="check"><input type="checkbox" data-home ${draft.home ? 'checked' : ''}> <span>${T.allowHome}</span></label>
       ${os === 'macos' ? '' : `<label class="check"><input type="checkbox" data-root ${draft.root ? 'checked' : ''}> <span>${T.allowRoot}</span></label>`}
-      ${os === 'windows' ? '' : `<p class="am-note">${T.manualCmd}</p>${cmdRow(String(r.command ?? '') + extra)}`}
+      ${os === 'windows' ? '' : `<p class="am-note">${T.manualCmd}</p>${cmdRow(String(r.command ?? '') + (draft.home ? ' --allow-home' : '') + (insecure ? ' --insecure' : ''))}`}
     </details>`
 }
 
@@ -47,7 +52,9 @@ function connectHtml() {
 
 function readyHtml() {
   const h = hosts.get(draft.joined.id) ?? draft.joined
-  return `<p class="am-note">${T.amAfterJoin}</p>
+  const login = { claude: 'claude', codex: 'codex login', grok: 'grok login' }
+  return `<p class="am-note">${esc(T.amSignIn)}</p><ul class="am-signin">${(draft.agents.length ? draft.agents : ['claude']).map(a => `<li>${agentMark({ agent: a })}<code>${login[a]}</code></li>`).join('')}</ul>
+    <p class="am-note">${esc(T.amThenFolders)}</p>
     <div class="card am-folders"><b>${esc(T.amFolders)}</b><div>${folderChips(h)}</div></div>
     <div class="nt-actions">${can('operator') ? `<button type="button" class="btn" data-amsession>${esc(T.newSession)}</button><a class="btn primary" href="#/new" data-amdone>${esc(T.amNewTeam)}</a>` : `<a class="btn primary" href="#/hosts" data-amdone>${esc(T.amToMachines)}</a>`}</div>`
 }
@@ -116,6 +123,7 @@ box.addEventListener('input', e => {
 box.addEventListener('change', e => {
   const t = e.target
   if (t.name === 'amplugin') draft.plugin = t.checked
+  else if (t.matches('[data-agentpick]')) { const a = t.dataset.agentpick; draft.agents = t.checked ? [...new Set([...draft.agents, a])] : draft.agents.filter(x => x !== a); renderAddMachine() }
   else if (t.matches('[data-home]')) { draft.home = t.checked; renderAddMachine() }
   else if (t.matches('[data-root]')) { draft.root = t.checked; renderAddMachine() }
   else if (t.matches('[data-osuser]')) { draft.osUser = /^[a-z_][a-z0-9_-]{0,31}$/.test(t.value) ? t.value : ''; renderAddMachine() }

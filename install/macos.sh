@@ -5,7 +5,8 @@
 #
 #   bash install.sh https://your-server --code-file code [options]
 #
-# It installs what is missing (tmux with Homebrew, Node.js 22, Claude Code),
+# It installs what is missing (tmux with Homebrew, Node.js 22, and the agents
+# chosen: Claude Code unless --no-claude, Codex CLI with --codex, Grok CLI with --grok),
 # then squadra-host, which joins the machine, installs the Squadra plugin, the
 # "squadra-host" command and a service that keeps it running.
 # Options are passed to squadra-host: --allow-home, --insecure, --no-service.
@@ -19,12 +20,17 @@ main() {
   CODE=""; CODE_FILE=""
   case "${1:-}" in ""|-*) ;; *) CODE="$1"; shift ;; esac
   SHA=""
+  WANT_CLAUDE=1; WANT_CODEX=""; WANT_GROK=""
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --sha256) [ $# -ge 2 ] || { echo "--sha256 needs a value" >&2; exit 2; }; SHA="$2"; shift 2 ;;
       --code-file) [ $# -ge 2 ] || { echo "--code-file needs a path" >&2; exit 2; }; CODE_FILE="$2"; shift 2 ;;
       --os-user*) echo "--os-user is for Linux. On macOS: create the user, log in as it, and run this command there." >&2; exit 2 ;;
+      # The agents to install.
+      --no-claude) WANT_CLAUDE=""; shift ;;
+      --codex) WANT_CODEX=1; shift ;;
+      --grok) WANT_GROK=1; shift ;;
       *) ARGS+=("$1"); shift ;;
     esac
   done
@@ -70,14 +76,23 @@ main() {
     node_ok || { echo "Node.js 22 could not be installed: install Node.js 22.13 or later, then run this command again." >&2; exit 1; }
   fi
 
-  # 3. Claude Code
+  # 3. The agents chosen, each in this user's home, each from its maker:
+  # Claude Code and Grok CLI with their own installers, Codex CLI from npm.
   export PATH="$HOME/.local/bin:$PATH"
-  if ! command -v claude >/dev/null 2>&1; then
+  if [ -n "$WANT_CLAUDE" ] && ! command -v claude >/dev/null 2>&1; then
     say "Installing Claude Code"
     curl -fsSL https://claude.ai/install.sh | bash
   fi
+  if [ -n "$WANT_CODEX" ] && ! command -v codex >/dev/null 2>&1; then
+    say "Installing Codex CLI"
+    npm install -g --prefix "$HOME/.local" @openai/codex
+  fi
+  if [ -n "$WANT_GROK" ] && ! command -v grok >/dev/null 2>&1; then
+    say "Installing Grok CLI"
+    curl -fsSL https://x.ai/cli/install.sh | bash
+  fi
 
-  # New terminals find the "claude" and "squadra-host" commands in ~/.local/bin.
+  # New terminals find the agents and "squadra-host" in ~/.local/bin.
   for rc in "$HOME/.zshrc" "$HOME/.bash_profile"; do
     if [ "$rc" = "$HOME/.zshrc" ] || [ -f "$rc" ]; then
       # (Managed elsewhere and read-only, as with home-manager: not worth stopping for.)
@@ -97,7 +112,10 @@ main() {
   node squadra-host.mjs enroll "$SERVER" --code-file=code ${ARGS[@]+"${ARGS[@]}"}
 
   say "Done"
-  echo "If you haven't yet: run 'claude' once in a terminal and sign in, so the sessions can start."
+  echo "If you haven't yet, sign in to each agent once in a terminal, so its sessions can start:"
+  [ -z "$WANT_CLAUDE" ] || echo "  claude        (then /login if it asks)"
+  [ -z "$WANT_CODEX" ] || echo "  codex login"
+  [ -z "$WANT_GROK" ] || echo "  grok login"
 }
 
 main "$@"
