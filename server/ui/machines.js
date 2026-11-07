@@ -6,7 +6,7 @@ import { esc, dur, now, hhmm } from './format.js'
 import { status } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
-import { sessionOn, roleTag, personaTag } from './topbar.js'
+import { sessionOn, personaTag } from './topbar.js'
 import { closeMenu, dialog, confirmDialog } from './dialogs.js'
 import { newSessionDialog, templatesDialog } from './squads.js'
 import { showLogin, serverVersion, olderThan } from './app.js'
@@ -66,16 +66,39 @@ export function hostState(h) {
   if (h.pending) return T.hostPending(h.created_at ? dur(now() - h.created_at) : '—')
   return T.hostOffline(h.last_seen_at ? dur(now() - h.last_seen_at) : '—')
 }
+// How the machines are, all at once: one row each, what needs doing marked.
+function overview(all) {
+  const rows = all.map(h => {
+    const i = h.info ?? {}
+    const old = i.version && serverVersion && olderThan(i.version, serverVersion)
+    const n = (i.terminals ?? []).length
+    return `<tr><td><a class="mc-name" href="#/h/${encodeURIComponent(h.id)}">${esc(h.name)}</a></td>
+        <td><span class="mc-state"><span class="dot ${h.online ? 'ok' : h.pending ? 'off' : 'err'}" aria-hidden="true"></span>${esc(hostState(h))}</span></td>
+        <td class="mc-num">${h.online ? n : '—'}</td>
+        <td class="mc-mono">${esc((i.folders ?? []).join(', ') || '—')}</td>
+        <td>${old ? `<span class="tag warn">${esc(T.mcUpdate(i.version))}</span>` : `<span class="mc-quiet">${esc(i.version ?? '—')}</span>`}</td></tr>`
+  }).join('')
+  return `<section class="card mc-card"><div class="mc-scroll"><table class="mc-table"><thead><tr><th scope="col">${esc(T.mcMachine)}</th><th scope="col">${esc(T.mcState)}</th><th scope="col">${esc(T.mcSessions)}</th><th scope="col">${esc(T.folders)}</th><th scope="col">${esc(T.mcVersion)}</th></tr></thead><tbody>${rows}</tbody></table></div></section>`
+}
+// A machine that stopped answering while sessions were open on it: what to check there.
+function trouble(h) {
+  const cmd = state.company && state.company !== 'default' ? `squadra-host-${state.company} status` : 'squadra-host status'
+  return `<section class="card mc-trouble"><h2>${esc(T.mcNotAnswering(h.name))}</h2><p>${esc(T.mcNotAnsweringHint)}</p>
+      <div class="cmdrow"><pre class="cmd">${esc(cmd)}</pre><button type="button" class="btn" data-copy>${esc(T.copy)}</button></div></section>`
+}
+
 export function renderHosts(only) {
-  const list = [...hosts.values()].filter(h => !only || h.id === only).sort((a, b) => (b.online - a.online) || COLLATOR.compare(a.name, b.name))
-  if (!list.length) { setHtml($('hosts'), `<div class="host-list"><div class="mosaic-empty">${only && hosts.size ? `${T.machineNotFound} <a href="#/hosts">${T.allMachines}</a>` : T.noMachines}</div></div>`); return }
-  setHtml($('hosts'), `<div class="host-list">${list.map(h => {
+  const all = [...hosts.values()].sort((a, b) => (b.online - a.online) || COLLATOR.compare(a.name, b.name))
+  const list = all.filter(h => !only || h.id === only)
+  if (!list.length) { setHtml($('hosts'), `<div class="host-list"><div class="empty"><b>${only && hosts.size ? `${esc(T.machineNotFound)}` : esc(T.noMachines)}</b>${only && hosts.size ? `<a class="btn" href="#/hosts">${esc(T.allMachines)}</a>` : ''}</div></div>`); return }
+  const stuck = list.filter(h => !h.online && !h.pending && [...sessions.values()].some(x => x.host_id === h.id && !x.archived_at && !x.deleted))
+  setHtml($('hosts'), `<div class="host-list">${only ? '' : overview(all)}${stuck.map(trouble).join('')}${list.map(h => {
     const i = h.info ?? {}
     const terms = i.terminals ?? []
     const rows = terms.map(t => {
       const s = sessionOn(h.id, t.id)
       return `<div class="term-row">
-          <span class="dot ${s ? status(s).dot : ''}" title="${esc(s ? status(s).text : '')}"></span><span class="n">${esc(t.name)}</span>${roleTag(t.role)}${personaTag(t.persona)}
+          <span class="role ${t.role === 'coordinator' ? 'coord' : t.role === 'solo' ? 'solo' : 'worker'}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[t.role] ?? '')}</span><span class="n">${esc(t.name)}</span><span class="dot ${s ? status(s).dot || 'off' : 'off'}" title="${esc(s ? status(s).text : '')}" aria-hidden="true"></span>${personaTag(t.persona)}
           <span class="m" title="${esc(t.folder ?? '')}">${esc(t.folder ?? '')}${t.role === 'worker' && t.coordinator ? ` · ${esc(T.coordinatorOf(t.coordinator))}` : ''}</span>
           <span class="acts">
             ${h.online && can('operator') ? `<button class="btn" data-go="#/t/${encodeURIComponent(h.id)}/${encodeURIComponent(t.id)}">${T.terminal}</button>` : ''}
@@ -86,14 +109,16 @@ export function renderHosts(only) {
     return `<div class="host ${h.online ? '' : 'offline'}">
         <div class="host-head"><span class="dot ${h.online ? 'ok' : ''}"></span><span class="n">${esc(h.name)}</span>
           <span class="m">${hostState(h)}${hostLine(h) ? ` · ${esc(hostLine(h))}` : ''}</span>
-          <span class="acts">${h.online ? (can('operator') ? `<button class="btn" data-hact="new" data-h="${esc(h.id)}">${T.newSession}</button>` : '') : (can('manager') ? `<button class="btn danger" data-hact="disconnect" data-h="${esc(h.id)}">${T.disconnect}</button>` : '')}${can('manager') ? `<button class="more" data-hmenu="${esc(h.id)}" aria-label="${esc(T.actions(h.name))}">⋯</button>` : ''}</span></div>
-        ${i.shares_user ? `<div class="host-warn">⚠️ ${esc(T.sharedUserWarn)}</div>` : ''}<div class="host-meta">${i.version && serverVersion && olderThan(i.version, serverVersion) ? `<span class="plugin-missing">${T.hostOld(esc(i.version), esc(serverVersion))}</span>` : ''}${i.plugin ? (i.plugin.installed && i.plugin.enabled ? `<span>${T.pluginOk(esc(i.plugin.version ?? ''))}</span>` : `<span class="plugin-missing">${T.pluginMissing(!i.plugin.installed)}</span>`) : ''}<span class="folders">${T.folders}: ${folderChips(h)}</span>${i.max_sessions ? `<span>${T.maxSessions(i.max_sessions)}</span>` : ''}<span>${i.allow_input === false ? T.typingOff : T.typingOn}</span></div>
+          <span class="acts">${h.online ? (can('operator') ? `<button class="btn" data-hact="new" data-h="${esc(h.id)}">${T.newSession}</button>` : '') : (can('manager') ? `<button class="btn danger" data-hact="disconnect" data-h="${esc(h.id)}">${T.disconnect}</button>` : '')}${can('manager') ? `<button class="btn quiet" data-hmenu="${esc(h.id)}" aria-haspopup="menu" aria-label="${esc(T.actions(h.name))}">${esc(T.svMoreShort)}</button>` : ''}</span></div>
+        ${i.shares_user ? `<div class="host-warn">${esc(T.sharedUserWarn)}</div>` : ''}<div class="host-meta">${i.version && serverVersion && olderThan(i.version, serverVersion) ? `<span class="plugin-missing">${T.hostOld(esc(i.version), esc(serverVersion))}</span>` : ''}${i.plugin ? (i.plugin.installed && i.plugin.enabled ? `<span>${T.pluginOk(esc(i.plugin.version ?? ''))}</span>` : `<span class="plugin-missing">${T.pluginMissing(!i.plugin.installed)}</span>`) : ''}<span class="folders">${T.folders}: ${folderChips(h)}</span>${i.max_sessions ? `<span>${T.maxSessions(i.max_sessions)}</span>` : ''}<span>${i.allow_input === false ? T.typingOff : T.typingOn}</span></div>
         <div class="host-terms">${rows || `<div class="host-empty">${T.noTerminals}</div>`}</div>
       </div>`
   }).join('')}</div>`)
 }
 
 $('hosts').addEventListener('click', e => {
+  const copy = e.target.closest('[data-copy]')
+  if (copy) return navigator.clipboard?.writeText(copy.previousElementSibling.textContent)
   const m = e.target.closest('[data-hmenu]')
   if (m) return openHostMenu(m, m.dataset.hmenu)
   const go = e.target.closest('[data-go]')

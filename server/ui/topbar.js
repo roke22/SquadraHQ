@@ -100,8 +100,9 @@ export function renderTop() {
     setHtml($('topRight'), colsSeg)
   } else if (r.view === 'hosts') {
     const h = r.host && hosts.get(r.host)
-    setHtml($('topTitle'), h ? `<span class="dot ${h.online ? 'ok' : ''}"></span>${esc(h.name)}` : T.allMachines)
-    $('topSub').textContent = h ? hostLine(h) : T.machinesSub
+    const all = [...hosts.values()]
+    setHtml($('topTitle'), h ? `<span class="dot ${h.online ? 'ok' : 'off'}" aria-hidden="true"></span>${esc(h.name)}` : esc(T.machines))
+    $('topSub').textContent = h ? hostLine(h) : all.length ? T.mcOnline(all.filter(x => x.online).length, all.length) : ''
     setHtml($('topRight'), `${can('manager') ? `<button class="btn" data-hact="add">${T.addMachine}</button>` : ''}${can('operator') ? `<button class="btn" data-hact="templates">${T.templates}</button><button class="btn primary" data-hact="new"${h ? ` data-h="${esc(h.id)}"` : ''}>${T.newSession}</button>` : ''}`)
   } else if (r.view === 'terminal') {
     const h = hosts.get(r.host)
