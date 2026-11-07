@@ -6,7 +6,7 @@ import { sortedSessions, status } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 import { applyCols, buildMosaic } from './mosaic.js'
-import { runAction } from './dialogs.js'
+import { runAction, openMenu } from './dialogs.js'
 import { terminalOf, hostLine, hostAction } from './machines.js'
 import { reopenable, reopen, addWorkerTo, saveTemplateDialog, newSessionDialog } from './squads.js'
 import { orgSquads, orgZoom, linksDialog } from './org.js'
@@ -121,31 +121,25 @@ export function renderTop() {
     setHtml($('topRight'), `<button class="btn" data-go="#/teams">${T.backAll}</button>`)
   } else {
     const s = sessions.get(r.name)
-    const a = s?.activity ?? {}
-    setHtml($('topTitle'), `<span class="dot ${status(s).dot}"></span>${esc(r.name)} ${roleTag(s?.role)} ${personaTag(s?.persona)}${s?.archived_at ? ` <span class="role-tag" style="background:var(--panel-2);color:var(--muted)">${T.archivedTag}</span>` : ''}`)
-    $('topSub').textContent = [a.cwd, a.context_tokens ? T.context(kfmt(a.context_tokens)) + (a.context_pct != null ? ` (${T.contextPct(a.context_pct)})` : '') : '', s?.role === 'worker' && s.coordinator ? T.coordinatorOf(s.coordinator) : ''].filter(Boolean).join(' · ')
-    const acts = []
+    const st = status(s)
+    const role = s?.role === 'coordinator' ? 'coord' : s?.role === 'solo' ? 'solo' : 'worker'
+    const team = s?.role === 'coordinator' ? s.name : s?.coordinator
+    const teamName = team ? state.squadMeta.get(team)?.title || team : ''
+    setHtml($('topTitle'), `<span class="role ${role}" aria-hidden="true"></span><span class="sv-name">${esc(r.name)}</span>${s?.archived_at ? ` <span class="tag">${esc(T.archivedTag)}</span>` : ''}`)
+    $('topSub').textContent = [s ? T.roleName[s.role] ?? T.roleName.worker : '', teamName, st.text].filter(Boolean).join(' · ')
+    // Its conversation, or its live terminal when it has one.
     const where = terminalOf(r.name)
-    if (where && !r.chat) {
-      // Its terminal on screen: the chat a click away, and the terminal's own actions.
-      acts.push(`<button class="btn" data-go="#/s/${encodeURIComponent(r.name)}/chat">${T.chat}</button>`)
-      acts.push(`<button class="btn" data-tact="redraw">${T.redraw}</button>`)
-      acts.push(`<button class="btn danger" data-tact="kill">${T.closeSession}</button>`)
-      acts.push(`<button class="btn" data-go="${s?.archived_at ? '#/archived' : '#/teams'}">${s?.archived_at ? T.backArchived : T.backAll}</button>`)
-      setHtml($('topRight'), acts.join(''))
-      return
-    }
-    if (where && can('operator')) acts.push(`<button class="btn" data-go="#/s/${encodeURIComponent(r.name)}">${T.terminal}</button>`)
+    const termOn = !!(where && !r.chat && can('operator'))
+    if (where && can('operator')) setHtml($('topTabs'), `<nav class="seg" aria-label="${esc(r.name)}"><a href="#/s/${encodeURIComponent(r.name)}/chat"${termOn ? '' : ' class="on" aria-current="page"'}>${esc(T.svChat)}</a><a href="#/s/${encodeURIComponent(r.name)}"${termOn ? ' class="on" aria-current="page"' : ''}>${esc(T.terminal)}</a></nav>`)
+    else setHtml($('topTabs'), '')
+    const acts = []
     if (reopenable(s) && can('operator')) acts.push(`<button class="btn primary" data-reopen="${esc(r.name)}">${T.reopen}</button>`)
-    if (s) {
-      if (s.approval_pending && can('manager')) acts.push(`<button class="btn primary" data-act="approve" data-s="${esc(s.name)}">${T.approve}</button>`)
-      if (can('operator')) acts.push(`<button class="btn" data-act="clear" data-s="${esc(s.name)}">${T.clearChat}</button>`)
-      if (!s.online && can('operator')) acts.push(s.archived_at
-        ? `<button class="btn" data-act="unarchive" data-s="${esc(s.name)}">${T.unarchive}</button>`
-        : `<button class="btn" data-act="archive" data-s="${esc(s.name)}">${T.archive}</button>`)
-      if (!s.online && can('manager')) acts.push(`<button class="btn danger" data-act="delete" data-s="${esc(s.name)}">${T.delete}</button>`)
-    }
-    acts.push(`<button class="btn" data-go="${s?.archived_at ? '#/archived' : '#/teams'}">${s?.archived_at ? T.backArchived : T.backAll}</button>`)
+    if (s?.approval_pending && can('manager')) acts.push(`<button class="btn primary" data-act="approve" data-s="${esc(s.name)}">${T.approve}</button>`)
+    if (termOn) acts.push(`<button class="btn quiet" data-tact="redraw">${esc(T.redraw)}</button><button class="btn quiet danger" data-tact="kill">${esc(T.closeSession)}</button>`)
+    if (s && !termOn && !s.online && can('operator')) acts.push(s.archived_at
+      ? `<button class="btn" data-act="unarchive" data-s="${esc(s.name)}">${T.unarchive}</button>`
+      : `<button class="btn" data-act="archive" data-s="${esc(s.name)}">${T.archive}</button>`)
+    if (s) acts.push(`<button class="btn quiet" data-menu="${esc(s.name)}" aria-haspopup="menu" aria-label="${esc(T.svMore(s.name))}">${esc(T.svMoreShort)}</button>`)
     setHtml($('topRight'), acts.join(''))
   }
 }
@@ -170,6 +164,8 @@ $('topRight').addEventListener('click', e => {
   if (stp) saveTemplateDialog(stp.dataset.savetpl)
   const lk = e.target.closest('[data-links]')
   if (lk) linksDialog(lk.dataset.links)
+  const menu = e.target.closest('[data-menu]')
+  if (menu) return openMenu(menu, menu.dataset.menu)
   const tact = e.target.closest('[data-tact]')
   if (tact) {
     const r = currentRoute()

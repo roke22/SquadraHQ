@@ -140,7 +140,7 @@ test('an invitation: a link of one use brings someone in, with only their role',
   await expect(guest.locator('#colsSeg')).toBeVisible()
   await expect(guest.locator('[data-addworker], [data-links], [data-savetpl], #modeSeg')).toHaveCount(0)
   await guest.goto(`${server.url}/#/s/worker1/chat`)
-  await expect(guest.locator('#topRight [data-go]')).toBeVisible()
+  await expect(guest.locator('#topRight [data-menu]')).toBeVisible()
   await expect(guest.locator('[data-act]')).toHaveCount(0)
   await guest.goto(`${server.url}/#/hosts`)
   await expect(guest.locator('.host').first()).toBeVisible()

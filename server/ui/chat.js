@@ -304,10 +304,10 @@ export class ChatView {
       case 'prompt': return `<div class="row-user"><div class="bubble-head"><b>${T.you}</b> · ${hhmm(it.ts)}</div><div class="bubble">${clipEsc(it, 'text', MAX_RENDER_TEXT)}</div></div>`
       case 'text': return `<div class="assistant">${mdCached(it)}</div>`
       case 'stop': return `<div class="divider">${T.turnEnded} · ${hhmm(it.ts)}${num(it.background_tasks) ? ` · ${T.background(num(it.background_tasks))}` : ''}</div>`
-      case 'notification': return `<div class="sysline warn">⏳ ${it.text ? clipEsc(it, 'text', 500) : esc(it.type)} · ${hhmm(it.ts)}</div>`
+      case 'notification': return `<div class="sysline warn">${it.text ? clipEsc(it, 'text', 500) : esc(it.type)} · ${hhmm(it.ts)}</div>`
       case 'compact': return `<div class="sysline">${T.compactingLine} · ${hhmm(it.ts)}</div>`
       case 'compacted': return `<div class="sysline">${T.compactedLine(it.trigger !== 'manual')} · ${hhmm(it.ts)}${it.summary ? `<details style="text-align:left"><summary>${T.compactSummary}</summary><pre style="white-space:pre-wrap;font:12px/1.4 var(--mono);background:var(--panel-2);padding:8px;border-radius:6px;max-height:300px;overflow:auto">${clipEsc(it, 'summary', MAX_RENDER_TEXT)}</pre></details>` : ''}</div>`
-      case 'session_start': if (it.source === 'clear') return `<div class="sysline">🧹 ${T.contextCleared} · ${hhmm(it.ts)}</div>`
+      case 'session_start': if (it.source === 'clear') return `<div class="sysline">${T.contextCleared} · ${hhmm(it.ts)}</div>`
         return `<div class="sysline">${T.sessionStarted(it.source === 'resume')}${it.cwd ? T.inDir(esc(it.cwd)) : ''} · ${hhmm(it.ts)}</div>`
       case 'session_end': return `<div class="sysline">${T.sessionEnded}${it.reason ? ` (${esc(it.reason)})` : ''} · ${hhmm(it.ts)}</div>`
       case 'observe_start': return `<div class="sysline">${T.observing(esc(it.level))} · ${hhmm(it.ts)}</div>`
@@ -329,7 +329,7 @@ export class ChatView {
     const names = [...new Set(real.map(t => toolName(t.start.tool)))].slice(0, 12)
     const waitingId = activity?.state === 'waiting' ? activity.tool?.id : null
     const st = running.length
-      ? (running.some(t => t.start.ref === waitingId) ? `<span class="res err">${T.waitingPermission}</span>` : `<span class="res run">⏳ ${T.running(running.length)}</span>`)
+      ? (running.some(t => t.start.ref === waitingId) ? `<span class="res err">${T.waitingPermission}</span>` : `<span class="res run"><span class="dot ok pulse" aria-hidden="true"></span> ${T.running(running.length)}</span>`)
       : failed.length ? `<span class="res err">✗ ${T.withErrors(failed.length)}</span>` : noResult ? `<span class="res">${T.noResult}</span>` : '<span class="res ok">✓</span>'
     const userChoice = this.openGroups.get(group.key)
     const open = userChoice ?? (running.length > 0)
@@ -338,7 +338,7 @@ export class ChatView {
     let chars = left.chars - 4000 - esc(names.join(', ')).length, tags = left.tags - 40, k = tools.length
     for (; k > 0; k--) {
       const t = tools[k - 1]
-      const row = t.sub ? `<div class="tool"><div class="line">🤖 <span class="arg">${T.subagent(t.sub.kind === 'subagent_start')}</span></div>${t.sub.text ? `<details><summary>${T.result}</summary><pre>${clipEsc(t.sub, 'text')}</pre></details>` : ''}</div>` : this.renderTool(t, waitingId)
+      const row = t.sub ? `<div class="tool"><div class="line"><span class="tn">${T.subagentShort}</span><span class="arg">${T.subagent(t.sub.kind === 'subagent_start')}</span></div>${t.sub.text ? `<details><summary>${T.result}</summary><pre>${clipEsc(t.sub, 'text')}</pre></details>` : ''}</div>` : this.renderTool(t, waitingId)
       const n = tagsIn(row)
       if (row.length > chars || n > tags) break
       rows.push(row)
@@ -348,7 +348,7 @@ export class ChatView {
     if (k) rows.push(`<div class="tool"><div class="line"><span class="arg">${T.olderHidden(k)}</span></div></div>`)
     rows.reverse()
     return `<details class="tools" data-g="${group.key}"${open ? ' open' : ''}>
-        <summary><span>🔧</span><span class="names">${T.tools(real.length)} · ${esc(names.join(', '))}</span><span class="st">${st}</span></summary>
+        <summary><span class="names">${T.tools(real.length)} · ${esc(names.join(', '))}</span><span class="st">${st}</span></summary>
         <div class="list">${rows.join('')}</div></details>`
   }
 
@@ -356,7 +356,7 @@ export class ChatView {
     let res
     if (!end && this.stopped.has(start)) res = `<span class="res">${T.noResult}</span>`
     else if (!end && start.ref === waitingId) res = `<span class="res err">${T.permShort}</span>`
-    else if (!end) res = `<span class="res run" data-since="${start.ts}">⏳ ${dur(now() - start.ts)}</span>`
+    else if (!end) res = `<span class="res run" data-since="${start.ts}"><span class="dot ok pulse" aria-hidden="true"></span> ${dur(now() - start.ts)}</span>`
     else if (end.ok === false) res = `<span class="res err">✗ ${end.interrupted ? T.interrupted : end.summary ? clipEsc(end, 'summary', 300) : T.error}${end.duration_ms ? ` · ${dur(end.duration_ms)}` : ''}</span>`
     else res = `<span class="res ok">✓${end.summary ? ` ${clipEsc(end, 'summary', 300)}` : ''}${end.duration_ms ? ` · ${dur(end.duration_ms)}` : ''}</span>`
     const det = []
@@ -366,7 +366,7 @@ export class ChatView {
     if (end?.detail) det.push(`<details data-d="${outKey}"${opened(outKey)}><summary>${end.ok === false ? T.error : T.output}</summary><pre>${clipEsc(end, 'detail')}</pre></details>`)
     const sum = clipEsc(start, 'summary', 300)
     const tip = esc(String(start.summary ?? '').slice(0, 300)) // an attribute: plain text only
-    return `<div class="tool"><div class="line"><span>${toolIcon(start.tool)}</span><span class="tn">${esc(toolName(start.tool))}</span>${start.agent ? `<span class="agent">${esc(start.agent)}</span>` : ''}<span class="arg" title="${tip}">${sum}</span>${res}</div>${det.join('')}</div>`
+    return `<div class="tool"><div class="line"><span class="tn">${esc(toolName(start.tool))}</span>${start.agent ? `<span class="agent">${esc(start.agent)}</span>` : ''}<span class="arg" title="${tip}">${sum}</span>${res}</div>${det.join('')}</div>`
   }
 
   renderStatus() {
@@ -380,11 +380,9 @@ export class ChatView {
   }
 
   tick() {
-    for (const el of this.itemsEl.querySelectorAll('.res.run[data-since]')) el.textContent = `⏳ ${dur(now() - Number(el.dataset.since))}`
+    for (const el of this.itemsEl.querySelectorAll('.res.run[data-since]')) el.innerHTML = `<span class="dot ok pulse" aria-hidden="true"></span> ${dur(now() - Number(el.dataset.since))}`
     this.renderStatus()
   }
 }
 
-const ICON = { Bash: '⚙️', Read: '📖', Write: '✏️', Edit: '✏️', MultiEdit: '✏️', NotebookEdit: '✏️', Grep: '🔎', Glob: '🔎', WebFetch: '🌐', WebSearch: '🌐', Task: '🤖', Agent: '🤖', TodoWrite: '📋', Skill: '🧩' }
-const toolIcon = t => (Object.hasOwn(ICON, t) ? ICON[t] : String(t).startsWith('mcp__') ? '🔌' : '🔧')
 export const toolName = t => String(t ?? '').startsWith('mcp__') ? String(t).split('__').slice(1).join(' › ') : (t ?? '')

@@ -10,6 +10,7 @@ import { buildMosaic, renderArchived } from './mosaic.js'
 import { renderInbox } from './inbox.js'
 import { renderTeams } from './teams.js'
 import { renderTeam } from './team.js'
+import { renderSessionAside } from './session.js'
 import { closeMenu } from './dialogs.js'
 import { renderHosts } from './machines.js'
 import { hideOrgTip, renderOrg } from './org.js'
@@ -156,9 +157,12 @@ export function route() {
     if (!state.sessionView || state.sessionView.name !== r.name) {
       state.sessionView?.destroy()
       state.sessionView = new ChatView(r.name, { full: true })
-      $('session').innerHTML = ''
-      $('session').appendChild(state.sessionView.el)
+      // The conversation, and beside it the team and where it runs.
+      $('session').innerHTML = '<div class="sv"><div class="sv-thread"></div><aside class="sv-aside"></aside></div>'
+      $('session').querySelector('.sv-thread').appendChild(state.sessionView.el)
+      $('session').querySelector('.sv-aside').setAttribute('aria-label', r.name)
     }
+    renderSessionAside()
     unread.delete(r.name)
   }
   renderTop()
