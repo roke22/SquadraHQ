@@ -1,0 +1,21 @@
+/* Several sessions at once: each a pane with who it is, what it is doing, and its chat or terminal. */
+
+#mosaic { padding: 16px; gap: 12px; }
+.pane { border: 1px solid var(--line); border-top: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); }
+.pane.coordinator, .pane.worker, .pane.solo { border-top-color: var(--line); }
+.pane.attention { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+.pane-head, .pane.coordinator .pane-head, .pane.worker .pane-head, .pane.solo .pane-head { gap: 8px; min-height: 40px; padding: 6px 8px 6px 12px; background: var(--panel); }
+.pane-head .title { font: 600 12.5px var(--mono); color: var(--text); }
+.pane-head .title:hover { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.pane-head .more { width: 26px; height: 26px; margin-left: 2px; }
+.pane-head .more .ic { width: 16px; height: 16px; }
+.pane .pane-term { background: var(--term); }
+.squad-row { border-bottom: 1px solid var(--line); padding: 4px 2px 8px; }
+.squad-row .n { color: var(--text); font-weight: 600; }
+.team { background: var(--panel); }
+.wchip { border-radius: var(--r); background: var(--bg); }
+.wchip.idle { border-color: var(--line-2); background: var(--bg); }
+.wchip.waiting { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--bg)); }
+.ctx { border-radius: var(--r-sm); }
+.arch .info .n .arch-name { font-family: var(--mono); font-size: 12.5px; }
+.arch { border-left-width: 1px; border-left-color: var(--line); border-radius: var(--r-md); }

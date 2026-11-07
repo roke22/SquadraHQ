@@ -217,7 +217,7 @@ export function openSettings(start) {
     const list = await call('/api/machines')
     if (turn !== drawing) return
     body.innerHTML = list.length ? `<table class="people"><tbody>${list.map(m => `<tr><td><b>${esc(m.hostname)}</b> <span class="note">${esc(T.machineSessions(m.sessions))}</span><br>
-        <span class="note">${esc(T.isolation[m.isolation])}</span>${m.isolation === 'same-user' ? ` <span class="note warn-text">⚠️ ${esc(T.sharedUserWarn)}</span>` : ''}
+        <span class="note">${esc(T.isolation[m.isolation])}</span>${m.isolation === 'same-user' ? ` <span class="note warn-text">${esc(T.sharedUserWarn)}</span>` : ''}
         ${m.instances.map(i => `<br><span class="dot ${i.online ? 'ok' : ''}"></span> ${esc(i.company_name)} · ${esc(i.name)}${i.os_user ? ` <span class="note">(${esc(i.os_user)})</span>` : ''} <span class="note">${esc(T.instanceSessions(i.sessions, i.max_sessions))}</span>`).join('')}</td></tr>`).join('')}</tbody></table>` : `<p class="note">${esc(T.noMachines)}</p>`
   }
 

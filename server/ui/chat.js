@@ -293,7 +293,7 @@ export class ChatView {
 
   renderItem(it) {
     if (it.t === 'message') {
-      const file = it.file ? `${it.text ? '\n' : ''}📎 ${esc(it.file.name)}` : ''
+      const file = it.file ? `${it.text ? '\n' : ''}${esc(it.file.name)}` : ''
       if (it.system) return `<div class="sysline notice">${esc(it.text)}<div class="t">${hhmm(it.ts)} · ${T.serverNotice}</div></div>`
       if (it.from === this.name) {
         return `<div class="sent"><div class="h">→ <b>${esc(it.target)}</b>${msgTag(it)} · ${hhmm(it.ts)}${it.edited_at ? ` · ${T.editedMark}` : ''}</div><div class="x">${clipEsc(it, 'text', MAX_RENDER_TEXT)}${file}</div></div>`

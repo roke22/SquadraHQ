@@ -35,7 +35,7 @@ export function msgTag(it) {
 
 // The persona (skill or agent) a session follows.
 export function personaTag(p) {
-  return p?.name ? `<span class="persona-tag" title="${esc(`${p.kind === 'agent' ? T.personaAgent : T.personaSkill} ${p.name}${p.description ? ` — ${p.description}` : ''}`)}">🎭 ${esc(p.name)}</span>` : ''
+  return p?.name ? `<span class="persona-tag" title="${esc(`${p.kind === 'agent' ? T.personaAgent : T.personaSkill} ${p.name}${p.description ? ` — ${p.description}` : ''}`)}">${esc(p.name)}</span>` : ''
 }
 
 // Teams can be seen three ways: every session, the coordinators with their
@@ -95,7 +95,7 @@ export function renderTop() {
     if (r.squad) {
       const c = sessions.get(r.squad)
       const ws = sortedSessions().filter(s => s.role !== 'coordinator' && s.coordinator === r.squad)
-      setHtml($('topTitle'), `<span class="dot ${c ? status(c).dot : ''}"></span>👥 ${esc(T.squadOf(r.squad))}`)
+      setHtml($('topTitle'), esc(T.tqLiveTitle(state.squadMeta.get(r.squad)?.title || r.squad)))
       const linked = linksOf(r.squad)
       $('topSub').textContent = [T.squadCount(ws.filter(w => w.online).length, ws.length), linked.length ? T.linkedWith(linked.join(', ')) : ''].filter(Boolean).join(' · ')
       setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}" title="${esc(T.addWorkerTo(r.squad))}">${T.addWorker}</button>` : ''}${can('manager') ? `<button class="btn" data-links="${esc(r.squad)}" title="${esc(T.linksTitle(r.squad))}">${T.links(linked.length)}</button><button class="btn" data-savetpl="${esc(r.squad)}" title="${esc(T.saveTemplateTitle(r.squad))}">${T.saveTemplate}</button>` : ''}<a class="btn" href="#/q/${encodeURIComponent(r.squad)}">${esc(T.tqBackToTeam)}</a>`)

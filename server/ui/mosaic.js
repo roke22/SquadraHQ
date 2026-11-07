@@ -6,7 +6,8 @@ import { status, sortedSessions, squadsOf } from './content.js'
 import { ChatView } from './chat.js'
 import { setHtml } from './nav.js'
 import { currentRoute, clearMosaic, mosaicPanes, teamStrip, giveWork } from './router.js'
-import { roleTag, personaTag } from './topbar.js'
+import { personaTag } from './topbar.js'
+import { icon } from './icons.js'
 import { openMenu, confirmDialog, runAction } from './dialogs.js'
 import { terminalOf } from './machines.js'
 import { addWorkerTo } from './squads.js'
@@ -14,9 +15,10 @@ import { TermView } from './terminal.js'
 
 export function paneHead(s) {
   const a = s.activity ?? {}
-  return `<span class="dot ${status(s).dot}"></span><button class="title" data-go="#/s/${encodeURIComponent(s.name)}">${esc(s.name)}</button>${roleTag(s.role)}${personaTag(s.persona)}
+  const role = s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'
+  return `<span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><button class="title" data-go="#/s/${encodeURIComponent(s.name)}">${esc(s.name)}</button><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${personaTag(s.persona)}
       <span class="meta" title="${esc(a.cwd ?? '')}">${esc(base(a.cwd))}</span>${ctxBadge(a)}
-      <button class="more" data-menu="${esc(s.name)}" title="${esc(T.actions(s.name))}" aria-label="${esc(T.actions(s.name))}">⋯</button>`
+      <button class="icon-btn more" data-menu="${esc(s.name)}" title="${esc(T.actions(s.name))}" aria-label="${esc(T.actions(s.name))}" aria-haspopup="menu">${icon('more')}</button>`
 }
 
 // Context gauge: tokens and % of the auto-compact point; amber from 60%, red from 80%.
@@ -52,7 +54,7 @@ function squadRow(key, coord, workers) {
   const on = workers.filter(w => w.online).length
   el.className = 'squad-row'
   // Rewritten only when something changed, so a click on its buttons is never lost.
-  const html = `<span class="dot ${status(coord).dot}"></span><span class="n">👥 ${esc(T.squadOf(coord.name))}</span><span class="m">${esc(T.squadCount(on, workers.length))}</span>
+  const html = `<span class="dot ${status(coord).dot}"></span><span class="n">${esc(state.squadMeta.get(coord.name)?.title || coord.name)}</span><span class="m">${esc(T.squadCount(on, workers.length))}</span>
       <span class="acts"><button class="btn" data-go="#/q/${encodeURIComponent(coord.name)}" title="${esc(T.viewSquadTitle(coord.name))}">${T.viewSquad}</button>${can('operator') ? `<button class="btn" data-addworker="${esc(coord.name)}" title="${esc(T.addWorkerTo(coord.name))}">${T.addWorker}</button>` : ''}</span>`
   if (el.dataset.html !== html) { setHtml(el, html); el.dataset.html = html }
   return el
@@ -167,7 +169,7 @@ export function renderArchived() {
   setHtml($('archived'), `<div class="arch-list">${list.length ? list.map(s => `
       <div class="arch ${s.role ?? ''}">
         <div class="info">
-          <div class="n"><span class="dot ${status(s).dot}"></span>${esc(s.name)} ${roleTag(s.role)}</div>
+          <div class="n"><span class="role ${s.role === 'coordinator' ? 'coord' : s.role === 'solo' ? 'solo' : 'worker'}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span><span class="arch-name">${esc(s.name)}</span></div>
           <div class="m">${T.archivedAt(new Date(s.archived_at).toLocaleString(LOCALE))} · ${esc(status(s).text)}${s.activity?.cwd ? ` · ${esc(s.activity.cwd)}` : ''}</div>
         </div>
         <div class="acts">

@@ -77,8 +77,8 @@ export class TermView {
   renderFoot() {
     const h = hosts.get(this.host)
     const ro = h?.info?.allow_input === false
-    this.foot.innerHTML = (ro ? `<span class="ro">👁 ${T.readOnly}</span><span>${esc(T.typingOff)}</span>` : this.compact ? '' : `<span>${esc(T.termHint(h?.name ?? this.host))}</span>`) +
-      (this.notice ? `<span class="ro">⚠ ${T.machineSays}: ${esc(this.notice)}</span>` : '')
+    this.foot.innerHTML = (ro ? `<span class="ro">${T.readOnly}</span><span>${esc(T.typingOff)}</span>` : this.compact ? '' : `<span>${esc(T.termHint(h?.name ?? this.host))}</span>`) +
+      (this.notice ? `<span class="ro">${T.machineSays}: ${esc(this.notice)}</span>` : '')
   }
 
   // A pasted image, at most the size Claude uses (1568 px on its long side)

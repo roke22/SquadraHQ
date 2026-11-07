@@ -41,7 +41,7 @@ function squadMembers(coord) {
   return { coordinator: c ? member(c, 'coordinator') : null, workers: ws.map(w => member(w, 'worker')) }
 }
 export const personaName = id => String(id ?? '').split(':')[2] ?? ''
-const memberLine = m => `<b>${esc(m.name)}</b> ${roleTag(m.role)} ${m.folder ? `<code>${esc(m.folder)}</code>` : esc(T.tplNoFolder)}${m.persona ? ` · 🎭 ${esc(personaName(m.persona))}` : ''}`
+const memberLine = m => `<b>${esc(m.name)}</b> ${roleTag(m.role)} ${m.folder ? `<code>${esc(m.folder)}</code>` : esc(T.tplNoFolder)}${m.persona ? ` · ${esc(personaName(m.persona))}` : ''}`
 
 export function saveTemplateDialog(coord) {
   const { coordinator, workers } = squadMembers(coord)
@@ -208,7 +208,7 @@ export function newSessionDialog(hostId, preset = {}) {
   f('coordinator').after(coordHint)
   const checkCoord = () => {
     const v = f('coordinator').value
-    coordHint.textContent = !coords.length && !preset.coordinator ? T.coordNoneYet : v && !ownCoords.includes(v) ? `⚠ ${T.coordSelf}` : ''
+    coordHint.textContent = !coords.length && !preset.coordinator ? T.coordNoneYet : v && !ownCoords.includes(v) ? `${T.coordSelf}` : ''
   }
   f('coordinator').addEventListener('change', checkCoord)
   checkCoord()
@@ -226,7 +226,7 @@ export function newSessionDialog(hostId, preset = {}) {
     if (key === shownFolders) return
     shownFolders = key
     const was = f('folder').value
-    f('folder').innerHTML = folders.length ? folders.map(x => `<option value="${esc(x)}" ${x === was ? 'selected' : ''}>${x === h?.info?.home ? '🏠 ' : ''}${esc(x)}</option>`).join('') : `<option value="">—</option>`
+    f('folder').innerHTML = folders.length ? folders.map(x => `<option value="${esc(x)}" ${x === was ? 'selected' : ''}>${x === h?.info?.home ? '' : ''}${esc(x)}</option>`).join('') : `<option value="">—</option>`
     noteFolder()
   }
   // What to do without folders (+ Folder right here), or what a session in
@@ -235,7 +235,7 @@ export function newSessionDialog(hostId, preset = {}) {
     const h = hosts.get(f('host').value)
     const editable = h?.info?.folders_from_dashboard === true
     if (!(h?.info?.folders ?? []).length) folderHint.innerHTML = `${T.noFoldersHere}${editable && can('manager') ? ` <button type="button" class="btn" data-addf>${T.addFolder}</button>` : ''}`
-    else folderHint.innerHTML = h?.info?.home && f('folder').value === h.info.home && !f('sub').value.trim() ? `⚠ ${T.homeSession}` : ''
+    else folderHint.innerHTML = h?.info?.home && f('folder').value === h.info.home && !f('sub').value.trim() ? `${T.homeSession}` : ''
     loadPersonas()
   }
   // The persona: a skill or agent the machine finds for that folder (the

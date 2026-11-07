@@ -114,7 +114,7 @@ function orgLinesHtml() {
     // (Amber from three quarters of what two coordinators may send each other in an hour.)
     const cls = n >= 60 ? 'full' : n >= 45 ? 'warn' : ''
     paths += `<path class="l ${cls}" d="${d}"/><path class="hit" d="${d}" data-la="${esc(l.a)}" data-lb="${esc(l.b)}"/>`
-    labels += `<button class="org-label ${cls}" style="left:${Math.round(mx)}px;top:${Math.round(my)}px" data-la="${esc(l.a)}" data-lb="${esc(l.b)}" title="${esc(T.orgLinkRecent(n))}">🔗 ${n}</button>`
+    labels += `<button class="org-label ${cls}" style="left:${Math.round(mx)}px;top:${Math.round(my)}px" data-la="${esc(l.a)}" data-lb="${esc(l.b)}" title="${esc(T.orgLinkRecent(n))}">${n}</button>`
   }
   return { paths, labels }
 }
@@ -123,7 +123,7 @@ function orgAgent(s, kind) {
   const pct = s.activity?.context_pct
   const persona = personaOf(s)
   return `<div class="org-agent ${kind}" data-orgtip="agent:${esc(s.name)}" tabindex="0">
-      <span class="dot ${status(s).dot}"></span><span class="n">${esc(s.name)}</span>${persona ? `<span class="org-persona">🎭 ${esc(persona)}</span>` : ''}
+      <span class="dot ${status(s).dot}"></span><span class="n">${esc(s.name)}</span>${persona ? `<span class="org-persona">${esc(persona)}</span>` : ''}
       <span class="org-ctx">${Number.isFinite(pct) ? `<span class="ctx ${pct >= 80 ? 'hot' : pct >= 60 ? 'warm' : ''}">${Math.round(pct)}%</span>` : ''}</span>
       <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}">⋯</button></div>`
 }
@@ -132,7 +132,7 @@ function orgCard(q, p) {
   const shown = orgOpen.has(c.name) ? q.workers : q.workers.slice(0, ORG_FOLD)
   const on = q.workers.filter(w => w.online).length
   return `<div class="org-card" data-squad="${esc(c.name)}" style="left:${p.x}px;top:${p.y}px">
-      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self" title="${esc(T.orgSelfWorking)}">🛠</span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">👥 ${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}">⋯</button></div>
+      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self" title="${esc(T.orgSelfWorking)}"></span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}">⋯</button></div>
       ${m.goal ? `<div class="org-goal">${esc(m.goal)}</div>` : ''}
       ${orgAgent(c, 'coord')}${shown.map(w => orgAgent(w, 'worker')).join('')}
       ${q.workers.length > ORG_FOLD ? `<button class="org-fold" data-orgfold="${esc(c.name)}">${orgOpen.has(c.name) ? T.orgLess : T.orgMore(q.workers.length - shown.length)}</button>` : ''}
@@ -205,7 +205,7 @@ function orgTipHtml(key) {
     const pct = s.activity?.context_pct
     return `<div class="org-tip-t">${esc(name)} ${roleTag(orgRole(s))}</div>
         <p>${purpose ? esc(purpose) : `<i>${T.orgNoPurpose}</i>`}</p>
-        ${personaOf(s) ? `<div>🎭 ${esc(personaOf(s))}${s.description && s.persona?.description ? ` — <span class="m">${esc(s.persona.description)}</span>` : ''}</div>` : ''}
+        ${personaOf(s) ? `<div>${esc(personaOf(s))}${s.description && s.persona?.description ? ` — <span class="m">${esc(s.persona.description)}</span>` : ''}</div>` : ''}
         <div class="m"><span class="dot ${status(s).dot}"></span> ${esc(status(s).text)}</div>
         ${host || folder ? `<div class="m">${[host ? T.onHost(host.name) : '', folder].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
         ${Number.isFinite(pct) ? `<div class="m">${esc(T.contextPct(Math.round(pct)))}</div>` : ''}`
@@ -217,10 +217,10 @@ function orgTipHtml(key) {
   const linked = linksOf(name)
   return `<div class="org-tip-t">${esc(m.title || name)}${m.title ? ` <span class="m">· ${esc(name)}</span>` : ''}</div>
       <p>${m.goal ? esc(m.goal) : `<i>${T.orgNoGoal}</i>`}</p>
-      ${personaOf(c) ? `<div>🎭 ${esc(personaOf(c))}</div>` : ''}
+      ${personaOf(c) ? `<div>${esc(personaOf(c))}</div>` : ''}
       <div class="m">${esc(T.squadCount(workers.filter(w => w.online).length, workers.length))}</div>
-      ${c.online && !workers.some(w => w.online) ? `<div class="m">🛠 ${esc(T.orgSelfWorking)}</div>` : ''}
-      ${linked.length ? `<div class="m">🔗 ${linked.map(n => esc(squadTitle(n))).join(', ')}</div>` : ''}`
+      ${c.online && !workers.some(w => w.online) ? `<div class="m">${esc(T.orgSelfWorking)}</div>` : ''}
+      ${linked.length ? `<div class="m">${linked.map(n => esc(squadTitle(n))).join(', ')}</div>` : ''}`
 }
 const orgTip = document.createElement('div')
 orgTip.className = 'org-tip'
