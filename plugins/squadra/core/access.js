@@ -1,7 +1,7 @@
 // Who may talk to this session: pairing, allowlists, pins and links
 // (the same shape as the Telegram plugin).
 
-import { readFileSync, renameSync, mkdirSync, writeFileSync, statSync, existsSync, rmSync } from 'node:fs'
+import { readFileSync, renameSync, mkdirSync, writeFileSync, statSync, existsSync, rmSync, lstatSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { agent } from './agent.js'
@@ -80,6 +80,16 @@ export function allowFromDashboard(s, name) {
   for (const [code, p] of Object.entries(a.pending ?? {})) if (p?.senderId === name) delete a.pending[code]
   saveAccess(a, s)
   return !had
+}
+
+// That approval for one name, if its machine left it: taken and applied.
+export function takeDashboardApproval(s, name) {
+  if (s?.role !== 'coordinator' || !NAME_RE.test(String(name))) return false
+  const file = join(s.stateDir, 'dashboard-approved', name)
+  try { if (!lstatSync(file).isFile()) return false } catch { return false }
+  try { rmSync(file, { force: true }) } catch { return false }
+  allowFromDashboard(s, name)
+  return true
 }
 
 // A private file, written to a new temporary file and renamed over the old
@@ -339,7 +349,7 @@ export function pinAllowed(s, senderId, identity) {
 }
 
 export function gate(msg, { pairing = true } = {}) {
-  const access = loadAccess()
+  let access = loadAccess()
   if (pruneExpired(access)) saveAccess(access)
 
   if (access.dmPolicy === 'disabled') return { action: 'drop' }
@@ -355,6 +365,9 @@ export function gate(msg, { pairing = true } = {}) {
   if (chatType === 'group' && !GROUP_ID_RE.test(String(msg.chat.id))) return { action: 'drop' }
 
   if (chatType === 'private') {
+    // (A worker greets as soon as it starts, maybe before the poll below took
+    // its approval from the dashboard: looked for now, before any pairing.)
+    if (!access.allowFrom.includes(senderId) && takeDashboardApproval(S, senderId)) access = loadAccess()
     if (access.allowFrom.includes(senderId) || linkedCoordinators(S).includes(senderId)) {
       return pinAllowed(S, senderId, from.squadra_identity) ? { action: 'deliver', access } : { action: 'drop' }
     }
