@@ -85,20 +85,20 @@ export function renderTop() {
     const ws = sortedSessions().filter(s => s.role !== 'coordinator' && cs.some(c => c.name === s.coordinator))
     setHtml($('topTitle'), esc(T.leads))
     $('topSub').textContent = T.leadsSub(cs.length, ws.length)
-    setHtml($('topRight'), `<span>${T.columns}</span><span class="seg" id="colsSeg">${['auto', '1', '2', '3', '4'].map(n => `<button data-c="${n}" class="${n === state.cols ? 'on' : ''}">${n === 'auto' ? T.auto : n}</button>`).join('')}</span>`)
+    setHtml($('topRight'), `<span class="seg" id="colsSeg" role="group" aria-label="${esc(T.columns)}" title="${esc(T.columns)}">${['auto', '1', '2', '3', '4'].map(n => `<button data-c="${n}" class="${n === state.cols ? 'on' : ''}">${n === 'auto' ? T.auto : n}</button>`).join('')}</span>`)
     return
   }
   if (r.view === 'mosaic') {
     // (Who has no terminals has nothing to choose.)
     const modeSeg = !can('operator') ? '' : `<span class="seg" id="modeSeg">${['terms', 'chats'].map(m => `<button data-mode="${m}" class="${m === state.mosaicMode ? 'on' : ''}">${m === 'terms' ? T.modeTerms : T.modeChats}</button>`).join('')}</span>`
-    const colsSeg = `${modeSeg}<span>${T.columns}</span><span class="seg" id="colsSeg">${['auto', '2', '3', '4', '5', '6'].map(n => `<button data-c="${n}" class="${n === state.cols ? 'on' : ''}">${n === 'auto' ? T.auto : n}</button>`).join('')}</span>`
+    const colsSeg = `${modeSeg}<span class="seg" id="colsSeg" role="group" aria-label="${esc(T.columns)}" title="${esc(T.columns)}">${['auto', '2', '3', '4', '5', '6'].map(n => `<button data-c="${n}" class="${n === state.cols ? 'on' : ''}">${n === 'auto' ? T.auto : n}</button>`).join('')}</span>`
     if (r.squad) {
       const c = sessions.get(r.squad)
       const ws = sortedSessions().filter(s => s.role !== 'coordinator' && s.coordinator === r.squad)
       setHtml($('topTitle'), esc(T.tqLiveTitle(state.squadMeta.get(r.squad)?.title || r.squad)))
       const linked = linksOf(r.squad)
       $('topSub').textContent = [T.squadCount(ws.filter(w => w.online).length, ws.length), linked.length ? T.linkedWith(linked.join(', ')) : ''].filter(Boolean).join(' · ')
-      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}" title="${esc(T.addWorkerTo(r.squad))}">${T.addWorker}</button>` : ''}${can('manager') ? `<button class="btn" data-links="${esc(r.squad)}" title="${esc(T.linksTitle(r.squad))}">${T.links(linked.length)}</button><button class="btn" data-savetpl="${esc(r.squad)}" title="${esc(T.saveTemplateTitle(r.squad))}">${T.saveTemplate}</button>` : ''}<a class="btn" href="#/q/${encodeURIComponent(r.squad)}">${esc(T.tqBackToTeam)}</a>`)
+      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}">${esc(T.addWorker)}</button>` : ''}<a class="btn" href="#/q/${encodeURIComponent(r.squad)}">${esc(T.tqBackToTeam)}</a>`)
       return
     }
     setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('mosaic'))

@@ -92,4 +92,4 @@
   .settings-close .x { width: 44px; height: 44px; }
   .settings-close kbd { display: none; }
 }
-.settings-ver { margin-top: 14px; }
+.note.settings-ver { margin: 16px 0 0; font-size: var(--fs-xs); }

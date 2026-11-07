@@ -37,7 +37,7 @@ function who(s, extra = '') {
   const role = s.role === 'coordinator' ? 'coord' : 'worker'
   const h = hosts.get(s.host_id)
   return `<li><a href="#/s/${encodeURIComponent(s.name)}" class="tq-member${s.online ? '' : ' offline'}"><span class="role ${role}" aria-hidden="true"></span><span class="sr-only">${esc(T.roleName[s.role] ?? '')}</span>`
-    + `<span class="tq-name">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span class="tq-where">${esc(h?.name ?? st.text)}</span>${extra}</a></li>`
+    + `<span class="tq-name">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span class="tq-where">${esc(h?.name ?? T.tqNoMachine)}</span>${extra}</a></li>`
 }
 
 // The plan its coordinator keeps (update_plan): how far it is, and each task.

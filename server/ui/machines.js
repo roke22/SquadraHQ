@@ -57,7 +57,7 @@ function folderChips(h) {
     const home = i.home && f === i.home
     return `<span class="fchip ${home ? 'home' : ''}" title="${esc(home ? T.homeFolder : f)}"><code>${home ? '' : ''}${esc(f)}</code>${editable ? `<button type="button" data-hact="rmfolder" data-h="${esc(h.id)}" data-f="${esc(f)}" title="${esc(T.removeFolder(f))}" aria-label="${esc(T.removeFolder(f))}">✕</button>` : ''}</span>`
   }).join(' ')
-  return `${chips || T.noFolders}${editable && can('manager') ? ` <button type="button" class="btn addf" data-hact="addfolder" data-h="${esc(h.id)}">${T.addFolder}</button>` : h.online && i.folders_from_dashboard === false && i.version ? ` <span class="t">(${T.foldersLocal})</span>` : ''}`
+  return `${chips || T.noFolders}${editable && can('manager') ? ` <button type="button" class="btn addf" data-hact="addfolder" data-h="${esc(h.id)}">${T.addFolder}</button>` : h.online && i.folders_from_dashboard === false && i.version ? ` <span class="t">· ${T.foldersLocal}</span>` : ''}`
 }
 
 // Connected, disconnected, or enrolled and never connected yet.

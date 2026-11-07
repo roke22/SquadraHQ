@@ -119,8 +119,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); p
 .tool .arg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .tool .tn { font-weight: 700; flex: none; }
 .tool .agent { font-family: system-ui, sans-serif; font-size: 10.5px; color: var(--info); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; flex: none; }
-.res { margin-left: auto; flex: none; font-family: system-ui, sans-serif; font-size: 11.5px; padding-left: 8px; }
-.res.ok { color: var(--ok); } .res.err { color: var(--err); } .res.run { color: var(--warn); }
+.res { margin-left: auto; flex: none; font-family: var(--sans); font-size: 11.5px; padding-left: 8px; }
+.res.ok { color: var(--ok); } .res.err { color: var(--err); } .res.run { color: var(--muted); }
 .tool details summary { cursor: pointer; color: var(--muted); font: 11.5px system-ui, sans-serif; margin-left: 22px; }
 .tool details pre { margin: 3px 0 4px 22px; padding: 7px 9px; background: var(--panel-2); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; }
 .t { color: var(--muted); font-size: 11px; font-family: var(--mono); }
@@ -310,7 +310,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); p
 #companySelect { margin: 4px 10px 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
 #peopleBtn { margin-left: auto; }
 table.people .note { font-size: 12px; color: var(--muted); }
-a.btn { display: inline-block; text-decoration: none; }
 .people-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-bottom: 10px; }
 .people-form .field { flex: 1 1 160px; margin: 0; }
 .people-form .btn { flex: none; padding: 8px 14px; }

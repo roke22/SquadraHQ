@@ -1,6 +1,11 @@
 /* SquadraHQ design system: components shared by every screen.
    Loaded after the screens' own styles, so these win where both define one. */
 
+/* --- optical centring ------------------------------------------------------- */
+/* One-line controls centre their text on its capitals, not on the font's box
+   (Inter's ascender is taller than its descender: a word sat a pixel high). */
+.btn, .seg button, .seg a, .badge, .tag, kbd, .kbd, .menu button, .rail-item, .rail-settings, .rail-search, .icon-btn { text-box: trim-both cap alphabetic; }
+
 /* --- icons ----------------------------------------------------------------- */
 /* Strokes in the colour of their text (icons.js); each place may size them. */
 .ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
@@ -132,3 +137,7 @@ table.people select { width: auto; min-height: 28px; padding: 3px 8px; }
 /* --- empty states ---------------------------------------------------------- */
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--s2); padding: 64px var(--s5); text-align: center; color: var(--muted); }
 .empty b { color: var(--text); font-size: var(--fs-lg); font-weight: 600; }
+
+/* A quiet button at either end of a row lines its text up with the text around it. */
+.tq-h > .btn.quiet:last-child, .nt-card-h > .btn.quiet:last-child { margin-right: -11px; }
+.tq-act.quiet { margin-left: -1px; }

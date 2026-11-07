@@ -33,7 +33,7 @@ git checkout "$(git tag --sort=-v:refname | head -1)"   # the latest release
 node server/server.js          # dashboard at http://127.0.0.1:7787
 ```
 
-Create the first owner with the server token it prints (you will need an authenticator app for the codes), open **Machines → + Add machine** and run the one command it shows on each computer where agents should work. That's it: the details, Docker and HTTPS are in [steps 1 and 2](#1-install-the-dashboard) below.
+Create the first owner with the server token it prints (you will need an authenticator app for the codes), open **Machines → Add machine** and run the one command it shows on each computer where agents should work. That's it: the details, Docker and HTTPS are in [steps 1 and 2](#1-install-the-dashboard) below.
 
 ### Just want to try it? Docker
 
@@ -142,12 +142,12 @@ It gets and renews its HTTPS certificate by itself, and the dashboard is at `htt
 
 ## 2. Add your computers
 
-In the dashboard, open **Machines → + Add machine** (or the **+** next to *Machines* in the sidebar), choose the computer's system (Linux, macOS or Windows) and **follow the instructions it shows**: it's a single command to run on that computer. It installs everything it needs and connects it to your dashboard.
+In the dashboard, open **Machines → Add machine** (or the **+** next to *Machines* in the sidebar), choose the computer's system (Linux, macOS or Windows) and **follow the instructions it shows**: it's a single command to run on that computer. It installs everything it needs and connects it to your dashboard.
 
 Then, still in the dashboard:
 
-1. **+ Folder** under the machine, on the *Machines* page: choose the folders where agents may work (your projects).
-2. **Open your first team** ([step 3](#3-build-your-teams)), or a single session with **Machines → + New session**. Each one opens in a live terminal in your browser. The first time, accept Claude Code's prompts (for the development channel, choose *"I am using this for local development"*).
+1. **Add folder** under the machine, on the *Machines* page: choose the folders where agents may work (your projects).
+2. **Open your first team** ([step 3](#3-build-your-teams)), or a single session with **Machines → New session**. Each one opens in a live terminal in your browser. The first time, accept Claude Code's prompts (for the development channel, choose *"I am using this for local development"*).
 3. **Talk to the coordinator** in its terminal (**Give an order** on its team's page takes you there) and tell it what you want done.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/live-dark-en.jpg"><img src="docs/screenshots/live-light-en.jpg" alt="A team all at once: the coordinator's terminal and its workers' conversations side by side" width="1440"></picture>
@@ -179,7 +179,7 @@ The **[examples](https://roke22.github.io/Squadra/examples.html)** show whole or
 - **Use HTTPS** (a domain, step 1) when other computers connect to your dashboard, and keep the server token to yourself: it creates the first owner, recovers access and always works on `/admin`: it's the key to the dashboard.
 - **Give your coordinator its own repository** with a `CLAUDE.md` describing your team: which worker handles which repository, what counts as done, and what it must always ask you first. Every coordinator you open from it then works the same way.
 - **Name workers after what they do** (`api`, `web`, `docs`): the coordinator uses the names to decide who gets each task.
-- **Give each worker a persona:** in **New team** or **+ New session**, pick one of the skills (`.claude/skills/<name>/SKILL.md`) or agents (`.claude/agents/<name>.md`) the machine finds in that folder or in `~/.claude`. It goes into the agent's system prompt, so it holds through compactions, and its coordinator is told which persona each worker follows.
+- **Give each worker a persona:** in **New team** or **New session**, pick one of the skills (`.claude/skills/<name>/SKILL.md`) or agents (`.claude/agents/<name>.md`) the machine finds in that folder or in `~/.claude`. It goes into the agent's system prompt, so it holds through compactions, and its coordinator is told which persona each worker follows.
 - **One worker per repository or area,** so they don't edit the same files. For parallel work in one repository, give each worker its own [git worktree](https://git-scm.com/docs/git-worktree).
 - **Open your own projects,** or repositories you trust, in the agents' folders.
 - **Leave room in the context:** with 1M-context models, the dashboard's default of auto-compacting at 600K tokens keeps agents sharp.

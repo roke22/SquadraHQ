@@ -33,7 +33,7 @@ git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
 node server/server.js          # panel en http://127.0.0.1:7787
 ```
 
-Crea el primer propietario con el token del servidor que muestra (necesitarás una app de autenticación para los códigos), abre **Máquinas → + Añadir máquina** y ejecuta el comando que te enseña en cada ordenador donde quieras agentes. Eso es todo: los detalles, Docker y HTTPS están en los [pasos 1 y 2](#1-instala-el-panel).
+Crea el primer propietario con el token del servidor que muestra (necesitarás una app de autenticación para los códigos), abre **Máquinas → Añadir máquina** y ejecuta el comando que te enseña en cada ordenador donde quieras agentes. Eso es todo: los detalles, Docker y HTTPS están en los [pasos 1 y 2](#1-instala-el-panel).
 
 ### ¿Solo quieres probarlo? Docker
 
@@ -142,12 +142,12 @@ Consigue y renueva su certificado HTTPS solo, y el panel queda en `https://squad
 
 ## 2. Añade tus ordenadores
 
-En el panel, abre **Máquinas → + Añadir máquina** (o el **+** junto a *Máquinas* en la barra lateral), elige el sistema del ordenador (Linux, macOS o Windows) y **sigue las instrucciones que te muestra**: es un único comando para ejecutar en ese ordenador. Instala todo lo que necesita y lo conecta a tu panel.
+En el panel, abre **Máquinas → Añadir máquina** (o el **+** junto a *Máquinas* en la barra lateral), elige el sistema del ordenador (Linux, macOS o Windows) y **sigue las instrucciones que te muestra**: es un único comando para ejecutar en ese ordenador. Instala todo lo que necesita y lo conecta a tu panel.
 
 Después, desde el panel:
 
-1. **+ Carpeta** debajo de la máquina, en la página *Máquinas*: elige las carpetas donde pueden trabajar los agentes (tus proyectos).
-2. **Abre tu primer equipo** ([paso 3](#3-monta-tus-equipos)), o una sesión suelta con **Máquinas → + Nueva sesión**. Cada una se abre en una terminal en directo en tu navegador. La primera vez, acepta los avisos de Claude Code (para el canal de desarrollo, elige *"I am using this for local development"*).
+1. **Añadir carpeta** debajo de la máquina, en la página *Máquinas*: elige las carpetas donde pueden trabajar los agentes (tus proyectos).
+2. **Abre tu primer equipo** ([paso 3](#3-monta-tus-equipos)), o una sesión suelta con **Máquinas → Nueva sesión**. Cada una se abre en una terminal en directo en tu navegador. La primera vez, acepta los avisos de Claude Code (para el canal de desarrollo, elige *"I am using this for local development"*).
 3. **Habla con el coordinador** en su terminal (**Dar una orden** en la página de su equipo te lleva allí) y dile lo que quieres hacer.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/live-dark-es.jpg"><img src="docs/screenshots/live-light-es.jpg" alt="Un equipo a la vez: la terminal del coordinador y las de sus workers, una al lado de otra" width="1440"></picture>
@@ -179,7 +179,7 @@ Los **[ejemplos](https://roke22.github.io/Squadra/es/ejemplos.html)** muestran o
 - **Usa HTTPS** (un dominio, paso 1) cuando otros ordenadores se conecten a tu panel, y guarda el token del servidor solo para ti: crea el primer propietario, recupera el acceso y siempre vale en `/admin`.
 - **Dale al coordinador su propio repositorio** con un `CLAUDE.md` que describa tu equipo: qué worker lleva cada repositorio, cuándo una tarea está terminada y qué debe consultarte siempre. Así cada coordinador que abras desde él trabaja igual.
 - **Pon a los workers nombres de lo que hacen** (`api`, `web`, `docs`): el coordinador los usa para decidir a quién da cada tarea.
-- **Dale una persona a cada worker:** en **Nuevo equipo** o en **+ Nueva sesión**, elige una de las skills (`.claude/skills/<nombre>/SKILL.md`) o agentes (`.claude/agents/<nombre>.md`) que la máquina encuentra en esa carpeta o en `~/.claude`. Va en el system prompt del agente, así que se mantiene tras las compactaciones, y su coordinador sabe qué persona sigue cada worker.
+- **Dale una persona a cada worker:** en **Nuevo equipo** o en **Nueva sesión**, elige una de las skills (`.claude/skills/<nombre>/SKILL.md`) o agentes (`.claude/agents/<nombre>.md`) que la máquina encuentra en esa carpeta o en `~/.claude`. Va en el system prompt del agente, así que se mantiene tras las compactaciones, y su coordinador sabe qué persona sigue cada worker.
 - **Un worker por repositorio o por área,** para que no editen los mismos ficheros. Para trabajar en paralelo en un mismo repositorio, dale a cada worker su propio [git worktree](https://git-scm.com/docs/git-worktree).
 - **Abre tus propios proyectos,** o repositorios de confianza, en las carpetas de los agentes.
 - **Deja espacio en el contexto:** con modelos de 1M de contexto, el autocompactado a 600K tokens que trae el panel por defecto mantiene a los agentes en forma.

@@ -61,5 +61,5 @@
 .pl-note { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--muted); }
 .pl-who { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; font-family: var(--mono); font-size: 12.5px; }
 .pl-who .role { width: 12px; height: 12px; }
-.tq-quiet0 { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.tq-quiet0 { color: var(--muted); font-size: var(--fs-sm); }
 .pl-foot { padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }

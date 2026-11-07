@@ -1,7 +1,8 @@
 /* Machines: how they all are, what to check on one that stopped answering, and each one with its sessions. */
 
 #hosts { padding: 20px; }
-.host-list { max-width: 1100px; margin: 0; gap: 16px; }
+.host-list { max-width: none; margin: 0; gap: 16px; }
+.host-meta .t { font-family: var(--sans); font-size: var(--fs-sm); }
 
 .mc-card { overflow: hidden; }
 .mc-scroll { overflow-x: auto; }

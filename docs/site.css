@@ -83,7 +83,7 @@ h2 { margin: 0 0 18px; font-size: clamp(30px, 4.4vw, 50px); line-height: 1.08; f
 .points li b { color: var(--text); font-weight: 600; }
 .points svg { width: 22px; height: 22px; margin-top: 2px; color: var(--accent); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .phone { width: min(320px, 80%); margin: 0 auto; border: 1px solid var(--line-2); border-radius: 36px; padding: 10px; background: var(--panel); box-shadow: var(--shadow); }
-.phone img { border-radius: 28px; }
+.phone img { border-radius: 26px; } /* concentric: 36 outside, 10 of frame */
 .pair { position: relative; }
 .pair .window { margin: 0; }
 .pair .phone { position: absolute; right: -24px; bottom: -48px; width: 190px; border-radius: 26px; padding: 6px; }
@@ -137,3 +137,19 @@ footer a:hover { color: var(--text); }
   .compare { display: block; overflow-x: auto; }
 }
 pre.code code { background: none; padding: 0; font-size: inherit; }
+
+/* One-line controls centre their text on its capitals (Inter's ascender is taller than its descender). */
+.btn, .eyebrow, .eyebrow b, .lang, .top nav a, .ex .toc a, .step::before { text-box: trim-both cap alphabetic; }
+.eyebrow { padding: 6px 13px 6px 6px; }
+.eyebrow b { padding: 5px 8px; }
+.top .lang { padding: 8px 11px; }
+
+/* A phone: the hero shows the phone's own inbox, in a phone's frame. */
+@media (max-width: 700px) {
+  .eyebrow { font-size: 13px; }
+  .eyebrow .long { display: none; }
+  .hero .window { width: min(300px, 82%); margin: 44px auto 0; border-radius: 34px; padding: 9px; }
+  .hero .window .bar { display: none; }
+  .hero .window img { border-radius: 25px; }
+}
+@media (min-width: 701px) { .eyebrow .short { display: none; } }
