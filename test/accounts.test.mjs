@@ -646,3 +646,47 @@ test('nobody can lock an account: wrong passwords from many addresses leave the 
   assert.equal((await addresses[0].post('auth/login', { email: 'locked@example.com', password: 'wrong password' })).error_code, 429)
   ok(await browser().post('auth/login', { email: 'locked@example.com', password: PASSWORD }))
 })
+
+test('people across companies: one invitation for several, and each sees and changes only the companies it manages', async () => {
+  const made = []
+  for (const name of ['People A', 'People B', 'People C']) made.push(ok(await owner.post('api/companies/create', { name })))
+  const [ca, cb, cc] = made
+  // The administrator invites once to two companies, each with its role, without joining them.
+  const { link } = ok(await owner.post('api/people/invite', { email: 'multi@example.com', roles: [{ company: ca.id, role: 'manager' }, { company: cb.id, role: 'observer' }] }))
+  const nb = browser()
+  assert.match(ok(await nb.post('auth/invite/info', { token: link.split('/#/invite/')[1] })).company ?? '', /People A, People B/)
+  const me = ok(await nb.post('auth/invite/accept', { token: link.split('/#/invite/')[1], name: 'Multi', password: PASSWORD }))
+  if (me.stage === 'totp_setup') await setUpCodes(nb)
+  let list = ok(await owner.get('api/people'))
+  assert.equal(list.admin, true)
+  const multi = list.users.find(u => u.email === 'multi@example.com')
+  assert.deepEqual(multi.roles, { [ca.id]: 'manager', [cb.id]: 'observer' })
+  // Changed, given and taken away, by the administrator, without joining.
+  ok(await owner.post('api/people/set', { user: multi.id, company: cb.id, role: 'operator' }))
+  ok(await owner.post('api/people/set', { user: multi.id, company: cc.id, role: 'observer' }))
+  ok(await owner.post('api/people/set', { user: multi.id, company: cc.id, role: null }))
+  list = ok(await owner.get('api/people'))
+  assert.deepEqual(list.users.find(u => u.id === multi.id).roles, { [ca.id]: 'manager', [cb.id]: 'operator' })
+  // That person manages A only: sees A, and only who is in A, as it is there.
+  const theirs = ok(await nb.get('api/people'))
+  assert.equal(theirs.admin, false)
+  assert.deepEqual(theirs.companies.map(x => x.id), [ca.id])
+  assert.ok(theirs.users.every(u => Object.keys(u.roles).every(k => k === ca.id)))
+  // Nothing in B; no owner given in A; no invitation to B; no administrator made.
+  assert.equal((await nb.post('api/people/set', { user: multi.id, company: cb.id, role: 'manager' })).error_code, 404)
+  assert.equal((await nb.post('api/people/set', { user: multi.id, company: ca.id, role: 'owner' })).error_code, 403)
+  assert.equal((await nb.post('api/people/invite', { email: 'x@example.com', roles: [{ company: cb.id, role: 'observer' }] })).error_code, 404)
+  assert.equal((await nb.post('api/people/invite', { email: 'x@example.com', roles: [{ company: ca.id, role: 'observer' }], is_platform_admin: true })).error_code, 403)
+  // A pending invitation to A shows there, and can be cancelled.
+  ok(await nb.post('api/people/invite', { email: 'later@example.com', roles: [{ company: ca.id, role: 'observer' }] }))
+  const pending = ok(await nb.get('api/people')).invitations.find(i => i.email === 'later@example.com')
+  assert.deepEqual(pending.roles, { [ca.id]: 'observer' })
+  ok(await nb.post('api/people/invitations/cancel', { id: pending.id }))
+  assert.ok(!ok(await nb.get('api/people')).invitations.some(i => i.email === 'later@example.com'))
+  // Each change is written down, with its company.
+  const db = new DatabaseSync(join(dataDir, 'control.db'), { readOnly: true })
+  assert.ok(db.prepare("SELECT 1 FROM platform_audit WHERE action = 'member-role' AND target = ?").get(cb.id))
+  assert.ok(db.prepare("SELECT 1 FROM platform_audit WHERE action = 'member-added' AND target = ?").get(cc.id))
+  assert.ok(db.prepare("SELECT 1 FROM platform_audit WHERE action = 'member-removed' AND target = ?").get(cc.id))
+  db.close()
+})

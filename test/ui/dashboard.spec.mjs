@@ -569,3 +569,23 @@ test('beside a session terminal: what it is doing, and what mattered, read from 
   await page.goto(`${server.url}/#/s/tlw/chat`)
   await expect(page.locator('.sv-aside .tl-list')).toContainText('Round the total')
 })
+
+test('people in all companies: a column each, the role changed in place, and one invitation for several', async ({ page }) => {
+  const other = await server.call('admin/createCompany', { name: 'People Two' })
+  await signIn(page)
+  await page.locator('#settingsBtn').click()
+  await page.locator('[data-tab=everyone]').click()
+  const table = page.locator('#settings table.ev')
+  await expect(table.locator('th', { hasText: 'People Two' })).toBeVisible()
+  // One invitation, the same role in every company: one link.
+  await page.locator('[data-evinvite] [name=email]').fill('two@example.com')
+  await page.locator('[data-evinvite] [data-same]').selectOption('observer')
+  await page.locator('[data-evinvite] button.primary').click()
+  await expect(page.locator('#settings [data-link] .cmd')).toContainText('/#/invite/')
+  await expect(page.locator('#settings')).toContainText('two@example.com')
+  await expect(page.locator('#settings')).toContainText('People Two: Observer')
+  // Each role says what it can do.
+  await page.locator('#settings .roles-help summary').click()
+  await expect(page.locator('#settings .roles-help')).toContainText('answers in the inbox')
+  void other
+})

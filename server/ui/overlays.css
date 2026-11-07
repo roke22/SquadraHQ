@@ -105,3 +105,17 @@
   .settings-close kbd { display: none; }
 }
 .note.settings-ver { margin: 16px 0 0; font-size: var(--fs-xs); }
+
+/* People in all companies: a column per company, the role chosen in place. */
+.ev-wrap { padding: 0; overflow-x: auto; }
+.settings-content .ev-wrap table.people { margin: 0; border: 0; border-radius: 0; }
+.settings-content table.people.ev th { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); white-space: nowrap; background: var(--raised); }
+.settings-content table.people.ev td:last-child:not(:first-child) { text-align: left; }
+.settings-content table.people.ev td:not(:first-child) { white-space: nowrap; }
+.settings-content table.people.ev select { min-width: 120px; }
+.ev-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 12px; }
+.roles-help { margin: 0 0 14px; font-size: var(--fs-sm); color: var(--muted); }
+.roles-help > summary { cursor: pointer; color: var(--info); font-weight: 500; }
+.roles-help dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); }
+.roles-help dt { color: var(--text); font-weight: 600; }
+.roles-help dd { margin: 0; }

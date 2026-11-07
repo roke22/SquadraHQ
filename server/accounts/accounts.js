@@ -231,8 +231,8 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
   // A link of one use, to copy by hand: there is no mail in this server.
   function newLink(req, kind, fields, ttl, by) {
     const token = randomBytes(32).toString('base64url')
-    q('INSERT INTO invitations (token_hash, kind, email, company_id, role, is_platform_admin, created_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(sha256(token), kind, fields.email, fields.company ?? null, fields.role ?? null, fields.isAdmin ? 1 : 0, by ?? null, now() + ttl)
+    q('INSERT INTO invitations (token_hash, kind, email, company_id, role, is_platform_admin, created_by, expires_at, also) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(sha256(token), kind, fields.email, fields.company ?? null, fields.role ?? null, fields.isAdmin ? 1 : 0, by ?? null, now() + ttl, fields.also?.length ? JSON.stringify(fields.also) : null)
     return { link: `${serverBaseUrl(req)}/#/${kind}/${token}`, expires_at: now() + ttl }
   }
 
@@ -244,6 +244,22 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
 
   // A link says what whoever made it could give then. It is good while they
   // still can: someone who lost that doesn't leave a way back behind them.
+  // The other companies an invitation is for, as they were written.
+  function alsoOf(row) {
+    let list = []
+    try { list = JSON.parse(row.also ?? '[]') } catch {}
+    return (Array.isArray(list) ? list : []).filter(a => a && typeof a.company === 'string' && ROLES.includes(a.role))
+  }
+  // Whoever made an invitation may still give that role in that company.
+  function inviterCanFor(createdBy, company, role) {
+    if (!createdBy) return true // (the server token)
+    const by = userById(createdBy)
+    if (!by || by.disabled_at) return false
+    if (by.is_platform_admin) return true
+    const mine = roleIn(by, company)
+    return !!mine && atLeast(mine, 'manager') && canGrant(mine, role)
+  }
+
   function inviterStillCan(row) {
     if (!row.created_by) return true // (the server token)
     const by = userById(row.created_by)
@@ -298,7 +314,8 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
     if (path === '/auth/invite/info') {
       const row = linkFor('invite', params.token)
       if (!inviterStillCan(row)) throw new ApiError(404, 'Not Found: this link is wrong, was used already, or has expired')
-      return answer({ email: row.email, company: row.company_id ? companyName(row.company_id) : null, role: row.role, known: !!userByEmail(row.email) })
+      const names = [row.company_id, ...alsoOf(row).map(a => a.company)].filter(Boolean).map(companyName).filter(Boolean)
+      return answer({ email: row.email, company: names.length ? names.join(', ') : null, role: row.role, known: !!userByEmail(row.email) })
     }
 
     if (path === '/auth/invite/accept') {
@@ -325,6 +342,12 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
       if (!q('UPDATE invitations SET used_at = ? WHERE token_hash = ? AND used_at IS NULL').run(now(), row.token_hash).changes) throw new ApiError(404, 'Not Found: this link was used already')
       if (row.company_id && companyName(row.company_id)) addMember(user, row.company_id, row.role, row.created_by)
       audit(user, 'invite-accepted', row.company_id ?? 'platform', req, row.role)
+      // The other companies it was for, as far as whoever made it still may give them.
+      for (const a of alsoOf(row)) {
+        if (!companyName(a.company) || !inviterCanFor(row.created_by, a.company, a.role)) continue
+        addMember(user, a.company, a.role, row.created_by)
+        audit(user, 'invite-accepted', a.company, req, a.role)
+      }
       user = userById(user.id)
       const s = startSession(req, res, user, false)
       return answer(me(user, s))
@@ -607,5 +630,90 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
   }
   setInterval(guarded(sweep), 60_000).unref()
 
-  return { handle, actorOf, meAnswer, roleIn, hasUsers, companyMethods, adminMethods, audit, recoverAccess }
+  // Settings → People, across companies: who is in which and with what role,
+  // for whoever manages them (an administrator of the server: all of them).
+  // Changing one reuses what each company's People does, effects included.
+  const isAdmin = actor => !!(actor?.token || actor?.is_platform_admin)
+  const managing = (actor, companyId) => (isAdmin(actor) ? 'owner' : roleIn(actor, companyId))
+  const managedBy = (actor, list) => list.filter(c => { const r = managing(actor, c.id); return !!r && atLeast(r, 'manager') })
+  const peopleMethods = {
+    people: {
+      method: 'GET',
+      run({ actor, list }) {
+        const mine = managedBy(actor, list)
+        const ids = new Set(mine.map(c => c.id))
+        const users = q('SELECT id, email, name, is_platform_admin, disabled_at FROM users ORDER BY name').all()
+          .map(u => ({ id: u.id, email: u.email, name: u.name, is_platform_admin: !!u.is_platform_admin, disabled: !!u.disabled_at, roles: Object.fromEntries(membershipsOf(u.id).filter(m => ids.has(m.company_id)).map(m => [m.company_id, m.role])) }))
+          .filter(u => isAdmin(actor) || Object.keys(u.roles).length)
+        const invitations = q("SELECT token_hash, email, company_id, role, also, expires_at FROM invitations WHERE kind = 'invite' AND used_at IS NULL AND expires_at > ? ORDER BY expires_at").all(now())
+          .map(r => ({ id: sha256(r.token_hash), email: r.email, expires_at: r.expires_at, roles: Object.fromEntries([[r.company_id, r.role], ...alsoOf(r).map(a => [a.company, a.role])].filter(([c]) => c && ids.has(c))) }))
+          .filter(i => Object.keys(i.roles).length)
+        return { admin: isAdmin(actor), companies: mine.map(c => ({ id: c.id, name: c.name, my_role: managing(actor, c.id) })), users, invitations }
+      },
+    },
+    // One person's role in one company: given, changed, or taken away (role: null).
+    'people/set': {
+      method: 'POST',
+      async run({ actor, params, req, list, companyOf }) {
+        const company = companyOf(String(params.company ?? ''))
+        const actorRole = managing(actor, company.id)
+        if (!actorRole || !atLeast(actorRole, 'manager')) throw new ApiError(404, 'Not Found: no such company')
+        const target = userById(String(params.user ?? ''))
+        if (!target) throw bad('no such person')
+        const current = roleIn(target, company.id)
+        const role = params.role == null || params.role === '' ? null : String(params.role)
+        if (!role) {
+          if (!current) return { id: target.id, role: null }
+          return companyMethods['members/remove'].run({ company, actor, actorRole, params: { user: target.id }, req })
+        }
+        checkRole(role)
+        if (current) return companyMethods['members/role'].run({ company, actor, actorRole, params: { user: target.id, role }, req })
+        if (!canGrant(actorRole, role)) throw new ApiError(403, 'Forbidden: you can\'t give that role')
+        // (Someone a manager can see: already in another company it manages.)
+        if (!isAdmin(actor) && !managedBy(actor, list).some(c => roleIn(target, c.id))) throw bad('that person is not in a company you manage: invite them')
+        addMember(target, company.id, role, actor.id ?? null)
+        audit(actor, 'member-added', company.id, req, `${target.email} as ${role}`)
+        return { id: target.id, role }
+      },
+    },
+    // One link for several companies, each with its role.
+    'people/invite': {
+      method: 'POST',
+      run({ actor, params, req, list, companyOf }) {
+        const email = cleanEmail(params.email)
+        if (!EMAIL.test(email)) throw bad('this is not an email address')
+        const seen = new Set()
+        const wanted = (Array.isArray(params.roles) ? params.roles : []).filter(r => r && r.role && !seen.has(r.company) && seen.add(r.company))
+        for (const w of wanted) {
+          const company = companyOf(String(w.company ?? ''))
+          checkRole(w.role)
+          const actorRole = managing(actor, company.id)
+          if (!actorRole || !atLeast(actorRole, 'manager')) throw new ApiError(404, 'Not Found: no such company')
+          if (!canGrant(actorRole, w.role)) throw new ApiError(403, `Forbidden: you can't give the role ${w.role} in ${company.name}`)
+        }
+        const admin = params.is_platform_admin === true
+        if (admin && !isAdmin(actor)) throw new ApiError(403, 'Forbidden: only an administrator of the server makes another')
+        if (!wanted.length && !admin) throw bad('choose a role in at least one company')
+        for (const w of wanted) audit(actor, 'member-invited', w.company, req, `${email} as ${w.role}`)
+        if (admin) audit(actor, 'user-invited', 'platform', req, `${email} (administrator)`)
+        const [first, ...also] = wanted.map(w => ({ company: String(w.company), role: w.role }))
+        return newLink(req, 'invite', { email, company: first?.company ?? null, role: first?.role ?? null, isAdmin: admin, also }, INVITE_MS, actor.id ?? null)
+      },
+    },
+    'people/invitations/cancel': {
+      method: 'POST',
+      run({ actor, params, req, list }) {
+        const row = q("SELECT token_hash, email, company_id, role, also FROM invitations WHERE kind = 'invite' AND used_at IS NULL").all().find(r => sha256(r.token_hash) === String(params.id ?? ''))
+        if (!row) throw bad('no such invitation')
+        const ids = new Set(managedBy(actor, list).map(c => c.id))
+        const all = [[row.company_id, row.role], ...alsoOf(row).map(a => [a.company, a.role])].filter(([c]) => c)
+        if (!isAdmin(actor) && !all.every(([c, r]) => ids.has(c) && canGrant(managing(actor, c), r))) throw new ApiError(403, 'Forbidden: you can\'t cancel that one')
+        q('DELETE FROM invitations WHERE token_hash = ?').run(row.token_hash)
+        for (const [c] of all) audit(actor, 'invitation-cancelled', c, req, row.email)
+        return { cancelled: true }
+      },
+    },
+  }
+
+  return { handle, actorOf, meAnswer, roleIn, hasUsers, companyMethods, adminMethods, peopleMethods, audit, recoverAccess }
 }

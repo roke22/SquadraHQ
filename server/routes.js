@@ -109,6 +109,16 @@ export function createRoutes(server, companies, accounts) {
       accounts.audit(actor, 'company-restored', id, req)
       return sendJson(res, 200, { ok: true, result: restored })
     }
+    // People across companies: each sees and changes only the companies it manages.
+    const people = own(accounts.peopleMethods, what)
+    if (people) {
+      if (req.method !== people.method) throw new ApiError(405, 'Method Not Allowed')
+      const params = req.method === 'POST' ? await readParams(req, url) : {}
+      // (Who it is now, once the body has arrived.)
+      const who = actor.token ? actor : accounts.actorOf(req)
+      const list = companies.list().filter(c => c.status !== 'deleting')
+      return sendJson(res, 200, { ok: true, result: await people.run({ actor: who, params, req, list, companyOf: named }) })
+    }
     if (!actor.token && !actor.is_platform_admin) throw new ApiError(403, 'Forbidden: this is for administrators of the server')
     if (what === 'machines') {
       if (req.method !== 'GET') throw new ApiError(405, 'Method Not Allowed')
@@ -233,7 +243,7 @@ export function createRoutes(server, companies, accounts) {
           if (!m) throw new ApiError(404, 'Not Found')
           return await companyCall(named(m[1]), m[2], req, res, url, actor)
         }
-        if (what === 'companies' || what.startsWith('companies/') || what === 'users' || what.startsWith('users/') || what === 'machines' || what === 'pending-links' || what === 'pending-links/cancel') return await platformCall(what, req, res, url, actor)
+        if (what === 'companies' || what.startsWith('companies/') || what === 'people' || what.startsWith('people/') || what === 'users' || what.startsWith('users/') || what === 'machines' || what === 'pending-links' || what === 'pending-links/cancel') return await platformCall(what, req, res, url, actor)
         // Without a company: scripts with the server token, on the first one.
         if (!actor.token) throw new ApiError(404, 'Not Found')
         return await companyCall(companies.first(), what, req, res, url, actor)

@@ -12,6 +12,10 @@ const ROLES = ['observer', 'operator', 'manager', 'owner']
 const grantable = () => ROLES.filter(r => r !== 'owner' || can('owner'))
 const roleSelect = (value, attrs = '') => `<select ${attrs}>${grantable().map(r => `<option value="${r}" ${r === value ? 'selected' : ''}>${esc(T.roles[r])}</option>`).join('')}</select>`
 const fmtTime = ms => new Date(ms).toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' })
+// Nobody gives more than they have; only owners give or take the role of owner.
+const canGive = (mine, role) => ROLES.indexOf(mine) >= ROLES.indexOf(role) && (mine === 'owner' || role !== 'owner')
+// What each role can do, said where roles are chosen.
+const rolesHelp = () => `<details class="roles-help"><summary>${esc(T.rolesWhat)}</summary><dl>${ROLES.map(r => `<dt>${esc(T.roles[r])}</dt><dd>${esc(T.roleHelp[r])}</dd>`).join('')}</dl></details>`
 const linkBox = l => `<div class="cmdrow"><pre class="cmd">${esc(l.link)}</pre><button class="btn" data-copy>${esc(T.copy)}</button></div><p class="note">${esc(T.linkOnce)}</p>`
 
 // Settings: over the whole dashboard, without its sidebar, in three groups by
@@ -23,8 +27,11 @@ export function openSettings(start) {
   const admin = state.me?.user.is_platform_admin
   const manager = can('manager')
   const here = state.me?.companies.find(c => c.id === state.company)
+  // People across companies: for an administrator, or whoever manages several.
+  const everywhere = admin || (state.me?.companies ?? []).filter(c => c.role === 'manager' || c.role === 'owner').length > 1
   const groups = [
     [T.setMine, [['account', T.setProfile], ['appearance', T.setAppearance]]],
+    ...(everywhere ? [[T.setAllCompanies, [['everyone', T.people]]]] : []),
     ...(manager && here ? [[here.name, [['members', T.people], ['company', T.tabCompany]]]] : []),
     ...(admin ? [[T.setServer, [['companies', T.tabCompanies], ['users', T.tabUsers], ['machines', T.tabMachines]]]] : []),
   ]
@@ -87,8 +94,8 @@ export function openSettings(start) {
       b.classList.toggle('on', b.dataset.tab === tab)
       if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current')
     }
-    root.querySelector('#settingsTitle').textContent = tabs.find(t => t[0] === tab)?.[1] ?? ''
-    try { await ({ members, company, companies, users, machines, account, appearance })[tab]() } catch (err) { fail(err) }
+    root.querySelector('#settingsTitle').textContent = tab === 'everyone' ? T.evSeeAll : tabs.find(t => t[0] === tab)?.[1] ?? ''
+    try { await ({ everyone, members, company, companies, users, machines, account, appearance })[tab]() } catch (err) { fail(err) }
   }
 
   // How the dashboard looks to you, in this browser.
@@ -103,6 +110,54 @@ export function openSettings(start) {
     for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('squadraLang', b.dataset.lang); location.reload() } }
   }
 
+  // Everyone in the companies you manage, a column each: their role there,
+  // changed right in the table, and one invitation for several at once.
+  async function everyone() {
+    const turn = ++drawing
+    const p = await call('/api/people')
+    if (turn !== drawing) return
+    const cos = p.companies
+    const cell = (u, c) => {
+      const role = u.roles[c.id] ?? ''
+      const can = role ? canGive(c.my_role, role) : true
+      const options = ['', ...ROLES].filter(r => !r || r === role || canGive(c.my_role, r))
+      return `<td><select data-person="${esc(u.id)}" data-co="${esc(c.id)}" aria-label="${esc(T.evRoleIn(u.name, c.name))}" ${can ? '' : 'disabled'}>${options.map(r => `<option value="${r}" ${r === role ? 'selected' : ''}>${r ? esc(T.roles[r]) : '—'}</option>`).join('')}</select></td>`
+    }
+    const pick = c => `<label class="field"><span>${esc(c.name)}</span><select name="co:${esc(c.id)}"><option value="">—</option>${ROLES.filter(r => canGive(c.my_role, r)).map(r => `<option value="${r}">${esc(T.roles[r])}</option>`).join('')}</select></label>`
+    body.innerHTML = `<div class="set-card ev-wrap"><table class="people ev"><thead><tr><th scope="col">${esc(T.evPerson)}</th>${cos.map(c => `<th scope="col">${esc(c.name)}</th>`).join('')}</tr></thead><tbody>
+        ${p.users.map(u => `<tr><td><b>${esc(u.name)}</b>${u.is_platform_admin ? ` <span class="tag">${esc(T.administrator)}</span>` : ''}${u.id === state.me.user.id ? ` <span class="note">${esc(T.evYou)}</span>` : ''}<br><span class="note">${esc(u.email)}${u.disabled ? ` · ${esc(T.disabled)}` : ''}</span></td>${cos.map(c => cell(u, c)).join('')}</tr>`).join('')}
+      </tbody></table></div>
+      ${rolesHelp()}
+      <h4>${esc(T.inviteTitle)}</h4><div class="set-card"><form data-evinvite>
+        <label class="field"><span>${esc(T.email)}</span><input type="text" name="email" required autocomplete="off"></label>
+        ${cos.length > 1 ? `<label class="field"><span>${esc(T.evSameRole)}</span><select data-same><option value="">—</option>${ROLES.map(r => `<option value="${r}">${esc(T.roles[r])}</option>`).join('')}</select></label>` : ''}
+        <div class="ev-picks">${cos.map(pick).join('')}</div>
+        ${p.admin ? `<label class="check"><input type="checkbox" name="admin"> <span>${esc(T.evAdmin)}</span></label>` : ''}
+        <p class="note">${esc(T.evInviteHint)}</p>
+        <button class="btn primary">${esc(T.invite)}</button></form><div data-link></div></div>
+      ${p.invitations.length ? `<h4>${esc(T.pendingInvites)}</h4><table class="people"><tbody>${p.invitations.map(i => `<tr><td>${esc(i.email)}<br><span class="note">${esc(Object.entries(i.roles).map(([id, r]) => `${cos.find(c => c.id === id)?.name ?? id}: ${T.roles[r] ?? r}`).join(' · '))}</span></td><td><button class="btn danger" data-evcancel="${esc(i.id)}">${esc(T.cancelInvite)}</button></td></tr>`).join('')}</tbody></table>` : ''}`
+    for (const s of body.querySelectorAll('[data-person]')) {
+      s.onchange = async () => {
+        ok()
+        try { await call('/api/people/set', { user: s.dataset.person, company: s.dataset.co, role: s.value || null }); current = null; await show('everyone') } catch (err) { fail(err); current = null; await show('everyone') }
+      }
+    }
+    const form = body.querySelector('[data-evinvite]')
+    form.querySelector('[data-same]')?.addEventListener('change', e => { for (const s of form.querySelectorAll('select[name^="co:"]')) if ([...s.options].some(o => o.value === e.target.value)) s.value = e.target.value })
+    form.onsubmit = async e => {
+      e.preventDefault()
+      ok()
+      const roles = [...form.querySelectorAll('select[name^="co:"]')].filter(s => s.value).map(s => ({ company: s.name.slice(3), role: s.value }))
+      try {
+        const r = await call('/api/people/invite', { email: form.elements.email.value, roles, is_platform_admin: !!form.elements.admin?.checked })
+        current = null
+        await show('everyone')
+        body.querySelector('[data-link]').innerHTML = linkBox(r)
+      } catch (err) { fail(err) }
+    }
+    for (const b of body.querySelectorAll('[data-evcancel]')) b.onclick = async () => { ok(); try { await call('/api/people/invitations/cancel', { id: b.dataset.evcancel }); current = null; await show('everyone') } catch (err) { fail(err) } }
+  }
+
   async function members() {
     const turn = ++drawing
     const [list, pending, { join_token }] = await Promise.all([call(inCompany('/api/members')), call(inCompany('/api/invitations')), call(inCompany('/api/join-token'))])
@@ -112,13 +167,17 @@ export function openSettings(start) {
     const fixed = m => m.role === 'owner' && (!can('owner') || owners < 2)
     body.innerHTML = `<table class="people"><tbody>${list.map(m => `<tr><td><b>${esc(m.name)}</b><br><span class="note">${esc(m.email)}${m.disabled ? ` · ${esc(T.disabled)}` : ''}</span></td>
         <td>${fixed(m) ? esc(T.roles[m.role]) : roleSelect(m.role, `data-role-of="${esc(m.id)}"`)}</td><td>${fixed(m) ? '' : `<button class="btn danger" data-remove="${esc(m.id)}">${esc(T.remove)}</button>`}</td></tr>`).join('')}</tbody></table>
+      ${rolesHelp()}
       <h4>${esc(T.inviteTitle)}</h4><div class="set-card"><form data-invite class="people-form"><label class="field"><span>${esc(T.email)}</span><input type="text" name="email" required></label>
         <label class="field"><span>${esc(T.role)}</span>${roleSelect('operator', 'name="role"')}</label>
-        <button class="btn primary">${esc(T.invite)}</button></form><div data-link></div></div>
+        <button class="btn primary">${esc(T.invite)}</button></form><p class="note" data-rolehint>${esc(T.roleHelp.operator)} ${esc(T.evOnlyHere)}</p><div data-link></div></div>
+      ${everywhere ? `<p class="note"><button type="button" class="btn quiet" data-tab-go="everyone">${esc(T.evSeeAll)}</button></p>` : ''}
       ${pending.length ? `<h4>${esc(T.pendingInvites)}</h4><table class="people"><tbody>${pending.map(i => `<tr><td>${esc(i.email)} <span class="note">${esc(T.roles[i.role] ?? i.role)}</span></td><td><button class="btn danger" data-cancel-invite="${esc(i.id)}">${esc(T.cancelInvite)}</button></td></tr>`).join('')}</tbody></table>` : ''}
       <h4>${esc(T.joinToken)}</h4><div class="set-card"><p class="note">${esc(T.joinTokenHint)}</p>
       <div class="cmdrow"><pre class="cmd">${esc(join_token)}</pre><button class="btn" data-copy>${esc(T.copy)}</button></div>
       <button class="btn danger" data-rotate>${esc(T.rotate)}</button></div>`
+    body.querySelector('[data-invite] select[name=role]').onchange = e => { body.querySelector('[data-rolehint]').textContent = `${T.roleHelp[e.target.value] ?? ''} ${T.evOnlyHere}` }
+    body.querySelector('[data-tab-go]')?.addEventListener('click', () => show('everyone'))
     body.querySelector('[data-invite]').onsubmit = async e => {
       e.preventDefault()
       ok()

@@ -83,5 +83,8 @@ export function openControl() {
     expires_at INTEGER NOT NULL
   );
 `)
+  // An invitation to several companies at once: the first in company_id and
+  // role, the rest here (JSON: [{ company, role }]).
+  if (!control.prepare('PRAGMA table_info(invitations)').all().some(c => c.name === 'also')) control.exec('ALTER TABLE invitations ADD COLUMN also TEXT')
   return control
 }
