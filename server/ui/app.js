@@ -70,7 +70,7 @@ function enter(me) {
   $('companyBox').hidden = me.companies.length < 2
   select.innerHTML = me.companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')
   select.value = here.id
-  $('companyName').hidden = me.companies.length > 1
+  $('companyName').hidden = true // (one company: nothing to tell apart)
   $('companyName').textContent = here.name ?? ''
   show('app')
   connect()

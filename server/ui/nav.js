@@ -53,7 +53,7 @@ const here = on => (on ? ' class="rail-item on" aria-current="page"' : ' class="
 
 // What a session's row says on its right, and what it reads aloud.
 function attention(s) {
-  if (status(s).waiting) return { html: '<span class="badge attn" aria-hidden="true">!</span>', say: T.waitingOnYou }
+  if (status(s).waiting) return { html: '', say: T.waitingOnYou }
   const n = unread.get(s.name) ?? 0
   return n ? { html: `<span class="badge" aria-hidden="true">${n > 99 ? '99+' : n}</span>`, say: T.unreadN(n) } : { html: '', say: '' }
 }

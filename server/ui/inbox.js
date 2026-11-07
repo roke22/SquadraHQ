@@ -58,6 +58,9 @@ function cantAnswer(i) {
   return null
 }
 
+// What a session waiting for permission wants to run.
+const permWhat = s => { const a = s.activity ?? {}; return a.tool?.name ? [a.tool.name, a.tool.summary].filter(Boolean).join(' · ') : a.waiting ?? '' }
+
 // Everything listed, in its groups. Each entry: { key, kind, ... }.
 function entries() {
   const open = state.inbox.filter(i => !i.resolved_at)
@@ -79,7 +82,7 @@ function row(e, on) {
   const href = `#/inbox/${e.key}`
   let dot, title, meta
   if (e.kind === 'perm') {
-    dot = 'warn'; title = T.ibxPermTitle(e.s.name, status(e.s).text)
+    dot = 'warn'; title = T.ibxPermTitle(e.s.name, permWhat(e.s))
     meta = [who(e.s.name), esc(T.ibxPermission), esc(teamOf(e.s.name)), esc(ago(e.at))]
   } else if (e.kind === 'approve') {
     dot = 'warn'; title = T.ibxApproveTitle(e.s.name)
@@ -115,7 +118,7 @@ function detail(e) {
   if (e.kind === 'perm') {
     const s = e.s
     return `${back}<div class="ibx-meta">${who(s.name)}<span>${esc(teamOf(s.name))}</span></div>
-      <h2 class="ibx-q">${esc(T.ibxPermTitle(s.name, ''))}</h2><pre class="ibx-perm">${esc(status(s).text)}</pre>
+      <h2 class="ibx-q">${esc(T.ibxPermTitle(s.name, ''))}</h2><pre class="ibx-perm">${esc(permWhat(s) || status(s).text)}</pre>
       <p class="ibx-note">${esc(T.ibxPermHint)}</p>
       <div class="ibx-actions"><a class="btn primary" href="#/s/${encodeURIComponent(s.name)}">${esc(T.ibxOpenSession)}</a></div>`
   }
