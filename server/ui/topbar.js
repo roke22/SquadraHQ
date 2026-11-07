@@ -8,7 +8,7 @@ import { currentRoute } from './router.js'
 import { applyCols, buildMosaic } from './mosaic.js'
 import { runAction, openMenu } from './dialogs.js'
 import { terminalOf, hostLine, hostAction } from './machines.js'
-import { reopenable, reopen, addWorkerTo, saveTemplateDialog, newSessionDialog } from './squads.js'
+import { reopenable, reopen, addWorkerTo, saveTemplateDialog } from './squads.js'
 import { orgSquads, orgZoom, linksDialog } from './org.js'
 
 // The terminal a session view shows (null: its chat).
@@ -57,6 +57,12 @@ export function renderTop() {
     // (Its subtitle, how many teams and sessions, is the list's own: see renderTeams.)
     setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('teams'))
     setHtml($('topRight'), can('operator') ? `<button class="btn primary" data-newteam>${esc(T.newTeam)}</button>` : '')
+    return
+  }
+  if (r.view === 'newteam') {
+    setHtml($('topTitle'), esc(T.newTeam))
+    $('topSub').textContent = ''
+    setHtml($('topRight'), `<a class="btn quiet" href="#/teams">${esc(T.cancel)}</a>`)
     return
   }
   if (r.view === 'team') {
@@ -158,7 +164,7 @@ $('topRight').addEventListener('click', e => {
   if (act) runAction(act.dataset.act, act.dataset.s)
   const hact = e.target.closest('[data-hact]')
   if (hact) hostAction(hact.dataset.hact, hact.dataset.h)
-  if (e.target.closest('[data-newteam]')) return newSessionDialog(undefined, { role: 'coordinator' })
+  if (e.target.closest('[data-newteam]')) { location.hash = '#/new'; return }
   const aw = e.target.closest('[data-addworker]')
   if (aw) addWorkerTo(aw.dataset.addworker)
   const stp = e.target.closest('[data-savetpl]')

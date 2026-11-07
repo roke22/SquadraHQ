@@ -219,7 +219,7 @@ function choose(n) {
 
 $('inbox').addEventListener('click', async e => {
   if (e.target.closest('[data-addmachine]')) { location.hash = '#/hosts'; return (await import('./machines.js')).addMachineDialog() }
-  if (e.target.closest('[data-newteam]')) return (await import('./squads.js')).newSessionDialog(undefined, { role: 'coordinator' })
+  if (e.target.closest('[data-newteam]')) { location.hash = '#/new'; return }
   const opt = e.target.closest('[data-option]')
   if (opt) return choose(Number(opt.dataset.option))
   const b = e.target.closest('[data-resolve]')

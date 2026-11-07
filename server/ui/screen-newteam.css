@@ -1,0 +1,46 @@
+/* A new team: one page, four steps, nothing opens until the last. */
+
+#newteam { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 20px 48px; }
+.nt { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+.nt-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; font-size: var(--fs-sm); color: var(--muted); }
+.nt-step { display: inline-flex; align-items: center; gap: 7px; }
+.nt-step b { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line-2); border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; }
+.nt-step.done { color: var(--text); }
+.nt-step.done b { border-color: var(--ok); color: var(--ok); }
+
+.nt-sec h2 { margin: 0 0 12px; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.01em; }
+.nt-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px; margin-bottom: 14px; }
+.nt-choice { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--panel); color: var(--text); text-align: left; transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease); }
+.nt-choice:hover { background: var(--raised); }
+.nt-choice.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.nt-choice b { font-weight: 600; }
+.nt-choice span { font-size: var(--fs-sm); color: var(--muted); }
+
+.nt-card { overflow: hidden; }
+.nt-card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--line); }
+.nt-card-h h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.nt-members { list-style: none; margin: 0; padding: 4px 0; }
+.nt-member { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 12px 7px 16px; }
+.nt-member + .nt-member { border-top: 1px solid var(--line); }
+.nt-name input { width: 170px; height: 32px; padding: 4px 9px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--text); font: 500 12.5px var(--mono); }
+.nt-name input:focus-visible, .nt-persona select:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.nt-role { font-size: var(--fs-sm); color: var(--muted); min-width: 84px; }
+.nt-persona { flex: 1 1 200px; min-width: 0; }
+.nt-persona select { width: 100%; height: 32px; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--text); }
+.nt-gap { width: 28px; }
+.nt-res { flex-basis: 100%; padding-left: 24px; font-size: var(--fs-sm); color: var(--muted); }
+.nt-res.ok { color: var(--ok); }
+.nt-res.bad { color: var(--err); }
+.nt-note { margin: 0; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
+.nt-sec > .nt-note { border-top: 0; padding: 0; }
+.nt-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 0 12px; }
+
+.nt-go { padding-top: 18px; border-top: 1px solid var(--line); }
+.nt-issues { margin: 0 0 12px; color: var(--err); font-size: var(--fs-sm); }
+.nt-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+@media (max-width: 700px) {
+  #newteam { padding: 16px 12px 40px; }
+  .nt-name input { width: 100%; }
+  .nt-name { flex: 1 1 140px; }
+}

@@ -63,7 +63,7 @@ function candidates() {
   if (sortedSessions({ archived: true }).length) items.push({ group: 'screens', label: T.archived, lead: icon('archive'), go: '#/archived' })
   if (can('operator')) items.push(
     { group: 'actions', label: T.actNewSession, lead: icon('plus'), run: async () => (await import('./squads.js')).newSessionDialog() },
-    { group: 'actions', label: T.actNewTeam, lead: icon('plus'), run: async () => (await import('./squads.js')).newSessionDialog(undefined, { role: 'coordinator' }) },
+    { group: 'actions', label: T.actNewTeam, lead: icon('plus'), go: '#/new' },
   )
   if (can('manager')) items.push(
     { group: 'actions', label: T.actAddMachine, lead: icon('machines'), run: async () => { if (location.hash !== '#/hosts') location.hash = '#/hosts'; (await import('./machines.js')).addMachineDialog() } },

@@ -54,5 +54,5 @@ export function renderTeams() {
 export const refreshTeams = () => { if (currentRoute().view === 'teams' && !$('teams').hidden) renderTeams() }
 
 $('teams').addEventListener('click', async e => {
-  if (e.target.closest('[data-newteam]')) (await import('./squads.js')).newSessionDialog(undefined, { role: 'coordinator' })
+  if (e.target.closest('[data-newteam]')) location.hash = '#/new'
 })

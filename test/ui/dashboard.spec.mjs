@@ -201,6 +201,23 @@ test('the shell on a phone: the sidebar slides in, and goes when you pick a plac
   await ctx.close()
 })
 
+test('a new team: one page, and it opens its coordinator and workers on the machine, named and described', async ({ page }) => {
+  await signIn(page, '#/teams')
+  await page.locator('#topRight [data-newteam]').click()
+  await expect(page).toHaveURL(/#\/new$/)
+  const form = page.locator('#newteam form')
+  await form.locator('[name=title]').fill('Payments')
+  await expect(form.locator('[data-name="0"]')).toHaveValue('coord-payments')
+  await form.locator('[name=goal]').fill('Take card payments')
+  await form.locator('[data-name="1"]').fill('pay-api')
+  await form.locator('[data-remove="1"]').click()
+  await expect(form.locator('.nt-member')).toHaveCount(2)
+  await form.locator('[data-launch]').click()
+  await expect(page).toHaveURL(/#\/q\/coord-payments$/)
+  expect([...machine.identities.keys()]).toEqual(expect.arrayContaining(['coord-payments', 'pay-api']))
+  await expect(page.locator('#topTitle')).toHaveText('Payments')
+})
+
 test('the sessions: they are listed with their squad', async ({ page }) => {
   await signIn(page)
   await expect(page.locator('#nav')).toContainText('coord')
@@ -244,7 +261,7 @@ test('the machines: a connected one is listed with its terminal', async ({ page 
   const hosts = page.locator('#hosts')
   await expect(hosts.locator('.host-head')).toContainText('machine1')
   await expect(hosts.locator('.host-head .dot.ok')).toBeVisible()
-  await expect(hosts.locator('.term-row')).toContainText('worker1')
+  await expect(hosts.locator('.term-row').filter({ hasText: 'worker1' })).toBeVisible()
 })
 
 test('the inbox: what a coordinator left is there, with what it wrote kept as text, and it can be marked done', async ({ page }) => {

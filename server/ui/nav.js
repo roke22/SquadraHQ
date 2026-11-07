@@ -5,7 +5,6 @@ import { esc } from './format.js'
 import { sortedSessions, status, squadsOf, squadOpen } from './content.js'
 import { currentRoute } from './router.js'
 import { addMachineDialog } from './machines.js'
-import { newSessionDialog } from './squads.js'
 import { icon } from './icons.js'
 
 // What a burst of stream changes redraws, once per frame (hundreds of
@@ -48,7 +47,7 @@ function patch(a, b) {
 // coordinator and workers. What needs you is on the right of each row: a
 // permission waiting (warn) or messages not read yet (accent).
 
-const isTeams = r => r.view === 'teams' || r.view === 'team' || r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
+const isTeams = r => r.view === 'teams' || r.view === 'team' || r.view === 'newteam' || r.view === 'mosaic' || r.view === 'leads' || r.view === 'org'
 const isMachines = r => r.view === 'hosts' || r.view === 'terminal'
 const here = on => (on ? ' class="rail-item on" aria-current="page"' : ' class="rail-item"')
 
@@ -140,6 +139,6 @@ $('nav').addEventListener('click', e => {
   }
   if (e.target.closest('[data-newteam]')) {
     openRail(false)
-    return newSessionDialog(undefined, { role: 'coordinator' })
+    location.hash = '#/new'
   }
 })
