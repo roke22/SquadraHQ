@@ -543,4 +543,8 @@ test('beside a session terminal: what it is doing, and what mattered, read from 
   await expect(page.locator('.tv')).toHaveClass(/folded/)
   await page.reload()
   await expect(page.locator('.tv')).toHaveClass(/folded/)
+  // Opened from Machines, the same terminal has it too.
+  await page.locator('[data-tvfold]').click()
+  await page.goto(`${server.url}/#/t/${machine.id}/tlw`)
+  await expect(page.locator('.tv-aside .tl-list')).toContainText('Round the total')
 })
