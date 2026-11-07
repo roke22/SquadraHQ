@@ -31,3 +31,4 @@
   #teams { padding: 12px; }
   .tm-person { min-height: 48px; }
 }
+.tm-plan { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }

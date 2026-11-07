@@ -40,6 +40,38 @@ function who(s, extra = '') {
     + `<span class="tq-name">${esc(s.name)}</span><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span class="tq-where">${esc(h?.name ?? st.text)}</span>${extra}</a></li>`
 }
 
+// The plan its coordinator keeps (update_plan): how far it is, and each task.
+const TASK_DOT = { todo: 'off', doing: 'info', done: 'ok', blocked: 'err', waiting: 'warn' }
+const refLink = ref => {
+  let url = null
+  try { url = new URL(ref) } catch {}
+  return url && (url.protocol === 'https:' || url.protocol === 'http:') ? `<a class="ibx-link" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(ref)}</a>` : `<span class="sv-mono">${esc(ref)}</span>`
+}
+export function planMeter(plan, big = false) {
+  const n = plan.tasks.length
+  const count = s => plan.tasks.filter(t => t.state === s).length
+  const parts = ['done', 'doing', 'blocked', 'waiting'].map(s => [s, count(s)]).filter(([, c]) => c)
+  const say = T.planSays(count('done'), n, count('doing'), count('blocked'), count('waiting'))
+  return `<div class="pl-meter${big ? ' big' : ''}" role="img" aria-label="${esc(say)}">${parts.map(([s, c]) => `<i class="pl-${s}" style="width: ${(c / n * 100).toFixed(2)}%"></i>`).join('')}</div>`
+}
+function planCard(coord) {
+  const plan = state.plans.get(coord)
+  if (!plan?.tasks.length) return ''
+  const count = s => plan.tasks.filter(t => t.state === s).length
+  const n = plan.tasks.length
+  return `<section class="card tq-card">
+      <header class="tq-h"><h2>${esc(plan.title || T.planTitle)}</h2><span class="tq-sub">${esc(T.planBy(coord, ago(plan.updated_at)))}</span></header>
+      <div class="tq-body pl-sum">${planMeter(plan, true)}<div class="pl-legend">${[['done', T.planDone(count('done'), n)], ['doing', T.planDoing(count('doing'))], ['blocked', T.planBlocked(count('blocked'))], ['waiting', T.planWaiting(count('waiting'))]].filter(([s]) => count(s)).map(([s, l]) => `<span><i class="pl-key pl-${s}" aria-hidden="true"></i>${esc(l)}</span>`).join('')}</div></div>
+      <div class="mc-scroll"><table class="pl-table"><thead><tr><th scope="col">${esc(T.planTask)}</th><th scope="col">${esc(T.planWho)}</th><th scope="col">${esc(T.mcState)}</th><th scope="col">${esc(T.ibxRef)}</th></tr></thead><tbody>
+      ${plan.tasks.map(t => `<tr class="pl-row-${t.state}"><td><span class="pl-t">${esc(t.title)}</span>${t.note ? `<span class="pl-note">${esc(t.note)}</span>` : ''}</td>
+        <td>${t.who ? `<a class="pl-who" href="#/s/${encodeURIComponent(t.who)}"><span class="role worker" aria-hidden="true"></span>${esc(t.who)}</a>` : `<span class="tq-quiet0">${esc(T.planNobody)}</span>`}</td>
+        <td><span class="mc-state"><span class="dot ${TASK_DOT[t.state]}${t.state === 'doing' ? ' pulse' : ''}" aria-hidden="true"></span>${esc(T.planState[t.state])}</span></td>
+        <td>${t.ref ? refLink(t.ref) : ''}</td></tr>`).join('')}
+      </tbody></table></div>
+      <footer class="pl-foot">${esc(T.planWhose)}</footer>
+    </section>`
+}
+
 export function renderTeam() {
   const r = currentRoute()
   const coord = sessions.get(r.squad)
@@ -54,6 +86,7 @@ export function renderTeam() {
     : `<p class="tq-quiet">${esc(T.tqNoReports)}</p>`
   setHtml($('team'), `<div class="tq">
       <div class="tq-main">
+        ${planCard(coord.name)}
         <section class="card tq-card">
           <header class="tq-h"><h2>${esc(T.tqGoal)}</h2>${can('manager') ? `<button type="button" class="btn quiet" data-describe>${esc(T.tqEdit)}</button>` : ''}</header>
           <div class="tq-body">${meta.goal ? `<p class="tq-goal">${esc(meta.goal)}</p>` : `<p class="tq-quiet">${esc(T.tmNoGoal)}</p>`}</div>

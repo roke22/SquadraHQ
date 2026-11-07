@@ -320,7 +320,7 @@ test('plugin: idle until login', async () => {
   assert.match(r.instructions, /ROLES\. Once logged in, the login tool's answer gives you the rules for your role/)
   assert.doesNotMatch(r.instructions, /COORDINATOR ROLE|WORKER ROLE/)
   const tools = (await p.request('tools/list', {})).result.tools.map(t => t.name).sort()
-  assert.deepEqual(tools, ['ask_user', 'download_attachment', 'edit_inbox', 'edit_message', 'login', 'logout', 'ping', 'react', 'reply', 'status', 'tell_user'])
+  assert.deepEqual(tools, ['ask_user', 'download_attachment', 'edit_inbox', 'edit_message', 'login', 'logout', 'ping', 'react', 'reply', 'status', 'tell_user', 'update_plan'])
   assert.match(await p.tool('status', {}), /not connected/)
   await assert.rejects(p.tool('reply', { chat_id: 'x', text: 'y' }), /\/squadra:login/)
   await sleep(300)
@@ -2734,6 +2734,38 @@ test('a name that moves to another company starts its list of who may write agai
   assert.ok(!existsSync(access) || !JSON.parse(readFileSync(access, 'utf8')).allowFrom.includes('reviewer'))
   assert.ok(readdirSync(stateDir).some(f => f.startsWith('access.json.other-')))
   moved.close()
+})
+
+test('a coordinator\'s plan: the whole list each time, checked, for the dashboard; nobody else keeps one', async () => {
+  const coord = new Plugin('pln1', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_ROLE: 'coordinator' })
+  await coord.init(); await coord.waitConnected()
+  const said = await coord.tool('update_plan', { title: 'Resolve the open issues', tasks: [
+    { title: 'Round the total', state: 'done', who: 'pln-w', ref: 'GH-2' },
+    { title: 'Drop legacy_discount', state: 'waiting', ref: 'GH-6', note: 'data in all rows' },
+    { title: 'Stock API', state: 'blocked', note: 'no key yet' },
+    { title: 'Free shipping from 40', state: 'doing', who: 'pln-w' },
+    { title: 'Release 1.3.0', state: 'todo' },
+  ] })
+  assert.equal(said, 'Plan updated: 1 of 5 done, 1 in progress, 1 blocked, 1 waiting on the user.')
+  let plan = (await dash('/api/state')).result.plans.find(p => p.coordinator === 'pln1')
+  assert.equal(plan.title, 'Resolve the open issues')
+  assert.deepEqual(plan.tasks.map(t => [t.title, t.state, t.who ?? null]), [['Round the total', 'done', 'pln-w'], ['Drop legacy_discount', 'waiting', null], ['Stock API', 'blocked', null], ['Free shipping from 40', 'doing', 'pln-w'], ['Release 1.3.0', 'todo', null]])
+  // The next one replaces it; what isn't a plan is refused, and says why.
+  await coord.tool('update_plan', { tasks: [{ title: 'Release 1.3.0', state: 'doing' }] })
+  plan = (await dash('/api/state')).result.plans.find(p => p.coordinator === 'pln1')
+  assert.deepEqual([plan.title, plan.tasks.length], [null, 1])
+  await assert.rejects(coord.tool('update_plan', { tasks: [{ title: 'x', state: 'finished' }] }), /state must be one of: todo, doing, done, blocked, waiting/)
+  await assert.rejects(coord.tool('update_plan', { tasks: [{ state: 'done' }] }), /task 1 needs a title/)
+  // Secrets are masked in it too; an empty list clears it.
+  await coord.tool('update_plan', { tasks: [{ title: 'Use key AKIAABCDEFGHIJKLMNOP', state: 'todo' }] })
+  assert.ok(!JSON.stringify((await dash('/api/state')).result.plans).includes('AKIAABCDEFGHIJKLMNOP'))
+  assert.equal(await coord.tool('update_plan', { tasks: [] }), 'Plan cleared.')
+  assert.equal((await dash('/api/state')).result.plans.find(p => p.coordinator === 'pln1'), undefined)
+  // A worker keeps none.
+  const w = new Plugin('pln-w', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_COORDINATOR: 'pln1', SQUADRA_ALLOW_FROM: 'pln1' })
+  await w.init(); await w.waitConnected()
+  await assert.rejects(w.tool('update_plan', { tasks: [] }), /only an approved coordinator keeps a plan/)
+  coord.close(); w.close()
 })
 
 test('the inbox: a coordinator leaves a question or a result for the user, and nobody else does', async () => {

@@ -6,6 +6,7 @@ import { sortedSessions, status, squadsOf } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 import { personaTag } from './topbar.js'
+import { planMeter } from './team.js'
 
 // Teams: one card per team, its coordinator and its workers, what each is
 // doing, and what the team is for. Sessions outside every team after them.
@@ -25,13 +26,14 @@ function person(s, sub) {
 
 function card({ coord, workers }) {
   const meta = state.squadMeta.get(coord.name)
+  const plan = state.plans.get(coord.name)
   const linked = linksOf(coord.name).map(titleOf)
   const on = workers.filter(w => w.online).length
   return `<section class="card tm-card" aria-labelledby="tm-${esc(coord.name)}">
       <header class="tm-h"><h2 id="tm-${esc(coord.name)}"><a href="#/q/${encodeURIComponent(coord.name)}">${esc(titleOf(coord.name))}</a></h2>
         <span class="tm-sub">${esc([workers.length ? T.squadCount(on, workers.length) : T.noWorkers, linked.length ? T.linkedWith(linked.join(', ')) : ''].filter(Boolean).join(' · '))}</span></header>
       <ul class="tm-people">${person(coord, false)}${workers.map(w => person(w, true)).join('')}</ul>
-      <footer class="tm-foot">${meta?.goal ? `<span class="tm-goal">${esc(meta.goal)}</span>` : `<span class="tm-none">${esc(T.tmNoGoal)}</span>`}</footer>
+      <footer class="tm-foot">${plan?.tasks.length ? `<div class="tm-plan"><span class="tm-goal">${esc(plan.title || meta?.goal || T.planTitle)}</span><span class="tm-none">${esc(T.ofTotal(plan.tasks.filter(t => t.state === 'done').length, plan.tasks.length))}</span></div>${planMeter(plan)}` : meta?.goal ? `<span class="tm-goal">${esc(meta.goal)}</span>` : `<span class="tm-none">${esc(T.tmNoGoal)}</span>`}</footer>
     </section>`
 }
 

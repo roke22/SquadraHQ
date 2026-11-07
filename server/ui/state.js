@@ -16,6 +16,7 @@ export const state = {
   templates: [], // squad templates [{name, host, coordinator, workers}]
   links: [], // linked coordinators of two squads [{a, b}]
   inbox: [], // what coordinators left for the user
+  plans: new Map(), // coordinator -> { title, tasks, updated_at }: the tasks it says it is working through
   serverSkew: 0,
   streamAbort: null,
   streamHelloSeen: false,

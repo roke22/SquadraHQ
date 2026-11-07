@@ -32,6 +32,7 @@ function onStream(type, data) {
     for (const fn of templateListeners) fn()
     state.links = data.links ?? []
     state.inbox = data.inbox ?? []
+    state.plans = new Map((data.plans ?? []).map(p => [p.coordinator, p]))
     for (const fn of linkListeners) fn()
     state.squadMeta = new Map((data.squads ?? []).map(q => [q.coordinator, q]))
     hosts.clear()
@@ -82,6 +83,10 @@ function onStream(type, data) {
     state.templates = Array.isArray(data) ? data : []
     for (const fn of templateListeners) fn()
     return
+  }
+  if (type === 'plans') {
+    state.plans = new Map((Array.isArray(data) ? data : []).map(p => [p.coordinator, p]))
+    soon(refreshTeam); soon(refreshTeams)
   }
   if (type === 'inbox') {
     state.inbox = Array.isArray(data) ? data : []

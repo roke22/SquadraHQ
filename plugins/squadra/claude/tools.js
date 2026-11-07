@@ -121,6 +121,33 @@ export const TOOLS = [
     },
   },
   {
+    name: 'update_plan',
+    _meta: ALWAYS_LOAD,
+    description: 'Coordinator: keep the user and the team\'s page up to date with the tasks you are working through, each with who has it and its state. Send the WHOLE list each time (it replaces the last one) when you split the work, and whenever a task starts, finishes, is blocked or waits on the user (then also ask_user). Not on every small step.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'What the whole job is, in a few words (the order you were given).' },
+        tasks: {
+          type: 'array',
+          description: 'Every task, in order. Empty to clear the plan.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'The task, in a few words.' },
+              state: { type: 'string', enum: ['todo', 'doing', 'done', 'blocked', 'waiting'], description: 'waiting: it waits on the user\'s decision.' },
+              who: { type: 'string', description: 'The worker that has it, if any.' },
+              ref: { type: 'string', description: 'Where it comes from: a ticket, an issue, a path.' },
+              note: { type: 'string', description: 'One line on how it went or what stops it.' },
+            },
+            required: ['title', 'state'],
+          },
+        },
+      },
+      required: ['tasks'],
+    },
+  },
+  {
     name: 'tell_user',
     _meta: ALWAYS_LOAD,
     description: 'Coordinator: leave something in the user\'s inbox that they will want to know when they come back and that needs no answer: a piece of work finished, its outcome, or a problem they should see. Not routine progress: that stays in this conversation.',
@@ -405,6 +432,12 @@ export async function callTool(name, args) {
       return name === 'ask_user'
         ? `It is in the user's inbox (#${id}). They answer when they can: go on with whatever doesn't depend on it. If you learn something that changes it, edit_inbox.`
         : `It is in the user's inbox (#${id}).`
+    }
+    case 'update_plan': {
+      const clean = v => (v == null || v === '' ? undefined : maskOutgoing(String(v)).text)
+      const tasks = Array.isArray(args.tasks) ? args.tasks.map(t => (t && typeof t === 'object' ? { title: clean(t.title), state: t.state, who: t.who == null ? undefined : String(t.who), ref: clean(t.ref), note: clean(t.note) } : t)) : args.tasks
+      const r = await call('setPlan', { title: clean(args.title), tasks })
+      return r.tasks ? `Plan updated: ${r.done} of ${r.tasks} done, ${r.doing} in progress${r.blocked ? `, ${r.blocked} blocked` : ''}${r.waiting ? `, ${r.waiting} waiting on the user` : ''}.` : 'Plan cleared.'
     }
     case 'edit_inbox': {
       const clean = v => (v == null ? undefined : maskOutgoing(String(v)).text)

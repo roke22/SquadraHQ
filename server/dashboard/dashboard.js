@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { unix, now, guarded, bad, ApiError, VERSION, ROLES } from '../platform/index.js'
 
-export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, organization }) {
+export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, plans, organization }) {
   const { rotateJoinToken, db, bus, broadcast, sseClients, truncateLog, dataDir, log, every } = platform
   const {
     register, approveSession, presenceOf, personaView, identityCreatedAt, identityExists, isOnline, linksOf,
@@ -151,6 +151,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
         templates: listTemplates(),
         links: listLinks(),
         inbox: inbox.list(),
+        plans: plans.list(),
         squads: listSquads(),
       }
     },
@@ -208,6 +209,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     db.prepare('UPDATE identities SET coordinator = NULL WHERE coordinator = ?').run(name)
     // Nor is it linked with other squads any more, nor its squad described.
     if (db.prepare('DELETE FROM squads WHERE coordinator = ?').run(name).changes) broadcast('squads', listSquads())
+    plans.forget(name)
     const links = linksOf(name)
     db.prepare('DELETE FROM squad_links WHERE a = ? OR b = ?').run(name, name)
     if (links.length) { broadcast('links', listLinks()); for (const n of links) void pushLinks(n) }
