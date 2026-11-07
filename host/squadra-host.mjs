@@ -1365,6 +1365,19 @@ async function setLinks(name, coordinators) {
   return { name, links }
 }
 
+// A worker the dashboard opened for a coordinator this machine started: its
+// plugin approves it as /squadra:access pair does, from a file left in its own
+// private folder (like links.json; only a session this machine started reads it).
+async function approveWorker(coordinator, worker) {
+  if (!NAME_RE.test(String(coordinator)) || !NAME_RE.test(String(worker)) || coordinator === worker) throw new Error('invalid session')
+  const t = (await listTerminals()).find(x => x.id === coordinator)
+  if (!t) throw new Error('no such session on this machine')
+  if (t.role !== 'coordinator') throw new Error('only a coordinator approves workers')
+  writePrivate(join(claudeCode.plugin.stateDir(coordinator), 'dashboard-approved'), worker, { worker, at: Date.now() })
+  log(`"${plain(worker)}" approved for "${plain(coordinator)}" from the dashboard`)
+  return { approved: worker }
+}
+
 // The user answers from the dashboard a question its coordinator left in their
 // inbox: typed in that coordinator's terminal, as they would. It is typing from
 // the dashboard, so only if this machine allows that (allow_input).
@@ -1725,6 +1738,8 @@ async function connect(creds) {
     async clear(m) { return clearSession(m.term, m.coordinator) },
     // The user answered from their inbox a question this coordinator asked.
     async answer(m) { return answerSession(m.term, m.text) },
+    // A worker opened from the dashboard for a coordinator running here.
+    async approve(m) { return approveWorker(m.term, m.worker) },
     // The dashboard adds or removes an allowed folder: the same checks as
     // here, unless this machine keeps its folders to itself.
     async folders(m) {

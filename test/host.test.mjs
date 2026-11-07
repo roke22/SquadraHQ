@@ -787,6 +787,22 @@ test('fresh start: a coordinator has its idle worker\'s context cleared before a
   }
 })
 
+test('a worker opened from the dashboard for a coordinator opened there is approved on the coordinator\'s machine', { skip: !hasTmux && 'tmux not installed' }, async () => {
+  const dir = name => join(claudeDir, 'channels', 'squadra', name, 'dashboard-approved')
+  assert.ok((await dash('terminals/open', { host: hostId, spec: { name: 'apc', role: 'coordinator', folder: allowed } })).ok)
+  assert.ok((await dash('terminals/open', { host: hostId, spec: { name: 'apw', role: 'worker', coordinator: 'apc', folder: allowed } })).ok)
+  // Left for the coordinator's plugin in its own folder, and written down.
+  await waitFor(() => existsSync(join(dir('apc'), 'apw')), { what: 'the approval for its plugin' })
+  assert.equal(JSON.parse(readFileSync(join(dir('apc'), 'apw'), 'utf8')).worker, 'apw')
+  await waitFor(async () => (await dash('company/audit')).result?.some(e => e.action === 'worker-approved' && e.target === 'apw → apc'), { what: 'the audit entry' })
+  // A coordinator that isn't one of this machine's sessions gets nothing.
+  for (const term of ['apc', 'apw']) assert.ok((await dash('terminals/kill', { host: hostId, term })).ok)
+  assert.ok((await dash('terminals/open', { host: hostId, spec: { name: 'apw2', role: 'worker', coordinator: 'nobody', folder: allowed } })).ok)
+  await sleep(500)
+  assert.ok(!existsSync(dir('nobody')))
+  assert.ok((await dash('terminals/kill', { host: hostId, term: 'apw2' })).ok)
+})
+
 test('an answer from the inbox is typed in its coordinator\'s terminal, as the user would', { skip: !hasTmux && 'tmux not installed' }, async () => {
   const api = async (method, params, auth, inst) => (await fetch(`${URL_}/${method}`, {
     method: 'POST',

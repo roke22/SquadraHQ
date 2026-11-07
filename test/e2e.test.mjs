@@ -2894,3 +2894,27 @@ test('reminders where decisions are made: a task that may be the user\'s, its wo
   coord.close()
   wk.close()
 })
+
+test('a worker its machine approved from the dashboard: the coordinator allows it, with no pairing', async () => {
+  const coord = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
+  await coord.init()
+  await coord.tool('login', { role: 'coordinator', name: 'dac' })
+  const state = join(coord.configDir, 'channels', 'squadra', 'dac')
+  mkdirSync(join(state, 'dashboard-approved'), { recursive: true })
+  writeFileSync(join(state, 'dashboard-approved', 'daw'), JSON.stringify({ worker: 'daw', at: Date.now() }))
+  await waitFor(() => JSON.parse(readFileSync(join(state, 'access.json'), 'utf8')).allowFrom.includes('daw'), { what: 'allowed' })
+  assert.ok(!existsSync(join(state, 'dashboard-approved', 'daw')), 'taken')
+  // Its greeting arrives as a message, not as a pairing request.
+  const wk = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
+  await wk.init()
+  await wk.tool('login', { role: 'worker', name: 'daw', coordinator: 'dac' })
+  await coord.waitChannel(p => p.content.startsWith('👋 daw connected as a worker'), 'greeting')
+  assert.equal(coord.channel(p => p.meta.kind === 'pairing_request').length, 0)
+  // A name that isn't one is ignored.
+  writeFileSync(join(state, 'dashboard-approved', '..bad'), '{}')
+  writeFileSync(join(state, 'dashboard-approved', 'bad name'), '{}')
+  await sleep(2500)
+  assert.deepEqual(JSON.parse(readFileSync(join(state, 'access.json'), 'utf8')).allowFrom.filter(n => n !== 'daw'), [])
+  coord.close()
+  wk.close()
+})

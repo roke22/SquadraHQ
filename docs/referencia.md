@@ -260,7 +260,7 @@ Después, en cada terminal:
 | `/squadra:access pair <código>` | Aprueba a un worker, en el terminal del coordinador |
 | `/squadra:access link <nombre>` | Enlaza este coordinador con el de otro equipo (en los dos) |
 
-La primera vez que entra un worker, el coordinador muestra una petición de emparejamiento: apruébala con `/squadra:access pair <código>`. A partir de ahí, ese nombre no necesita emparejarse de nuevo.
+La primera vez que entra un worker, el coordinador muestra una petición de emparejamiento: apruébala con `/squadra:access pair <código>`. A partir de ahí, ese nombre no necesita emparejarse de nuevo. Un worker abierto desde el panel para un coordinador también abierto allí no lo necesita: lo aprueba la máquina del coordinador (quien abrió los dos quería que trabajasen juntos), y la actividad de la empresa lo apunta como *worker-approved*.
 
 ### 4. Abrir el panel
 

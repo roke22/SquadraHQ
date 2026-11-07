@@ -68,6 +68,20 @@ function saveAccess(a, s = S) {
   s.lastGoodAccess = structuredClone(a)
 }
 
+// A worker the dashboard opened for this coordinator (squadra-host left it in
+// dashboard-approved/): allowed, as the /squadra:access skill's pair does,
+// and its pairing request, if it made one, gone. By this process, the only
+// one that writes access.json while it runs.
+export function allowFromDashboard(s, name) {
+  if (s.staticAccess || s.role !== 'coordinator' || !NAME_RE.test(String(name)) || name === s.name) return false
+  const a = readAccessFile(s)
+  const had = a.allowFrom.includes(name)
+  if (!had) a.allowFrom.push(name)
+  for (const [code, p] of Object.entries(a.pending ?? {})) if (p?.senderId === name) delete a.pending[code]
+  saveAccess(a, s)
+  return !had
+}
+
 // A private file, written to a new temporary file and renamed over the old
 // one: never through a symlink someone left in its place.
 export function writePrivateFile(file, text) {

@@ -332,7 +332,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     'org/squad': p => describeSquad(p),
     'org/positions': p => placeSquads(p),
     'org/describe': p => describeSession(p),
-    'terminals/open': p => openTerminalOn(p),
+    'terminals/open': (p, req) => openTerminalOn(p, req.actor),
     'terminals/kill': p => killTerminalOn(p),
     'terminal/ticket': (p, req) => newTerminalTicket(req.actor ?? null),
     'inbox/resolve': p => inbox.resolve(Number(p.id)),

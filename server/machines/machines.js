@@ -750,7 +750,7 @@ export function createMachines(platform, { sessions, observation }) {
     }
   }
 
-  async function openTerminalOn(p) {
+  async function openTerminalOn(p, actor = null) {
     const id = String(p.host ?? '')
     const spec = p.spec && typeof p.spec === 'object' && !Array.isArray(p.spec) ? { ...p.spec } : null
     if (!spec) throw bad('spec is required')
@@ -774,7 +774,7 @@ export function createMachines(platform, { sessions, observation }) {
     }
     opening.set(key, now())
     let timedOut = false
-    try { return await openNow(id, name, spec, existing) } catch (err) {
+    try { return await openNow(id, name, spec, existing, actor) } catch (err) {
       timedOut = err instanceof ApiError && err.code === 504
       throw err
     } finally {
@@ -785,7 +785,7 @@ export function createMachines(platform, { sessions, observation }) {
     }
   }
   const opening = new Map() // "host\0name" -> since: an open in progress
-  async function openNow(id, name, spec, existing) {
+  async function openNow(id, name, spec, existing, actor) {
     let created = false
     // The role it was opened with (the dashboard trusts that one, not whatever
     // the session claims later).
@@ -814,6 +814,7 @@ export function createMachines(platform, { sessions, observation }) {
     try {
       const result = await askHost(id, { t: 'open', spec })
       log(`opened session "${name}" on host ${id}`)
+      if (openedRole === 'worker') void approveOnCoordinator(spec.coordinator, name, actor)
       return result
     } catch (err) {
       // Only when the machine said no: after a timeout it may still open the
@@ -821,6 +822,20 @@ export function createMachines(platform, { sessions, observation }) {
       if (created && err instanceof ApiError && err.code === 400) db.prepare('DELETE FROM identities WHERE name = ? AND host_id = ?').run(name, id)
       throw err
     }
+  }
+
+  // A worker opened from here for a coordinator also opened from here: the
+  // coordinator's machine approves it, as /squadra:access pair would (whoever
+  // opened both meant them to work together). A coordinator opened by hand,
+  // or not connected, pairs as before. Written down either way it happens.
+  async function approveOnCoordinator(coordinator, worker, actor) {
+    const row = NAME_RE.test(String(coordinator ?? '')) ? db.prepare('SELECT host_id, opened_role FROM identities WHERE name = ?').get(coordinator) : null
+    if (!row?.host_id || row.opened_role !== 'coordinator' || !hostLinks.has(row.host_id)) return
+    try {
+      await askHost(row.host_id, { t: 'approve', term: coordinator, worker })
+      audit(actor ?? { token: true }, 'worker-approved', `${worker} → ${coordinator}`, null)
+      log(`"${worker}" approved for "${coordinator}" on its machine`)
+    } catch (err) { log(`could not approve "${worker}" for "${coordinator}": ${err.message}`) }
   }
 
   async function killTerminalOn(p) {

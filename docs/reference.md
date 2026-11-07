@@ -260,7 +260,7 @@ Then, in each terminal:
 | `/squadra:access pair <code>` | Approve a worker, in the coordinator's terminal |
 | `/squadra:access link <name>` | Link this coordinator with another team's (run it in both) |
 
-The first time a worker joins, the coordinator shows a pairing request; approve it with `/squadra:access pair <code>`. After that, the same name needs no new pairing.
+The first time a worker joins, the coordinator shows a pairing request; approve it with `/squadra:access pair <code>`. After that, the same name needs no new pairing. A worker opened from the dashboard for a coordinator also opened there needs none: the coordinator's machine approves it (whoever opened both meant them to work together), and the company's activity records it as *worker-approved*.
 
 ### 4. Open the dashboard
 

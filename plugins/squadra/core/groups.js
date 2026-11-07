@@ -5,13 +5,14 @@ import { join } from 'node:path'
 import { agent } from './agent.js'
 import { log, NAME_RE } from './settings.js'
 import { active } from './session.js'
-import { loadAccess, peerMatchesPin } from './access.js'
+import { loadAccess, peerMatchesPin, allowFromDashboard } from './access.js'
 import { call } from './client.js'
 
 // The /squadra:access skill drops a file at approved/<senderId> when it pairs
 // someone. Poll for it, send confirmation, clean up.
 export function checkApprovals(s) {
   if (!active(s)) return
+  dashboardApprovals(s)
   let files
   // (A link to another folder isn't this one: what it holds is not ours to remove.)
   try {
@@ -27,6 +28,24 @@ export function checkApprovals(s) {
     drop(file)
     if (!NAME_RE.test(senderId) || !allowed.includes(senderId)) continue
     void call('sendMessage', { chat_id: senderId, text: `Paired with "${s.name}". You can now message each other.`, squadra_fyi: true }, { s })
+      .catch(err => log(`failed to send approval confirm: ${err.message}`))
+  }
+}
+
+// Workers the dashboard opened for this coordinator, left by its machine in
+// dashboard-approved/ (its private folder): approved, and told so.
+function dashboardApprovals(s) {
+  const dir = join(s.stateDir, 'dashboard-approved')
+  let files
+  try {
+    if (!lstatSync(dir).isDirectory()) return
+    files = readdirSync(dir).filter(f => !f.startsWith('.'))
+  } catch { return }
+  for (const name of files) {
+    try { rmSync(join(dir, name), { recursive: true, force: true }) } catch (err) { log(`cannot remove ${name}: ${err.message}`); continue }
+    if (!allowFromDashboard(s, name)) continue
+    log(`"${name}" approved from the dashboard`)
+    void call('sendMessage', { chat_id: name, text: `Paired with "${s.name}". You can now message each other.`, squadra_fyi: true }, { s })
       .catch(err => log(`failed to send approval confirm: ${err.message}`))
   }
 }
