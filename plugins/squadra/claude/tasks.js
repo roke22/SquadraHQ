@@ -50,7 +50,21 @@ export function closeTasks(s, replyTo) {
 // a dev server, say), and a turn may follow when it ends. Nothing is asked yet,
 // but its coordinator isn't left waiting in silence: told after a while.
 const BACKGROUND_NOTICE_MS = Number(process.env.SQUADRA_BACKGROUND_NOTICE_MS) || 10 * 60_000
-export async function stopCheck(s, { background = false } = {}) {
+// A coordinator ending its turn asking the user for something in this chat,
+// which they don't read: once per turn, a reminder to use the inbox. (A guess
+// from its last words; only ever a reminder.)
+const ASKS_USER_RE = /necesito que (?:decidas|confirmes|me digas|hagas)|queda(?:n)? pendientes? (?:para ti|de ti|de una persona)|pendientes? para ti|decide[sn]? t[uú]|tu (?:ok|confirmaci[oó]n|decisi[oó]n|aprobaci[oó]n)|dime (?:qu[eé]|si)|¿(?:quieres|prefieres|apruebas|hago|subo|lo hago|seguimos|procedo)|need you to (?:decide|confirm)|your (?:call|decision|approval|ok)|do you want me to|should i (?:go ahead|proceed|deploy|apply)|let me know (?:if|whether|which)/i
+function chatAskHint(s, lastText) {
+  if (S !== s || s.role !== 'coordinator' || s.inboxThisTurn || s.chatAskHinted) return ''
+  const hit = ASKS_USER_RE.exec(String(lastText ?? ''))
+  if (!hit) return ''
+  s.chatAskHinted = true
+  return `[Squadra] Before you finish: you are asking the user for something here ("${hit[0]}"), but they read their inbox, not this conversation. Put each decision that is theirs in its own ask_user (with its options and what you recommend), and what they should know or do in tell_user, then end your turn (help("inbox")).`
+}
+
+export async function stopCheck(s, { background = false, lastText = '' } = {}) {
+  const hint = chatAskHint(s, lastText)
+  if (hint) return hint
   if (S !== s || s.role !== 'worker') return ''
   const ids = pendingTasks(s)
   if (!ids.length) return ''

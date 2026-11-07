@@ -115,11 +115,11 @@ export async function login({ name, role, coordinator, staticAccess = false, see
     send: events => call('observe', { events }, { s }),
     log,
     contextProvider: source => (S !== s ? '' : source === 'prompt' ? briefOnPrompt(s) : withBrief(s, source === 'clear' ? clearedContext(s) : recoveryContext(s))),
-    onPrompt: prompt => { if (S === s) tasksStarting(s, channelIds(prompt)) },
+    onPrompt: prompt => { if (S === s) { s.inboxThisTurn = false; s.chatAskHinted = false; tasksStarting(s, channelIds(prompt)) } },
     onChannelSeen: ids => { if (S === s) tasksStarting(s, ids) },
     // For squadra-host, to open this session again in its own conversation.
     onConversation: (id, transcript) => { if (S === s) writePrivateFile(join(s.stateDir, 'conversation.json'), JSON.stringify({ id, transcript, folder: process.cwd() }) + '\n') },
-    stopCheck: background => stopCheck(s, { background }),
+    stopCheck: (background, lastText) => stopCheck(s, { background, lastText }),
     onToolInput: (tool, input) => {
       const now = Date.now()
       s.toolInputs.push({ tool, input, at: now })

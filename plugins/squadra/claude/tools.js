@@ -5,7 +5,7 @@ import { maskOutgoing } from '../observe.js'
 import {
   REPORTS, NAME_RE, GROUP_ID_RE, MAX_CHUNK_LIMIT, PHOTO_EXTS, S, openSendable, launchPersona,
   loadAccess, linkedCoordinators, assertAllowedChat, assertPeerIsPinned, call, ApiError, uploadFile,
-  downloadFile,
+  downloadFile, decisionHit,
 } from '../core/index.js'
 import { closeTasks, pendingTasks } from './tasks.js'
 import { login, logout, status } from './login.js'
@@ -59,6 +59,14 @@ function riskyApproval(chat_id, text) {
   const req = [...(S.recent ?? [])].reverse().find(m => m.from === chat_id && m.text.includes('🔐 Permission') && m.text.includes(code))
   const hit = req && RISKY_RE.exec(req.text.split('\n').filter(l => /^(?:Description|Input|Its "description")/.test(l)).join('\n'))
   return hit ? `\n⚠️ Approved. It looks like it could be hard to undo or reach beyond the machine ("${hit[0].trim()}"): if the user hasn't approved it, the rules say ask_user first (help("permissions")). This is only a reminder.` : ''
+}
+
+// Handing out a task that may be the user's decision: said then, when it
+// still can be kept out of the task (the rules alone weren't enough).
+function decisionHint(chat_id, text) {
+  if (S.role !== 'coordinator' || S.coordinator === chat_id || linkedCoordinators(S).includes(chat_id)) return ''
+  const hit = decisionHit(text)
+  return hit ? `\n⚠️ This task mentions "${hit}": deleting data, credentials, a deploy or publishing are often the user's decision. If this is, ask_user first and keep that part out of the task until they answer, not even written and left unapplied (help("decisions")).` : ''
 }
 
 // A text that opens like a report ("done: …", "✅ report: blocked …").
@@ -426,7 +434,7 @@ export async function callTool(name, args) {
         stillOpen = `\nNOT taken as your final report: the report argument was not set. If this was it, send it once more with report: "${REPORT_IN_TEXT_RE.exec(text)[1].toLowerCase()}".`
       } else if (S.role === 'coordinator' && !fyi && !GROUP_ID_RE.test(chat_id)) {
         // (Said where it matters, handing out work: the rules alone weren't enough for every model.)
-        stillOpen = riskyApproval(chat_id, text) || planHint()
+        stillOpen = riskyApproval(chat_id, text) || (decisionHint(chat_id, text) + planHint())
       }
       const result = (sentIds.length === 1 ? `sent (id: ${sentIds[0]})` : `sent ${sentIds.length} parts (ids: ${sentIds.join(', ')})`) +
         (masked ? ` (${masked} secret${masked > 1 ? 's' : ''} masked as [REDACTED])` : '') + stillOpen
@@ -461,6 +469,7 @@ export async function callTool(name, args) {
     case 'tell_user': {
       if (String(args.text ?? '').length > 1024 * 1024) throw new Error('that text is too long')
       const clean = v => (v == null ? undefined : maskOutgoing(String(v)).text)
+      S.inboxThisTurn = true
       const { id } = await call(name === 'ask_user' ? 'askUser' : 'tellUser', {
         text: clean(args.text),
         ref: clean(args.ref),

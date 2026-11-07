@@ -16,3 +16,4 @@ export { call, claimPidFile, releasePidFile, nameOrQ, ApiError, uploadFile, down
 export { readPeerKey } from './signed.js'
 export { safeContent, checkCoordinator, skeleton, LOOKALIKE } from './inbound.js'
 export { connect, startLoops } from './connection.js'
+export { decisionHit } from './risk.js'

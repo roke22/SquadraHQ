@@ -2190,7 +2190,7 @@ async function enroll(server, code, { plugin = true, insecure = false, service =
   process.stderr.write(`
 squadra-host: this machine is now "${plain(r.name)}" on ${server}.
   ${svc?.ok ? `It runs in the background as ${svc.how}.` : 'It keeps running while this terminal stays open.'}
-  Next, in the dashboard: Machines → this machine → + Folder, to choose where sessions may be opened.
+  Next, in the dashboard: Add folder on the Add machine page, or under this machine in Machines, to choose where sessions may be opened.
   ${COMPANY ? `This company has its own Claude Code login. Sign in once: CLAUDE_CONFIG_DIR='${process.env.CLAUDE_CONFIG_DIR}' claude, then /login.\n  ` : ''}  ${launcher?.onPath === false ? `The ${SERVICE_NAME} command is in ${dirname(LAUNCHER)}: open a new terminal to use it (or add that folder to your PATH).` : launcher?.skipped ? `${LAUNCHER} already exists and isn't this program's: use node ${INSTALLED_SCRIPT}.` : `Commands: ${SERVICE_NAME} status · ${SERVICE_NAME} help`}
 
 `)

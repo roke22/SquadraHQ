@@ -10,6 +10,7 @@ import {
 } from './access.js'
 import { call, ApiError, downloadFile } from './client.js'
 import { noticeAccepted, signatureAccepted } from './signed.js'
+import { decisionHit } from './risk.js'
 
 // Names and titles are sender-controlled. They land inside the <channel>
 // notification — delimiter chars would let the sender break out of the tag
@@ -332,6 +333,8 @@ export async function handleInbound(s, msg, { edited = false } = {}) {
       ...(msg.chat.type === 'private' && linkedCoordinators(s).includes(String(from.id)) ? { linked: 'true' } : {}),
       ...(msg.squadra_fyi ? { fyi: 'true' } : {}),
       ...(report ? { report } : {}),
+      // A task that may be the user's to decide: the worker's rule, said with it.
+      ...(isTask && decisionHit(text) ? { squadra_note: `This task mentions "${decisionHit(text)}". If it deletes data you didn't create, changes credentials, deploys or publishes, do that part only if your coordinator says the user approved it, not even written and left unapplied: otherwise report question (help("decisions")).` } : {}),
       ts: new Date((msg.edit_date ?? msg.date ?? 0) * 1000).toISOString(),
       ...(msg.chat.type === 'group' ? { group: safeName(chat_id) } : {}),
       ...(msg.reply_to_message?.message_id != null ? { in_reply_to: safeName(msg.reply_to_message.message_id) } : {}),

@@ -2858,3 +2858,39 @@ test('the inbox: a coordinator leaves a question or a result for the user, and n
   await assert.rejects(coord.tool('edit_inbox', { id: String(id), text: 'Again?' }), /no longer open \(it was closed\)/)
   coord.close(); w.close(); other.close()
 })
+
+test('reminders where decisions are made: a task that may be the user\'s, its worker, and a coordinator asking in its chat', async () => {
+  const coord = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
+  const wk = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
+  await coord.init()
+  await wk.init()
+  await coord.tool('login', { role: 'coordinator', name: 'rmc' })
+  const accessFile = join(coord.configDir, 'channels', 'squadra', 'rmc', 'access.json')
+  const acc = JSON.parse(readFileSync(accessFile, 'utf8'))
+  acc.allowFrom.push('rmw')
+  writeFileSync(accessFile, JSON.stringify(acc, null, 2))
+  await wk.tool('login', { role: 'worker', name: 'rmw', coordinator: 'rmc' })
+  await coord.waitChannel(p => p.content.startsWith('👋 rmw connected as a worker'), 'greeting')
+  // Handing out a task that deletes data: a reminder to the coordinator, and to its worker with the task.
+  assert.match(await coord.tool('reply', { chat_id: 'rmw', text: 'Issue 6: borra la columna legacy_discount y escribe la migración' }), /This task mentions "borra".*ask_user first/s)
+  const task = await wk.waitChannel(p => p.content.startsWith('Issue 6'), 'risky task')
+  assert.match(task.meta.squadra_note, /not even written and left unapplied/)
+  // An ordinary one: neither.
+  assert.doesNotMatch(await coord.tool('reply', { chat_id: 'rmw', text: 'Fix the typo in the README' }), /This task mentions/)
+  assert.equal((await wk.waitChannel(p => p.content.startsWith('Fix the typo'), 'plain task')).meta.squadra_note, undefined)
+  // Ending its turn asking the user for something in this chat: reminded, once a turn.
+  const stop = text => runHookOut(coord, { hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: text, session_id: 's', cwd: '/x' }, ['--stop'])
+  assert.match(JSON.parse(await stop('Quedan pendientes para ti: la migración 006 y la contraseña 008.')).reason, /they read their inbox, not this conversation/)
+  assert.equal(await stop('Quedan pendientes para ti: la migración 006 y la contraseña 008.'), '')
+  // A new turn in which it did use the inbox: nothing to remind.
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'sigue', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  await coord.tool('ask_user', { text: 'Drop legacy_discount, with data in all 1240 rows?', options: ['Back up, then drop', 'Keep it'] })
+  assert.equal(await stop('Te lo he dejado en la bandeja. Dime si quieres algo más.'), '')
+  // Nor when it asks nothing.
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'y ahora', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.equal(await stop('Hecho: las seis issues están cerradas y los tests pasan.'), '')
+  coord.close()
+  wk.close()
+})

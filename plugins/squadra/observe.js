@@ -315,7 +315,8 @@ const MAX_HOOK_BYTES = 64 * 1024 * 1024
 // onPrompt(prompt): each prompt about to be sent, whole (a worker's tasks start).
 // onChannelSeen(ids): message_ids of channel messages the transcript shows
 // reached Claude, also those put into a turn already going (no prompt for them).
-// stopCheck(background): when the turn is about to end, a reason to go on, or ''
+// stopCheck(background, lastText): when the turn is about to end (lastText: Claude's
+// last words in it, read here and never sent), a reason to go on, or ''
 // (asked for by the Stop hook through the same socket).
 // onConversation(id, transcript): the conversation this session is in, when
 // first known and whenever it changes (/clear, /resume), at every level.
@@ -363,6 +364,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
     tail = { path, offset, rest: '', decoder: new StringDecoder('utf8'), timer: setInterval(readTail, 700) }
   }
 
+  let lastText = ''
   function readTail() {
     if (!tail) return
     let size
@@ -409,6 +411,8 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
         push({ ts, kind: 'usage', context_tokens: context, model: e.message.model, context_window: window, compact_at: point, context_pct: Math.min(100, Math.round(context / point * 100)) })
       }
     }
+    // (Kept here whatever the level: the stop check reads it, nothing is sent.)
+    for (const block of e.message.content ?? []) if (block?.type === 'text' && block.text?.trim()) lastText = block.text
     if (!limits.text) return
     for (const block of e.message.content ?? []) {
       if (block?.type === 'text' && block.text?.trim()) {
@@ -549,7 +553,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
           if (msg?.want === 'stop') {
             // Up to date first: what reached Claude in this turn counts.
             readTail()
-            Promise.resolve().then(() => stopCheck?.(msg.background === true))
+            Promise.resolve().then(() => stopCheck?.(msg.background === true, typeof msg.last_text === 'string' && msg.last_text ? msg.last_text : lastText))
               .catch(err => { log(`observe: stop check failed: ${err.message}`); return '' })
               .then(block => conn.end(JSON.stringify({ block: typeof block === 'string' ? block : '' })))
             return

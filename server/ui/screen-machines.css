@@ -39,3 +39,4 @@
 @media (max-width: 900px) {
   #hosts { padding: 12px; }
 }
+#hosts > .empty { min-height: 60vh; justify-content: center; }

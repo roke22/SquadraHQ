@@ -8,6 +8,7 @@ import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
 import { sessionOn, personaTag } from './topbar.js'
 import { closeMenu, dialog, confirmDialog } from './dialogs.js'
+import { icon } from './icons.js'
 import { newSessionDialog, templatesDialog } from './squads.js'
 import { showLogin, serverVersion, olderThan } from './app.js'
 
@@ -90,7 +91,12 @@ function trouble(h) {
 export function renderHosts(only) {
   const all = [...hosts.values()].sort((a, b) => (b.online - a.online) || COLLATOR.compare(a.name, b.name))
   const list = all.filter(h => !only || h.id === only)
-  if (!list.length) { setHtml($('hosts'), `<div class="host-list"><div class="empty"><b>${only && hosts.size ? `${esc(T.machineNotFound)}` : esc(T.noMachines)}</b>${only && hosts.size ? `<a class="btn" href="#/hosts">${esc(T.allMachines)}</a>` : ''}</div></div>`); return }
+  if (!list.length) {
+    setHtml($('hosts'), only && hosts.size
+      ? `<div class="empty"><b>${esc(T.machineNotFound)}</b><a class="btn" href="#/hosts">${esc(T.allMachines)}</a></div>`
+      : `<div class="empty">${icon('machines', 'empty-ic')}<b>${esc(T.noMachines)}</b><span>${esc(T.mcEmptyHint)}</span>${can('manager') ? `<a class="btn primary" href="#/hosts/new">${esc(T.addMachine)}</a>` : ''}</div>`)
+    return
+  }
   const stuck = list.filter(h => !h.online && !h.pending && [...sessions.values()].some(x => x.host_id === h.id && !x.archived_at && !x.deleted))
   setHtml($('hosts'), `<div class="host-list">${only ? '' : overview(all)}${stuck.map(trouble).join('')}${list.map(h => {
     const i = h.info ?? {}

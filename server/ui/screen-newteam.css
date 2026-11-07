@@ -1,7 +1,7 @@
 /* A new team: one page, four steps, nothing opens until the last. */
 
 #newteam { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 20px 48px; }
-.nt { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+.nt { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .nt-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; font-size: var(--fs-sm); color: var(--muted); }
 .nt-step { display: inline-flex; align-items: center; gap: 7px; }
 .nt-step b { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line-2); border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; }
@@ -35,7 +35,7 @@
 .nt-sec > .nt-note { border-top: 0; padding: 0; }
 .nt-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 0 12px; }
 
-.nt-go { padding-top: 18px; border-top: 1px solid var(--line); }
+.nt-go { padding-top: 4px; }
 .nt-issues { margin: 0 0 12px; color: var(--err); font-size: var(--fs-sm); }
 .nt-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
@@ -65,3 +65,13 @@
 .am-wait.bad { color: var(--err); }
 .am-folders { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 16px; padding: 12px 14px; }
 .am-folders b { font-weight: 500; }
+
+/* Each step in its own card (what is inside a step sits on the page's colour). */
+.nt-steps { margin-bottom: 6px; }
+.nt-sec { padding: 20px 22px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 1px 2px rgba(15, 17, 20, .04); }
+.nt-sec > :last-child { margin-bottom: 0; }
+.nt-sec .nt-card, .nt-sec .nt-choice, .nt-sec .am-adv, .nt-sec .am-folders { background: var(--bg); }
+.nt-sec .nt-choice.on { background: color-mix(in srgb, var(--info) 6%, var(--bg)); }
+.nt-sec .nt-actions { margin-top: 14px; }
+@media (max-width: 900px) { .nt-sec { padding: 16px; } }
+.nt-sec.nt-go { padding: 4px 0 0; background: none; border: 0; box-shadow: none; }
