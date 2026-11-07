@@ -8,7 +8,7 @@ Please do **not** open a public issue. Use [GitHub private vulnerability reporti
 
 ## Supported versions
 
-Only the latest release gets fixes. Update the dashboard (`git pull`) and run `squadra-host update` on each machine.
+Only the latest release gets fixes. Update the server to the latest release tag (`git fetch --tags && git checkout <latest tag>`, not `main`, which can hold a squadra-host that isn't signed yet) and run `squadra-host update` on each machine.
 
 ## What is in scope
 
@@ -17,6 +17,8 @@ Only the latest release gets fixes. Update the dashboard (`git pull`) and run `s
 - `squadra-host` and the install scripts.
 
 Prompt-injection through channel messages is a known class of risk; the plugin's access control and the coordinator's instructions are designed around it, and reports of bypasses are very welcome.
+
+An answer from the dashboard's inbox reaches its coordinator as input typed in its terminal, the user's own words, so it carries the same trust as typing there from the dashboard and is turned off by the same `allow_input` switch. A way to get something typed there that the user didn't answer, or to answer without the operator role, is in scope.
 
 ## Companies on one server
 

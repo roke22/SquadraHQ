@@ -64,6 +64,7 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Partir un trabajo grande en piezas en paralelo:** una migración, una refactorización o más tests, un worker por módulo.
 - **Dejarlo trabajando solo:** los workers deciden los detalles técnicos y el coordinador aprueba sus acciones seguras, así la escuadra sigue mientras no estás.
 - **Vigilarlo desde cualquier sitio:** todos los agentes en directo en tu navegador, y una barra «Te necesitan» con quien espera una respuesta.
+- **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal; respondes desde el panel.
 - **Usar todos tus equipos y cuentas:** cada agente funciona en cualquier máquina que añadas, con la sesión de Claude Code de esa máquina.
 - **Montar equipos con tus propias skills:** dale a cada agente una skill o un agente de su proyecto (diseño, marketing, RR. HH., revisión de código…) como persona, y guarda toda la escuadra como plantilla para volver a abrirla de un clic.
 - **Enlazar escuadras:** enlaza los coordinadores de dos escuadras (por ejemplo, diseño y marketing) para que se repartan trabajo, y cada uno lo pase a sus propios workers.
@@ -181,10 +182,12 @@ Los **[ejemplos](https://roke22.github.io/Squadra/es/ejemplos.html)** muestran o
 
 Actualiza el panel a la última versión (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) y arráncalo de nuevo, o reconstruye la imagen de Docker desde ahí. Después ejecuta `squadra-host update` en cada equipo. El panel te dice cuáles están desactualizados.
 
+**Desde 0.0.7:** lo que tenía el panel pasa a ser su primera empresa, y los equipos y las sesiones siguen funcionando como estaban. La primera vez que lo abres, el token del servidor crea el primer propietario; después entras con email, contraseña y código, y el token ya no abre el panel (`--allow-token-api` lo mantiene en `/api` para tus scripts). Ejecuta `squadra-host update` en cada equipo y vuelve a abrir sus sesiones para tener lo nuevo, como la bandeja; los equipos sin actualizar siguen funcionando sin ello.
+
 ## Preguntas frecuentes
 
 **¿Qué aprueba el coordinador por su cuenta y qué me pregunta?**
-Aprueba lo que no tiene efectos secundarios: leer ficheros, buscar, ejecutar tests y compilaciones locales. Todo lo destructivo, irreversible o con efectos fuera del equipo (borrar datos, force push, desplegar, publicar, gastar dinero, credenciales) te lo pregunta antes, igual que las decisiones de producto y lo relativo a seguridad o costes. Los workers deciden los detalles técnicos solos. Las reglas están en las instrucciones del plugin y en el `CLAUDE.md` de tu coordinador, así que puedes endurecerlas.
+Aprueba lo que no tiene efectos secundarios: leer ficheros, buscar, ejecutar tests y compilaciones locales. Todo lo destructivo, irreversible o con efectos fuera del equipo (borrar datos, force push, desplegar, publicar, gastar dinero, credenciales) te lo pregunta antes en tu bandeja, igual que las decisiones de producto y lo relativo a seguridad o costes. Los workers deciden los detalles técnicos solos. Las reglas están en las instrucciones del plugin y en el `CLAUDE.md` de tu coordinador, así que puedes endurecerlas.
 
 **¿Funciona con mi plan de Claude?**
 Sí, con cualquier plan de claude.ai que incluya Claude Code (Pro, Max, Team, Enterprise) o con una clave de API de Anthropic Console. Cada agente es una sesión normal de Claude Code en su equipo, con la sesión de ese equipo, así que consume de esa cuenta como cualquier otra sesión.

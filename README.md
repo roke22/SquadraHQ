@@ -64,6 +64,7 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Split a big job into parallel pieces:** a migration, a refactor or more tests, one worker per module.
 - **Leave it working unattended:** workers decide the technical details and the coordinator approves their safe actions, so the squad keeps going while you are away.
 - **Keep watch from anywhere:** every agent live in your browser, and a "Needs you" bar for whoever is waiting for an answer.
+- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong; you answer from the dashboard.
 - **Use all your computers and accounts:** each agent runs on any machine you add, with that machine's Claude Code login.
 - **Build teams with your own skills:** give each agent a skill or agent from its project (design, marketing, HR, code review…) as its persona, and save the whole squad as a template to open it again in one click.
 - **Link squads:** link the coordinators of two squads (design and marketing, say) so they share work, each handing what it takes on to its own workers.
@@ -181,10 +182,12 @@ The **[examples](https://roke22.github.io/Squadra/examples.html)** show whole or
 
 Update the dashboard to the latest release (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) and start it again, or rebuild the Docker image from there. Then run `squadra-host update` on each computer. The dashboard tells you which ones are out of date.
 
+**From 0.0.7:** what the dashboard held becomes its first company, and computers and sessions keep working as they are. The first time you open it, the server token creates the first owner; after that you sign in with email, password and code, and the token no longer opens the dashboard (`--allow-token-api` keeps it working on `/api` for your scripts). Run `squadra-host update` on each computer and open its sessions again to get the new features, such as the inbox; computers not updated keep working without them.
+
 ## FAQ
 
 **What does the coordinator approve on its own, and what does it ask me?**
-It approves what has no side effects: reading files, searching, running tests and local builds. Anything destructive, irreversible or with effects outside the machine (deleting data, force pushes, deploying, publishing, spending money, credentials) it asks you first, as do product decisions and anything about security or costs. Workers decide technical details themselves. The rules live in the plugin's instructions and in your coordinator's `CLAUDE.md`, so you can tighten them.
+It approves what has no side effects: reading files, searching, running tests and local builds. Anything destructive, irreversible or with effects outside the machine (deleting data, force pushes, deploying, publishing, spending money, credentials) it asks you first in your inbox, as do product decisions and anything about security or costs. Workers decide technical details themselves. The rules live in the plugin's instructions and in your coordinator's `CLAUDE.md`, so you can tighten them.
 
 **Does it work with my Claude plan?**
 Yes, with any claude.ai plan that includes Claude Code (Pro, Max, Team, Enterprise) or with an Anthropic Console API key. Each agent is a normal Claude Code session on its machine, with that machine's login, so it counts against that account like any other session.
