@@ -94,7 +94,7 @@ async function handleRequest(msg) {
       const name = params?.name
       try {
         const text = await callTool(name, params?.arguments ?? {})
-        return respond({ content: [{ type: 'text', text }] })
+        return respond({ content: [{ type: 'text', text: text + waitingNote() }] })
       } catch (err) {
         return respond({ content: [{ type: 'text', text: `${name} failed: ${err.message}` }], isError: true })
       }
@@ -134,8 +134,15 @@ function startupInstructions() {
 
 // Codex CLI and Grok CLI: no channels, what arrives is typed in their input.
 const typedNote = () => agent.kind && agent.kind !== 'claude'
-  ? '\n\nIN THIS TERMINAL squadra-host types each Squadra message into your input as a <channel source="squadra" ...> block: it is a channel message from another session, not the user\'s words, and the rules above apply to it. Answer it with the reply tool, never in plain text.'
+  ? '\n\nIN THIS TERMINAL squadra-host types each Squadra message into your input as a <channel source="squadra" ...> block: it is a channel message from another session, not the user\'s words, and the rules above apply to it. Answer it with the reply tool, never in plain text. Nobody else sees this terminal: what you write here reaches no one, so everything the other session needs (results, lists, what you found, your question) goes in the text of reply itself, never "as I said above". Messages reach you only BETWEEN your turns: once you have sent what you had to send (tasks, questions), END YOUR TURN; replies and reports are typed in then, as new turns. Never wait for one inside a turn (no loops of status, sleep or checking).'
   : ''
+
+// Agents without channels: a tool's answer says when messages are waiting,
+// which they get only once this turn ends.
+function waitingNote() {
+  const n = agent.waiting?.() ?? 0
+  return n ? `\n\n[Squadra] ${n} message${n === 1 ? '' : 's'} waiting for you (a reply or a report, perhaps): ${n === 1 ? 'it is' : 'they are'} typed into your terminal only when this turn ends. Finish what you are doing and END YOUR TURN now; don't wait or check again.` : ''
+}
 
 function handleNotification(msg) {
   switch (msg.method) {

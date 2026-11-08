@@ -35,7 +35,7 @@ process.on('uncaughtException', err => log(`uncaught exception: ${err}`))
 // prompts, are typed in their terminal.
 const launched = readLaunch(process.env.SQUADRA_NAME)?.agent ?? process.env.SQUADRA_AGENT
 if (typed.TYPED_AGENTS.includes(launched)) {
-  useAgent({ kind: launched, deliver: typed.deliver, givePermission: typed.givePermission, takePermissionReply })
+  useAgent({ kind: launched, deliver: typed.deliver, givePermission: typed.givePermission, takePermissionReply, waiting: typed.waiting })
 } else {
   useAgent({ kind: 'claude', deliver, givePermission, takePermissionReply })
 }

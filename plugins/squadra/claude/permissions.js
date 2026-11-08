@@ -283,9 +283,10 @@ const REQUEST_LETTERS = 'abcdefghijkmnopqrstuvwxyz'
 // 120-column terminal.
 const TYPED_LINE_MAX = 100
 
-// A typed request stands for the prompt on screen: once another prompt comes,
-// or its call ran or failed (it was answered in the terminal), it is withdrawn
-// and its answer no longer taken. tool and input: only the request for that call.
+// A typed request stands for a prompt in the terminal: once its call ran or
+// failed (it was answered there), it is withdrawn and its answer no longer
+// taken. (Several can wait at once: an agent asks for calls it makes together
+// one after another.) tool and input: only the request for that call.
 export function withdrawTyped(s, why, tool, input) {
   const json = input === undefined ? null : JSON.stringify(input)
   for (const [id, p] of pendingPermissions) {
@@ -302,8 +303,6 @@ export async function onTypedPermission(s, tool, input) {
   const approvers = await currentApprovers(s)
   if (!approvers.length) return
   const send = text => { for (const chat_id of approvers) void call('sendMessage', { chat_id, text }, { s }).then(m => { if (m?.message_id) s.relayIds.add(Number(m.message_id)) }).catch(e => log(`permission notice to ${chat_id} failed: ${e.message}`)) }
-  // (One prompt shows at a time: an earlier request is for a prompt that is gone.)
-  withdrawTyped(s, 'a newer permission prompt replaced it')
   if (!tool || !input || typeof input !== 'object' || Array.isArray(input)) {
     send(`🔐 Session ${s.name} waits for a permission in its terminal, and which call it asks about could not be read: the user answers it there.`)
     return

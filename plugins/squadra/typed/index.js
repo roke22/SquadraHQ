@@ -4,7 +4,7 @@
 // block like the ones Claude Code shows, so the same rules read the same way.
 // Answers to permission prompts are left the same way, for squadra-host to type.
 
-import { mkdirSync, lstatSync } from 'node:fs'
+import { mkdirSync, lstatSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { S, log, writePrivateFile } from '../core/index.js'
 
@@ -39,6 +39,12 @@ export function deliver(params) {
   } catch (err) {
     log(`could not leave a message for the terminal: ${err.message}`)
   }
+}
+
+// Messages left for the terminal and not typed yet: squadra-host types them
+// only while the agent waits for input, so between its turns.
+export function waiting() {
+  try { return readdirSync(join(S.stateDir, PENDING_DIR)).filter(f => /^\d{14}-\d{6}-\d+\.txt$/.test(f)).length } catch { return 0 }
 }
 
 // Where squadra-host looks for answers to permission prompts (the same name there).

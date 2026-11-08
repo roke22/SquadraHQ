@@ -1306,7 +1306,9 @@ const codexHome = () => { const c = process.env.CODEX_HOME; return c && isAbsolu
 async function codexPluginStatus(cmd = typedProgram(loadSettings().codex_command)) {
   if (!cmd) return null
   try {
-    const list = JSON.parse((await runTyped(cmd, ['plugin', 'list', '--json'])).stdout)
+    // (Only this marketplace: signed in, the whole list also fetches OpenAI's
+    // remote catalog, about a minute.)
+    const list = JSON.parse((await runTyped(cmd, ['plugin', 'list', '--marketplace', 'squadra', '--json'])).stdout)
     const p = (list?.installed ?? []).find(x => x?.pluginId === 'squadra@squadra')
     if (!p) return { installed: false, version: null, enabled: false, root: null }
     // A plugin called squadra from somewhere else is not ours.
@@ -1523,15 +1525,11 @@ async function typeWaiting(t, a) {
   } finally { typingNow.delete(t.id) }
 }
 
-// Answers to permission prompts (see plugins/squadra/typed): typed while the
-// prompt on screen still shows the call they answer, never otherwise. Dropped
-// after two minutes (it was answered in the terminal, or another came).
+// Answers to permission prompts (see plugins/squadra/typed): typed when the
+// prompt on screen shows the very call they answer, never otherwise. Dropped
+// after two minutes (it was answered in the terminal, or never came).
 const ANSWER_RE = /^\d{14}-[a-km-z]{5}\.json$/
 const ANSWER_KEEP_MS = 2 * 60_000
-// Answers whose prompt was not on screen at the last look (file -> true): one
-// more look a second later, then dropped (it was answered in the terminal, or
-// another prompt replaced it: an answer never waits for a later prompt).
-const answerMissed = new Set()
 async function typePermissionAnswers(t, a, target) {
   const dir = join(claudeCode.plugin.stateDir(t.id), 'permission-answers')
   let files
@@ -1544,13 +1542,13 @@ async function typePermissionAnswers(t, a, target) {
     const age = Date.now() - Number(f.slice(0, 14))
     const keys = ans && typeof ans === 'object' && age <= ANSWER_KEEP_MS && age >= -60_000 ? a.permissionKeys(await screenOf(target), ans) : null
     if (!keys) {
-      if (ans && typeof ans === 'object' && age <= ANSWER_KEEP_MS && !answerMissed.has(file)) { answerMissed.add(file); continue }
-      answerMissed.delete(file)
+      // (Its prompt may still come: an agent asks for calls it makes together
+      // one after another. Only that exact call is ever answered.)
+      if (ans && typeof ans === 'object' && age <= ANSWER_KEEP_MS && age >= -60_000) continue
       rmSync(file, { force: true })
       if (ans) log(`the answer to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" was not typed: its prompt is not on the screen, or shows its call over several lines (answer it there)`)
       continue
     }
-    answerMissed.delete(file)
     for (const k of keys) await tmux(['send-keys', '-t', target, k])
     rmSync(file, { force: true })
     log(`typed "${ans.behavior === 'allow' ? 'yes' : 'no'}" to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" (${a.name})`)

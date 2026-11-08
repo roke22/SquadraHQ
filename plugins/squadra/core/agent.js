@@ -5,6 +5,9 @@
 //                                    verdict, null to drop it, 'chat' if it isn't one
 //   givePermission(verdict)          hand it that answer
 //   kind                             which agent it is: 'claude', 'codex' or 'grok'
+//   waiting()                        (optional) how many messages wait to be put
+//                                    in front of it (an agent without channels
+//                                    gets them only between its turns)
 export const agent = {}
 
 export function useAgent(a) {

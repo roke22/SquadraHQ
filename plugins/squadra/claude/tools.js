@@ -310,7 +310,7 @@ export async function ping(chatId) {
       lines.push(`${t}: ${err instanceof ApiError && err.code === 400 ? 'does not exist on the server (never connected)' : err.message}`)
     }
   }
-  lines.push('', 'ALIVE = its Claude Code session is running. It does not tell whether it is busy or waiting: for that, look at when it last sent a message.')
+  lines.push('', 'ALIVE = its session (Claude Code, Codex CLI or Grok CLI) is running. It does not tell whether it is busy or waiting: for that, look at when it last sent a message.')
   return lines.join('\n')
 }
 
