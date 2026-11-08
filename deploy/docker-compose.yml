@@ -22,7 +22,7 @@ services:
 
   caddy:
     # (Fixed by digest, here and in the Dockerfiles: to update, change both the tag and the digest.)
-    image: caddy:2.8.4@sha256:226d1f059b75399fe19182893c7184591c07b97afc8dfcf44eeb80c9a77a530f
+    image: caddy:2.10.2@sha256:c3d7ee5d2b11f9dc54f947f68a734c84e9c9666c92c88a7f30b9cba5da182adb
     restart: unless-stopped
     depends_on:
       - squadra-server
