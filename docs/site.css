@@ -62,12 +62,13 @@ code { font-family: var(--mono); font-size: .88em; background: var(--raised); pa
 .note { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
 .agents { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 12px; margin: 26px auto 0; font-size: 14.5px; color: var(--muted); }
 .agents > span:first-child { margin-right: 2px; }
-.agents .ag { display: inline-flex; align-items: center; gap: 9px; padding: 6px 12px 6px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text); font-weight: 550; }
+.agents .ag { display: inline-flex; align-items: center; gap: 9px; padding: 7px 13px 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text); font-weight: 550; }
 .agents .ag small { font-size: 12px; font-weight: 500; color: var(--muted); }
-/* The dashboard's own marks for each agent (not the labs' logos). */
-.mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; font: 700 13px/1 var(--sans); color: #fff; }
-.mark.claude { background: #b8664a; } .mark.codex { background: #14805f; } .mark.grok { background: #4a5260; }
-@media (prefers-color-scheme: dark) { .mark.claude { background: #c7785b; } .mark.grok { background: #6b7482; } }
+/* Each agent's official logo, as its maker provides it (docs/brand). */
+.agents .logo { display: block; width: 20px; height: 20px; max-width: none; }
+.agents picture { flex: none; }
+/* (OpenAI's file keeps a clear space of a quarter on each side: shown twice as large, so the blossom is the size of the others.) */
+.agents .logo[data-pad] { width: 40px; height: 40px; margin: -10px; }
 
 /* A screenshot in a window, in the reader's theme. */
 .window { margin: 56px auto 0; border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
