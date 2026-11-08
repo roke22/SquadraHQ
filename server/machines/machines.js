@@ -857,8 +857,11 @@ export function createMachines(platform, { sessions, observation }) {
   async function approveOnCoordinator(coordinator, worker, actor) {
     const row = NAME_RE.test(String(coordinator ?? '')) ? db.prepare('SELECT host_id, opened_role FROM identities WHERE name = ?').get(coordinator) : null
     if (!row?.host_id || row.opened_role !== 'coordinator' || !hostLinks.has(row.host_id)) return
+    // (The registration opened, not just the name: the coordinator pins it.)
+    const identity = db.prepare('SELECT epoch FROM identities WHERE name = ?').get(worker)?.epoch
+    if (!identity) return
     try {
-      await askHost(row.host_id, { t: 'approve', term: coordinator, worker })
+      await askHost(row.host_id, { t: 'approve', term: coordinator, worker, identity })
       audit(actor ?? { token: true }, 'worker-approved', `${worker} → ${coordinator}`, null)
       log(`"${worker}" approved for "${coordinator}" on its machine`)
     } catch (err) { log(`could not approve "${worker}" for "${coordinator}": ${err.message}`) }

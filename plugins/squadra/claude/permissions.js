@@ -279,13 +279,41 @@ export async function onPermissionRequest(params) {
 // answered in the terminal. When the call can't be told (tool null), the
 // approvers are only told that the session waits: there is nothing to answer.
 const REQUEST_LETTERS = 'abcdefghijkmnopqrstuvwxyz'
+// The longest call that still fits on one line of the prompt in a session's
+// 120-column terminal.
+const TYPED_LINE_MAX = 100
+
+// A typed request stands for the prompt on screen: once another prompt comes,
+// or its call ran or failed (it was answered in the terminal), it is withdrawn
+// and its answer no longer taken. tool and input: only the request for that call.
+export function withdrawTyped(s, why, tool, input) {
+  const json = input === undefined ? null : JSON.stringify(input)
+  for (const [id, p] of pendingPermissions) {
+    if (!p.typed || p.withdrawn) continue
+    if (json !== null && (p.typed.tool !== tool || JSON.stringify(p.typed.input) !== json)) continue
+    p.withdrawn = true
+    const text = `🔐 Permission ${id} WITHDRAWN: ${why}. Don't answer it.`
+    for (const chat_id of p.approvers) void call('sendMessage', { chat_id, text }, { s }).catch(e => log(`withdrawal notice to ${chat_id} failed: ${e.message}`))
+  }
+}
+
 export async function onTypedPermission(s, tool, input) {
   if (!s?.secret) return
   const approvers = await currentApprovers(s)
   if (!approvers.length) return
   const send = text => { for (const chat_id of approvers) void call('sendMessage', { chat_id, text }, { s }).then(m => { if (m?.message_id) s.relayIds.add(Number(m.message_id)) }).catch(e => log(`permission notice to ${chat_id} failed: ${e.message}`)) }
+  // (One prompt shows at a time: an earlier request is for a prompt that is gone.)
+  withdrawTyped(s, 'a newer permission prompt replaced it')
   if (!tool || !input || typeof input !== 'object' || Array.isArray(input)) {
     send(`🔐 Session ${s.name} waits for a permission in its terminal, and which call it asks about could not be read: the user answers it there.`)
+    return
+  }
+  // squadra-host types an answer only where the prompt shows the whole call on
+  // one line: a long or multi-line call is only told, to be answered there.
+  const what = typeof input.command === 'string' ? input.command : [input.file_path, input.path, input.notebook_path].find(v => typeof v === 'string')
+  if (typeof what !== 'string' || /[\r\n]/.test(what) || what.trim().length > TYPED_LINE_MAX) {
+    const shownCall = maskDeep(input, t => maskOutgoing(t).text)
+    send(`🔐 Session ${s.name} waits for a permission in its terminal for ${JSON.stringify(tool)}: ${shown(JSON.stringify(shownCall.value), 3000, shownCall.masked)}\nThis call is long, spans lines or names no command or file, so an answer from here could not be checked against its screen: the user answers it there.`)
     return
   }
   let request_id

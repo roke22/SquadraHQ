@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { agent } from './agent.js'
 import { log, NAME_RE } from './settings.js'
 import { active } from './session.js'
-import { loadAccess, peerMatchesPin, allowFromDashboard } from './access.js'
+import { loadAccess, peerMatchesPin, allowFromDashboard, readDashboardApproval } from './access.js'
 import { call } from './client.js'
 
 // The /squadra:access skill drops a file at approved/<senderId> when it pairs
@@ -42,8 +42,9 @@ function dashboardApprovals(s) {
     files = readdirSync(dir).filter(f => !f.startsWith('.'))
   } catch { return }
   for (const name of files) {
+    const identity = readDashboardApproval(join(dir, name))
     try { rmSync(join(dir, name), { recursive: true, force: true }) } catch (err) { log(`cannot remove ${name}: ${err.message}`); continue }
-    if (!allowFromDashboard(s, name)) continue
+    if (identity === false || !allowFromDashboard(s, name, identity)) continue
     log(`"${name}" approved from the dashboard`)
     void call('sendMessage', { chat_id: name, text: `Paired with "${s.name}". You can now message each other.`, squadra_fyi: true }, { s })
       .catch(err => log(`failed to send approval confirm: ${err.message}`))

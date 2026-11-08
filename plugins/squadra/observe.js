@@ -324,8 +324,9 @@ const MAX_HOOK_BYTES = 64 * 1024 * 1024
 // terminal (agents without channels: Codex CLI's PermissionRequest hook, Grok
 // CLI's permission_prompt notification), for the tool call it asks about;
 // tool null when that can't be told (Grok names none: the one call still
-// running, if there is exactly one).
-export function createObserver({ level = 'full', send, log = () => {}, contextProvider = () => '', onToolInput = null, onPrompt = null, onChannelSeen = null, stopCheck = null, onConversation = null, onPermissionAsk = null }) {
+// running, if there is exactly one). onToolEnd(tool, input): with it, a call of
+// the main agent that ran or failed (its prompt, if any, is gone).
+export function createObserver({ level = 'full', send, log = () => {}, contextProvider = () => '', onToolInput = null, onPrompt = null, onChannelSeen = null, stopCheck = null, onConversation = null, onPermissionAsk = null, onToolEnd = null }) {
   level = normalizeLevel(level) ?? 'full'
   const limits = LIMITS[level]
   let server = null
@@ -547,7 +548,10 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
       running.set(id, { tool: String(input.tool_name ?? ''), input: input.tool_input, at: Date.now() })
       // (Calls whose end never came: forgotten after ten minutes, at most 50 kept.)
       for (const [k, v] of running) if (Date.now() - v.at > 10 * 60_000 || running.size > 50) running.delete(k)
-    } else if ((event === 'PostToolUse' || event === 'PostToolUseFailure') && id) running.delete(id)
+    } else if (event === 'PostToolUse' || event === 'PostToolUseFailure') {
+      if (id) running.delete(id)
+      if (!input.agent_id) try { onToolEnd?.(String(input.tool_name ?? ''), input.tool_input ?? null) } catch (err) { log(`observe: tool end callback failed: ${err.message}`) }
+    }
     try {
       if (event === 'PermissionRequest' && !input.agent_id) { askedAt = Date.now(); onPermissionAsk(String(input.tool_name ?? ''), input.tool_input ?? null) }
       else if (event === 'Notification' && input.notification_type === 'permission_prompt') {

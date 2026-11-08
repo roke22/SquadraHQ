@@ -202,6 +202,8 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     }
     const groupsOf = db.prepare('SELECT group_id FROM group_members WHERE name = ?').all(name).map(r => r.group_id)
     db.prepare('DELETE FROM identities WHERE name = ?').run(name)
+    // (Its open questions to the user: closed, never passed to a new session of that name.)
+    inbox.closeOrphans(name)
     db.prepare('DELETE FROM group_members WHERE name = ?').run(name)
     db.prepare('DELETE FROM group_invites WHERE name = ? OR invited_by = ?').run(name, name)
     for (const g of groupsOf) if (!db.prepare('SELECT 1 FROM group_members WHERE group_id = ?').get(g)) closeGroup(g); else handOverGroup(g, name)

@@ -189,6 +189,7 @@ export function openDatabase(dir) {
     ['inbox', 'answered_by', 'TEXT'],                    // and who
     ['inbox', 'closed_reason', 'TEXT'],                  // why its coordinator closed it
     ['inbox', 'dismissed_by', 'TEXT'],                   // who put a question away without answering it
+    ['inbox', 'epoch', 'TEXT'],                          // the registration of its coordinator that wrote it (identities.epoch)
   ]) {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name)
     if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
@@ -208,6 +209,8 @@ export function openDatabase(dir) {
   // messages count, so a pile of automatic replies can't make it a scan.
   db.exec('CREATE INDEX IF NOT EXISTS messages_relation ON messages(from_name, target, created_at) WHERE system = 0 AND auto = 0')
   db.exec("UPDATE identities SET epoch = lower(hex(randomblob(12))) WHERE epoch IS NULL")
+  // (Written before the inbox said whose registration: the one there now.)
+  db.exec('UPDATE inbox SET epoch = (SELECT epoch FROM identities WHERE name = inbox.session) WHERE epoch IS NULL')
 
   // Several writes in one transaction (one disk sync instead of one each).
   // Re-entrant: an inner call just joins the outer transaction.

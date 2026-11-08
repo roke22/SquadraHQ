@@ -18,7 +18,7 @@ import {
 } from './context.js'
 import { tasksStarting, channelIds, stopCheck } from './tasks.js'
 import { ping } from './tools.js'
-import { pinApprovers, TOOL_INPUT_KEEP_MS, withdrawIfAmbiguous, pendingPermissions, onTypedPermission } from './permissions.js'
+import { pinApprovers, TOOL_INPUT_KEEP_MS, withdrawIfAmbiguous, pendingPermissions, onTypedPermission, withdrawTyped } from './permissions.js'
 import { confirmWithUser } from './mcp.js'
 
 function parseRole(role) {
@@ -131,7 +131,10 @@ export async function login({ name, role, coordinator, staticAccess = false, see
       withdrawIfAmbiguous(s, tool, input)
     },
     // Agents without channels: a prompt in their terminal is relayed from their hooks.
-    ...(agent.kind && agent.kind !== 'claude' ? { onPermissionAsk: (tool, input) => { if (S === s) void onTypedPermission(s, tool, input) } } : {}),
+    ...(agent.kind && agent.kind !== 'claude' ? {
+      onPermissionAsk: (tool, input) => { if (S === s) void onTypedPermission(s, tool, input) },
+      onToolEnd: (tool, input) => { if (S === s) withdrawTyped(s, 'its call already ran or failed (answered at the session)', tool, input) },
+    } : {}),
   })
   const sockDir = prepareSocketDir(RUN_DIR)
   if (sockDir) s.observer.start(join(sockDir, `${process.ppid}.sock`))

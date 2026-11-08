@@ -72,8 +72,16 @@ function saveAccess(a, s = S) {
 // dashboard-approved/): allowed, as the /squadra:access skill's pair does,
 // and its pairing request, if it made one, gone. By this process, the only
 // one that writes access.json while it runs.
-export function allowFromDashboard(s, name) {
+// identity: the registration the dashboard opened (the server's random
+// identity for that name), pinned now: if that worker is deleted and its name
+// registered again before it ever writes, the new one isn't let in by this.
+export function allowFromDashboard(s, name, identity = null) {
   if (s.staticAccess || s.role !== 'coordinator' || !NAME_RE.test(String(name)) || name === s.name) return false
+  if (identity) {
+    const pins = readAllowPins(s)
+    pins[name] = `i:${identity}`
+    try { writePrivateFile(s.allowPinsFile, JSON.stringify(pins, null, 2) + '\n') } catch { return false }
+  }
   const a = readAccessFile(s)
   const had = a.allowFrom.includes(name)
   if (!had) a.allowFrom.push(name)
@@ -82,13 +90,26 @@ export function allowFromDashboard(s, name) {
   return !had
 }
 
+// The identity in an approval its machine left (a small plain file), or null
+// (an older machine that doesn't say). false: not an approval file.
+export function readDashboardApproval(file) {
+  try {
+    const st = lstatSync(file)
+    if (!st.isFile()) return false
+    if (st.size > 4096) return null
+    const id = JSON.parse(readFileSync(file, 'utf8'))?.identity
+    return typeof id === 'string' && /^[0-9a-f]{16,64}$/.test(id) ? id : null
+  } catch { return false }
+}
+
 // That approval for one name, if its machine left it: taken and applied.
 export function takeDashboardApproval(s, name) {
   if (s?.role !== 'coordinator' || !NAME_RE.test(String(name))) return false
   const file = join(s.stateDir, 'dashboard-approved', name)
-  try { if (!lstatSync(file).isFile()) return false } catch { return false }
+  const identity = readDashboardApproval(file)
+  if (identity === false) return false
   try { rmSync(file, { force: true }) } catch { return false }
-  allowFromDashboard(s, name)
+  allowFromDashboard(s, name, identity)
   return true
 }
 

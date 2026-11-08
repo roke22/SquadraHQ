@@ -1195,6 +1195,14 @@ test('observation: a permission prompt of Codex CLI or Grok CLI is told once, wi
   assert.deepEqual(asked, [[null, null]])
   await o.stop()
   await o2.stop()
+  // A call that ran or failed is told (its request, if any, is withdrawn), a subagent's isn't.
+  const ended = []
+  const o3 = createObserver({ level: 'off', send: async () => {}, onPermissionAsk: () => {}, onToolEnd: (tool, input) => ended.push([tool, input]) })
+  o3._onHook({ ts: Date.now(), input: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'rm -f a' }, tool_use_id: 'x1' } })
+  o3._onHook({ ts: Date.now(), input: { hook_event_name: 'PostToolUseFailure', tool_name: 'Bash', tool_input: { command: 'rm -f b' }, tool_use_id: 'x2' } })
+  o3._onHook({ ts: Date.now(), input: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'rm -f c' }, tool_use_id: 'x3', agent_id: 'sub' } })
+  assert.deepEqual(ended, [['Bash', { command: 'rm -f a' }], ['Bash', { command: 'rm -f b' }]])
+  await o3.stop()
 })
 
 // --- context & compaction ------------------------------------------------------------
@@ -2824,6 +2832,26 @@ test('a coordinator\'s plan: the whole list each time, checked, for the dashboar
   coord.close(); w.close()
 })
 
+test('the inbox: a deleted coordinator\'s open questions are closed, never passed to a new session of its name', async () => {
+  const old = new Plugin('inbd', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_ROLE: 'coordinator' })
+  await old.init(); await old.waitConnected()
+  const id = Number(/#(\d+)/.exec(await old.tool('ask_user', { text: 'Ship on Friday?', options: ['Yes', 'No'] }))[1])
+  old.close()
+  await waitFor(async () => (await api('admin/deleteIdentity', { name: 'inbd' }, SERVER_TOKEN)).ok, { what: 'deleted once offline' })
+  let item = (await dash('/api/inbox')).result.find(i => i.id === id)
+  assert.ok(item.resolved_at, 'closed on delete')
+  assert.equal(item.closed_reason, 'its coordinator no longer exists')
+  // A new session given the name neither changes it nor gets an answer to it.
+  const again = new Plugin('inbd', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_ROLE: 'coordinator' })
+  await again.init(); await again.waitConnected()
+  await assert.rejects(again.tool('edit_inbox', { id: String(id), text: 'Ship on Monday?' }), /nothing of yours/)
+  const ans = await dashPost('/api/inbox/answer', { id, version: item.version, answer: 'Yes' })
+  assert.equal(ans.ok, false)
+  item = (await dash('/api/inbox')).result.find(i => i.id === id)
+  assert.equal(item.answer, null)
+  again.close()
+})
+
 test('the inbox: a coordinator leaves a question or a result for the user, and nobody else does', async () => {
   const coord = new Plugin('inb1', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_ROLE: 'coordinator' })
   const init = await coord.init()
@@ -2956,4 +2984,31 @@ test('a worker its machine approved from the dashboard: the coordinator allows i
   assert.deepEqual(JSON.parse(readFileSync(join(state, 'access.json'), 'utf8')).allowFrom.filter(n => n !== 'daw' && n !== 'daw2'), [])
   coord.close()
   wk.close()
+})
+
+test('a dashboard approval is for the registration opened: the name deleted and registered again before it greets gets nothing', async () => {
+  const JOIN = readFileSync(join(dataDir, 'join-token'), 'utf8').trim()
+  const coord = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
+  await coord.init()
+  await coord.tool('login', { role: 'coordinator', name: 'dic' })
+  const state = join(coord.configDir, 'channels', 'squadra', 'dic')
+  // The dashboard opens "diw" for it: the server registers the name, and the
+  // coordinator's machine leaves the approval with that registration's identity.
+  assert.equal((await api('register', { name: 'diw' }, SERVER_TOKEN)).ok, true)
+  const epochOf = () => { const db = new DatabaseSync(join(dataDir, 'squadra.db'), { readOnly: true }); try { return db.prepare('SELECT epoch FROM identities WHERE name = ?').get('diw')?.epoch } finally { db.close() } }
+  const first = epochOf()
+  mkdirSync(join(state, 'dashboard-approved'), { recursive: true })
+  writeFileSync(join(state, 'dashboard-approved', 'diw'), JSON.stringify({ worker: 'diw', at: Date.now(), identity: first }))
+  await waitFor(() => JSON.parse(readFileSync(join(state, 'access.json'), 'utf8')).allowFrom.includes('diw'), { what: 'allowed' })
+  assert.equal(JSON.parse(readFileSync(join(state, 'allow-pins.json'), 'utf8')).diw, `i:${first}`, 'pinned at once')
+  // It never starts; it is deleted, and someone with the join token takes the name.
+  assert.equal((await api('admin/deleteIdentity', { name: 'diw' }, SERVER_TOKEN)).ok, true)
+  const other = new Plugin('diw', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_COORDINATOR: 'dic' }, { noServer: true, envFile: `SQUADRA_URL=${URL_}\nSQUADRA_SERVER_TOKEN=${JOIN}\n` })
+  await other.init(); await other.waitConnected()
+  assert.notEqual(epochOf(), first)
+  // Its greeting is not delivered: the coordinator is told it isn't the session approved.
+  await coord.waitChannel(p => p.meta.kind === 'squadra_notice' && p.content.includes('"diw" is not the one this session paired with'), 'warning')
+  assert.equal(coord.channel(p => p.content.startsWith('👋 diw connected')).length, 0)
+  coord.close()
+  other.close()
 })

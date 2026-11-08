@@ -1673,40 +1673,58 @@ test('Codex CLI and Grok CLI: a session names its agent, and what arrives is typ
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
-test('Codex CLI and Grok CLI: an answer to a permission prompt is typed only while that prompt is on screen', () => {
+test('Codex CLI and Grok CLI: an answer to a permission prompt is typed only for the exact call on the prompt line', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sq-answers-'))
-  const codex = [
-    '› RUN: rm -f /tmp/a',
+  const codex = (call, reason = 'test') => [
+    '› RUN: something',
     '• Ran rm -f /tmp/old',
     '  Would you like to run the following command?',
-    '  Reason: test',
-    '  $ rm -f /tmp/a',
+    `  Reason: ${reason}`,
+    `  $ ${call}`,
     '› 1. Yes, proceed (y)',
     '  3. No, and tell Codex what to do differently (esc)',
     '  Press enter to confirm or esc to cancel',
   ].join('\n')
-  const grok = [
+  const grok = (...call) => [
     '     ◆ Ran rm -f /tmp/old',
     '  ┃  ›  test',
-    '  ┃  │ rm -f /tmp/very/long/path/that/',
-    '  ┃  │ wraps',
+    ...call.map(l => `  ┃  │ ${l}`),
     '  ┃  1 (○) Yes, and don\'t ask again for anything (always-approve mode)',
     '  ┃  3 (●) Yes, proceed',
     '  ┃  4 (○) No, reject (type to add feedback)',
   ].join('\n')
+  const cases = {
+    codex: [
+      [codex('rm -f /tmp/a'), 'rm -f /tmp/a', 'allow'], // its own call: yes
+      [codex('rm -f /tmp/a'), 'rm -f /tmp/a', 'deny'], // and no
+      [codex('rm -f /tmp/a'), 'rm -f /tmp/old', 'allow'], // a call shown above the prompt
+      [codex('ls ./tmp; rm -rf ~/x'), 'ls ./tmp', 'allow'], // a prefix of the call on screen
+      [codex('rm -rf ~/x', 'ls ./tmp'), 'ls ./tmp', 'allow'], // the approved call in the agent's reason
+      [codex('rm -rf ./build/ *'), 'rm -rf ./build/*', 'allow'], // only spaces differ
+      [codex('ls'), 'l', 'allow'], // a short needle
+      [codex('rm -f /tmp/a').split('\n').slice(0, 2).join('\n'), 'rm -f /tmp/old', 'allow'], // no prompt
+    ],
+    grok: [
+      [grok('rm -f /tmp/b'), 'rm -f /tmp/b', 'allow'],
+      [grok('rm -f /tmp/b'), 'rm -f /tmp/b', 'deny'],
+      [grok('rm -f /tmp/b; rm -rf ~'), 'rm -f /tmp/b', 'allow'], // a prefix
+      [grok('rm -f /tmp/very/long/path/that/', 'wraps'), 'rm -f /tmp/very/long/path/that/wraps', 'allow'], // wrapped: left to the terminal
+      [grok('rm -f /tmp/b'), 'rm -f /tmp/old', 'allow'],
+    ],
+  }
   const script = `
     import { codexPermissionKeys, grokPermissionKeys } from ${JSON.stringify(join(ROOT, 'host/squadra-host.mjs'))}
-    const ans = (command, behavior = 'allow') => ({ behavior, input: { command } })
-    const codex = ${JSON.stringify(codex)}, grok = ${JSON.stringify(grok)}
+    const cases = ${JSON.stringify(cases)}
+    const ans = (command, behavior) => ({ behavior, input: { command, description: 'x' } })
     process.stdout.write(JSON.stringify({
-      codex: [codexPermissionKeys(codex, ans('rm -f /tmp/a')), codexPermissionKeys(codex, ans('rm -f /tmp/a', 'deny')), codexPermissionKeys(codex, ans('rm -f /tmp/old')), codexPermissionKeys(codex.split('\\n').slice(0, 2).join('\\n'), ans('rm -f /tmp/old'))],
-      grok: [grokPermissionKeys(grok, ans('rm -f /tmp/very/long/path/that/wraps')), grokPermissionKeys(grok, ans('rm -f /tmp/very/long/path/that/wraps', 'deny')), grokPermissionKeys(grok, ans('rm -f /tmp/old')), grokPermissionKeys(grok, { behavior: 'allow', input: {} })],
+      codex: cases.codex.map(([s, c, b]) => codexPermissionKeys(s, ans(c, b))),
+      grok: cases.grok.map(([s, c, b]) => grokPermissionKeys(s, ans(c, b))),
+      multiline: codexPermissionKeys(cases.codex[0][0], ans('rm -f /tmp/a\\nrm -rf ~', 'allow')),
     }))`
   const out = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, SQUADRA_HOST_DIR: join(dir, 'host') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }))
   try {
-    // The prompt's own call: yes or no. Another call (one shown above the
-    // prompt), no prompt, or nothing to compare: nothing is typed.
-    assert.deepEqual(out.codex, [['y'], ['Escape'], null, null])
-    assert.deepEqual(out.grok, [['3'], ['4'], null, null])
+    assert.deepEqual(out.codex, [['y'], ['Escape'], null, null, null, null, null, null])
+    assert.deepEqual(out.grok, [['3'], ['4'], null, null, null])
+    assert.equal(out.multiline, null)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

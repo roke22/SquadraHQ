@@ -1117,6 +1117,16 @@ async function prepareSession(s, settings) {
   if (st?.version && olderVersion(st.version, VERSION)) {
     throw new Error(`the Squadra plugin on this machine is ${plain(st.version)}, older than this squadra-host (${VERSION}): run "${cli()} plugin" there, then open the session again`)
   }
+  checkPluginState(s)
+  // The persona, looked up again in the folder now (it may have changed since
+  // the dashboard listed it).
+  s.personaInfo = s.persona ? findPersona(s.folder, s.persona, s.role) : null
+  return claude
+}
+
+// Where the plugin keeps its state and which server it talks to, checked
+// before any session opens, whatever its agent (they all run this plugin).
+function checkPluginState(s) {
   // The plugin ignores a CLAUDE_CONFIG_DIR inside the highest folder above the
   // session's folder that doesn't contain the home (a repository could plant
   // one): it would never find what is written here. Said now, not silently.
@@ -1137,10 +1147,6 @@ async function prepareSession(s, settings) {
   if (s.identity && CREDS_SERVER && origin(pluginServerUrl()) !== origin(CREDS_SERVER)) {
     throw new Error(`the Squadra plugin on this machine is configured for ${pluginServerUrl() ?? 'no server'}, but this machine belongs to ${CREDS_SERVER}: set SQUADRA_URL=${CREDS_SERVER} in ${join(claudeHome(), 'channels', 'squadra', '.env')}`)
   }
-  // The persona, looked up again in the folder now (it may have changed since
-  // the dashboard listed it).
-  s.personaInfo = s.persona ? findPersona(s.folder, s.persona, s.role) : null
-  return claude
 }
 
 // What a session's process is started with, besides what is Squadra's.
@@ -1254,6 +1260,7 @@ const claudeCode = {
     status: pluginStatus,
     ensure: ensurePlugin,
     commands: PLUGIN_COMMANDS,
+    checkState: checkPluginState,
     serverUrl: pluginServerUrl,
     stateDir: pluginStateDir,
     acceptPlainHttp: acceptPlainHttpInPlugin,
@@ -1368,6 +1375,8 @@ async function ensureGrokPlugin({ update = false } = {}) {
 async function prepareTyped(a, s) {
   const program = typedProgram(a.command(loadSettings()))
   if (!program) throw new Error(`${a.name} ("${a.command(loadSettings())}") was not found on this machine`)
+  // The same plugin as Claude Code's: the same rules for its state and server.
+  claudeCode.plugin.checkState(s)
   // The persona, looked up again in the folder now; its text goes in as
   // instructions (see personaArg).
   s.personaInfo = s.persona ? claudeCode.findPersona(s.folder, s.persona, s.role, { toolsApply: false }) : null
@@ -1496,6 +1505,10 @@ async function typeWaiting(t, a) {
 // after two minutes (it was answered in the terminal, or another came).
 const ANSWER_RE = /^\d{14}-[a-km-z]{5}\.json$/
 const ANSWER_KEEP_MS = 2 * 60_000
+// Answers whose prompt was not on screen at the last look (file -> true): one
+// more look a second later, then dropped (it was answered in the terminal, or
+// another prompt replaced it: an answer never waits for a later prompt).
+const answerMissed = new Set()
 async function typePermissionAnswers(t, a, target) {
   const dir = join(claudeCode.plugin.stateDir(t.id), 'permission-answers')
   let files
@@ -1506,40 +1519,55 @@ async function typePermissionAnswers(t, a, target) {
     // (A session can write there: only small plain files are read.)
     try { const st = lstatSync(file); if (st.isFile() && st.size <= 64 * 1024) ans = JSON.parse(readFileSync(file, 'utf8')) } catch {}
     const age = Date.now() - Number(f.slice(0, 14))
-    if (!ans || typeof ans !== 'object' || age > ANSWER_KEEP_MS || age < -60_000) {
+    const keys = ans && typeof ans === 'object' && age <= ANSWER_KEEP_MS && age >= -60_000 ? a.permissionKeys(await screenOf(target), ans) : null
+    if (!keys) {
+      if (ans && typeof ans === 'object' && age <= ANSWER_KEEP_MS && !answerMissed.has(file)) { answerMissed.add(file); continue }
+      answerMissed.delete(file)
       rmSync(file, { force: true })
-      if (ans) log(`the answer to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" was not typed: that prompt is no longer on its screen`)
+      if (ans) log(`the answer to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" was not typed: its prompt is not on the screen, or shows its call over several lines (answer it there)`)
       continue
     }
-    const keys = a.permissionKeys(await screenOf(target), ans)
-    if (!keys) continue
+    answerMissed.delete(file)
     for (const k of keys) await tmux(['send-keys', '-t', target, k])
     rmSync(file, { force: true })
     log(`typed "${ans.behavior === 'allow' ? 'yes' : 'no'}" to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" (${a.name})`)
   }
 }
 
-// Whether a prompt's text shows the call an answer is for: a command (its
-// first 60 characters) or the file it changes, spaces and box lines aside.
-function promptShows(text, ans) {
+// Whether the prompt's own call line shows exactly the call an answer is for:
+// the whole command, or the file it changes, spaces included (only blanks at
+// the ends aside). Never the reason or description around it, which the agent
+// writes. A call over several lines (its own, or the terminal's wrapping) is
+// never matched: "./build/*" and "./build/ *" could look the same wrapped.
+function promptShows(callLines, ans) {
   const i = ans.input && typeof ans.input === 'object' ? ans.input : {}
   const what = typeof i.command === 'string' ? i.command : [i.file_path, i.path, i.notebook_path].find(v => typeof v === 'string')
-  const needle = typeof what === 'string' ? what.replace(/\s+/g, '').slice(0, 60) : ''
-  return needle.length >= 2 && text.replace(/[\s│┃]+/g, '').includes(needle)
+  if (typeof what !== 'string' || !what.trim() || /[\r\n]/.test(what) || callLines.length !== 1) return false
+  return callLines[0].trim() === what.trim()
 }
 
 // The keys that answer the prompt on screen, if it is the one asked about.
-// Codex: "Would you like to run …?" (y: yes; Esc: no). Grok: numbered options
-// in a box (the number picks and confirms).
+// Codex: "Would you like to run …?" with the call on its "$ " line (y: yes;
+// Esc: no). Grok: numbered options in a box, the call on its "│" lines (the
+// number picks and confirms).
 export function codexPermissionKeys(screen, ans) {
   const at = screen.lastIndexOf('Would you like to')
-  if (at < 0 || !/Press enter to confirm/i.test(screen.slice(at)) || !promptShows(screen.slice(at), ans)) return null
+  if (at < 0 || !/Press enter to confirm/i.test(screen.slice(at))) return null
+  const lines = screen.slice(at).split('\n')
+  const start = lines.findIndex(l => /^\s*\$ /.test(l))
+  if (start < 0) return null
+  const end = lines.findIndex((l, k) => k > start && /^\s*›?\s*\d+\. /.test(l))
+  if (end < 0) return null
+  const call = lines.slice(start, end).map((l, k) => k === 0 ? l.replace(/^\s*\$ /, '') : l)
+  if (!promptShows(call, ans)) return null
   return ans.behavior === 'allow' ? ['y'] : ['Escape']
 }
 export function grokPermissionKeys(screen, ans) {
-  const box = screen.split('\n').filter(l => /^\s*┃/.test(l)).join('\n')
-  const yes = /(\d) \([○●]\) Yes, proceed/.exec(box), no = /(\d) \([○●]\) No, reject/.exec(box)
-  if (!yes || !no || !promptShows(box, ans)) return null
+  const box = screen.split('\n').filter(l => /^\s*┃/.test(l))
+  const text = box.join('\n')
+  const yes = /(\d) \([○●]\) Yes, proceed/.exec(text), no = /(\d) \([○●]\) No, reject/.exec(text)
+  const call = box.filter(l => /^\s*┃\s*│ /.test(l)).map(l => l.replace(/^\s*┃\s*│ /, ''))
+  if (!yes || !no || !promptShows(call, ans)) return null
   return [ans.behavior === 'allow' ? yes[1] : no[1]]
 }
 
@@ -1792,12 +1820,15 @@ async function setLinks(name, coordinators) {
 // A worker the dashboard opened for a coordinator this machine started: its
 // plugin approves it as /squadra:access pair does, from a file left in its own
 // private folder (like links.json; only a session this machine started reads it).
-async function approveWorker(coordinator, worker) {
+// identity: the registration of that worker the dashboard opened (the
+// coordinator pins it), when the server says.
+async function approveWorker(coordinator, worker, identity) {
   if (!NAME_RE.test(String(coordinator)) || !NAME_RE.test(String(worker)) || coordinator === worker) throw new Error('invalid session')
+  if (identity != null && !(typeof identity === 'string' && /^[0-9a-f]{16,64}$/.test(identity))) throw new Error('invalid identity')
   const t = (await listTerminals()).find(x => x.id === coordinator)
   if (!t) throw new Error('no such session on this machine')
   if (t.role !== 'coordinator') throw new Error('only a coordinator approves workers')
-  writePrivate(join(claudeCode.plugin.stateDir(coordinator), 'dashboard-approved'), worker, { worker, at: Date.now() })
+  writePrivate(join(claudeCode.plugin.stateDir(coordinator), 'dashboard-approved'), worker, { worker, at: Date.now(), ...(identity ? { identity } : {}) })
   log(`"${plain(worker)}" approved for "${plain(coordinator)}" from the dashboard`)
   return { approved: worker }
 }
@@ -2188,7 +2219,7 @@ async function connect(creds) {
     // The user answered from their inbox a question this coordinator asked.
     async answer(m) { return answerSession(m.term, m.text) },
     // A worker opened from the dashboard for a coordinator running here.
-    async approve(m) { return approveWorker(m.term, m.worker) },
+    async approve(m) { return approveWorker(m.term, m.worker, m.identity) },
     // The dashboard adds or removes an allowed folder: the same checks as
     // here, unless this machine keeps its folders to itself.
     async folders(m) {

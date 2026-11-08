@@ -36,6 +36,20 @@ export function createInbox(platform, { sessions }) {
     return text
   }
 
+  // Each question belongs to the registration of its coordinator that wrote it,
+  // not to the name: a name deleted and registered again by someone else
+  // neither changes them nor gets the user's answers.
+  const epochOf = name => db.prepare('SELECT epoch FROM identities WHERE name = ?').get(name)?.epoch ?? null
+  const ownedNow = row => row.epoch != null && row.epoch === epochOf(row.session)
+  const GONE = 'its coordinator no longer exists'
+  // Open questions whose coordinator is gone (deleted, or registered again): closed.
+  function closeOrphans(name = null) {
+    const changes = db.prepare(`UPDATE inbox SET resolved_at = ?, closed_reason = ? WHERE resolved_at IS NULL ${name ? 'AND session = ?' : ''}
+      AND (epoch IS NULL OR epoch IS NOT (SELECT epoch FROM identities WHERE name = inbox.session))`).run(now(), GONE, ...(name ? [name] : [])).changes
+    if (changes) broadcast('inbox', list())
+    return changes
+  }
+
   // Only who leads a squad, and has been approved to: nobody else speaks for it.
   function checkWriter(name) {
     const row = db.prepare('SELECT role, needs_approval FROM identities WHERE name = ?').get(name)
@@ -65,8 +79,8 @@ export function createInbox(platform, { sessions }) {
     const f = fields(p, kind)
     if (!allow('inbox', name, PER_HOUR, 3600_000)) throw new ApiError(429, `Too Many Requests: at most ${PER_HOUR} an hour`)
     spendStorage('text', name, f.text.length + f.options.join('').length)
-    const info = db.prepare('INSERT INTO inbox (session, kind, text, options, recommended, ref, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(name, kind, f.text, f.options.length ? JSON.stringify(f.options) : null, f.recommended, f.ref, now())
+    const info = db.prepare('INSERT INTO inbox (session, kind, text, options, recommended, ref, created_at, epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(name, kind, f.text, f.options.length ? JSON.stringify(f.options) : null, f.recommended, f.ref, now(), epochOf(name))
     broadcast('inbox', list())
     return { id: Number(info.lastInsertRowid) }
   }
@@ -78,7 +92,7 @@ export function createInbox(platform, { sessions }) {
     checkWriter(name)
     const id = Number(p.id)
     const row = Number.isSafeInteger(id) ? db.prepare('SELECT * FROM inbox WHERE id = ? AND session = ?').get(id, name) : null
-    if (!row) throw bad(`nothing of yours in the user's inbox with id ${p.id}`)
+    if (!row || !ownedNow(row)) throw bad(`nothing of yours in the user's inbox with id ${p.id}`)
     if (row.resolved_at) throw bad(`#${id} is no longer open (${row.answer != null ? 'the user answered it' : row.dismissed_by ? 'the user dismissed it without answering: don\'t wait for an answer' : 'it was closed'}): if you still need something, ask again`)
     if (!allow('inbox-edit', name, EDITS_PER_HOUR, 3600_000)) throw new ApiError(429, `Too Many Requests: at most ${EDITS_PER_HOUR} changes an hour`)
     if (p.close != null) {
@@ -114,6 +128,7 @@ export function createInbox(platform, { sessions }) {
   function dismiss(id, by) {
     const row = Number.isSafeInteger(id) ? db.prepare('SELECT * FROM inbox WHERE id = ?').get(id) : null
     if (!row || row.kind !== 'ask') throw bad('no question with that id')
+    if (!row.resolved_at && !ownedNow(row)) { closeOrphans(row.session); throw new ApiError(409, `Conflict: ${GONE}: it was closed`, { parameters: { reason: 'closed' } }) }
     if (!db.prepare('UPDATE inbox SET resolved_at = ?, dismissed_by = ? WHERE id = ? AND resolved_at IS NULL').run(now(), by, id).changes) {
       throw new ApiError(409, 'Conflict: it is no longer open', { parameters: { reason: 'closed' } })
     }
@@ -130,6 +145,7 @@ export function createInbox(platform, { sessions }) {
     const row = Number.isSafeInteger(id) ? db.prepare('SELECT * FROM inbox WHERE id = ?').get(id) : null
     if (!row || row.kind !== 'ask') throw bad('no question with that id')
     if (row.resolved_at) throw new ApiError(409, 'Conflict: it is no longer open', { parameters: { reason: 'closed' } })
+    if (!ownedNow(row)) { closeOrphans(row.session); throw new ApiError(409, `Conflict: ${GONE}: it was closed`, { parameters: { reason: 'closed' } }) }
     if (Number(p.version) !== row.version) throw new ApiError(409, 'Conflict: its coordinator changed it after you read it: read it again before answering', { parameters: { reason: 'changed', version: row.version } })
     const answer = short(p.answer, MAX_ANSWER, 'the answer')
     if (!answer) throw bad('the answer is empty')
@@ -145,6 +161,7 @@ export function createInbox(platform, { sessions }) {
   }
 
   function cleanupInbox() {
+    closeOrphans()
     db.prepare('DELETE FROM inbox WHERE resolved_at < ?').run(now() - 30 * 24 * 3600_000)
     db.prepare('DELETE FROM inbox WHERE resolved_at IS NOT NULL AND id <= (SELECT id FROM inbox WHERE resolved_at IS NOT NULL ORDER BY id DESC LIMIT 1 OFFSET ?)').run(MAX_KEPT)
   }
@@ -154,5 +171,5 @@ export function createInbox(platform, { sessions }) {
     tellUser: (name, p) => add(name, 'tell', { text: p.text, ref: p.ref }),
     editInbox: (name, p) => edit(name, p),
   }
-  return { inboxMethods, list, resolve, dismiss, takeAnswer, giveBack, cleanupInbox }
+  return { inboxMethods, list, resolve, dismiss, takeAnswer, giveBack, cleanupInbox, closeOrphans }
 }
