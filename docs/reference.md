@@ -4,7 +4,7 @@
 
 <p align="center"><b>A coordinator agent that runs teams of Claude Code agents — fast, unattended, and visible live.</b></p>
 
-<p align="center"><a href="referencia.md">Leer en español</a> · v0.0.7</p>
+<p align="center"><a href="referencia.md">Leer en español</a> · v0.0.8</p>
 
 ---
 

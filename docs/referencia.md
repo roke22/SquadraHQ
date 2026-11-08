@@ -4,7 +4,7 @@
 
 <p align="center"><b>Un agente coordinador que dirige equipos de agentes de Claude Code: rápido, desatendido y a la vista en directo.</b></p>
 
-<p align="center"><a href="reference.md">Read in English</a> · v0.0.7</p>
+<p align="center"><a href="reference.md">Read in English</a> · v0.0.8</p>
 
 ---
 
