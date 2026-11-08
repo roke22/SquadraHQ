@@ -949,7 +949,12 @@ function personaPrompt(p) {
 // installed on this machine.
 
 const PLUGIN_ID = 'squadra@squadra'
-const PLUGIN_REPO = 'roke22/Squadra'
+const PLUGIN_REPO = 'roke22/SquadraHQ'
+// The repository's name until 0.0.8 (GitHub sends it on to the new one): a
+// marketplace added from it is this project's too, moved to the new name the
+// next time it is pinned.
+const OLD_REPOS = ['roke22/Squadra']
+const ourRepo = repo => [PLUGIN_REPO, ...OLD_REPOS].some(r => r.toLowerCase() === String(repo ?? '').toLowerCase())
 // The plugin version that goes with this program: a release tag, not whatever
 // the default branch holds today.
 const PLUGIN_MARKETPLACE = `${PLUGIN_REPO}#v${VERSION}`
@@ -962,7 +967,7 @@ async function checkMarketplace(cmd) {
   let list = []
   try { list = JSON.parse((await runClaude(cmd, ['plugin', 'marketplace', 'list', '--json'], { timeout: 30_000, cwd: HOME })).stdout) } catch { return null }
   const m = Array.isArray(list) ? list.find(x => x?.name === 'squadra') : null
-  if (m && String(m.repo ?? '').toLowerCase() !== PLUGIN_REPO.toLowerCase()) {
+  if (m && !ourRepo(m.repo)) {
     throw new Error(`a different marketplace named "squadra" is installed (${plain(m.repo ?? m.source ?? 'unknown source')}). Remove it with: claude plugin marketplace remove squadra`)
   }
   return m ?? null
@@ -977,7 +982,9 @@ async function pinMarketplace(cmd, opts) {
   const ref = String(m?.ref ?? '')
   // (A version tag in any spelling — v0.0.3, 0.0.3, V0.0.3-beta.1 — by its numbers.)
   const tag = /^v?(\d+(?:\.\d+)*)(?:-.*)?$/i.exec(ref)
-  if (!m || ref === `v${VERSION}` || (tag && !olderVersion(tag[1], VERSION))) return false
+  // (The repository's old name moves too, to this version's tag under the new one.)
+  const oldName = String(m?.repo ?? '').toLowerCase() !== PLUGIN_REPO.toLowerCase()
+  if (!m || (!oldName && (ref === `v${VERSION}` || (tag && !olderVersion(tag[1], VERSION))))) return false
   // Removing the marketplace uninstalls the plugin: first make sure the
   // release tag can be fetched, so a missing tag or no network changes nothing.
   // (SQUADRA_HOST_TEST_SKIP_TAG_CHECK=1: the test suite only.)
@@ -994,7 +1001,7 @@ async function pinMarketplace(cmd, opts) {
     await runClaude(cmd, ['plugin', 'marketplace', 'add', PLUGIN_MARKETPLACE], opts)
   } catch (err) {
     // (The one it had goes back, so the machine isn't left without the plugin.)
-    const before = `${PLUGIN_REPO}${m.ref ? `#${m.ref}` : ''}`
+    const before = `${m.repo || PLUGIN_REPO}${m.ref ? `#${m.ref}` : ''}`
     let restored = false
     try { await runClaude(cmd, ['plugin', 'marketplace', 'add', before], opts); await runClaude(cmd, ['plugin', 'install', PLUGIN_ID], opts); restored = true } catch {}
     throw new Error(`could not add ${PLUGIN_MARKETPLACE} (${err.message.split('\n')[0]}); ${restored ? `the marketplace was put back as ${before}` : `putting back ${before} failed too: run "claude plugin marketplace add ${before} && claude plugin install ${PLUGIN_ID}" once the network is back`}`)
@@ -1297,8 +1304,8 @@ async function typedVersion(cmd) {
 
 // Where the plugin comes from: this project's repository at this program's
 // release tag, never what the server says.
-const TYPED_REPO = 'roke22/Squadra'
-const ourSource = src => typeof src === 'string' && (isAbsolute(src) || src.toLowerCase().includes(TYPED_REPO.toLowerCase()))
+const TYPED_REPO = 'roke22/SquadraHQ'
+const ourSource = src => typeof src === 'string' && (isAbsolute(src) || [TYPED_REPO, 'roke22/Squadra'].some(r => src.toLowerCase().includes(r.toLowerCase())))
 
 // Codex's config folder.
 const codexHome = () => { const c = process.env.CODEX_HOME; return c && isAbsolute(c) ? c : join(HOME, '.codex') }

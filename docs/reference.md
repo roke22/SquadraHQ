@@ -151,7 +151,7 @@ SquadraHQ does not run on native Windows: squadra-host refuses to start there an
 ### 1. Start the server
 
 ```bash
-git clone https://github.com/roke22/Squadra.git squadra && cd squadra
+git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
 git checkout "$(git tag --sort=-v:refname | head -1)"   # the latest release
 node server/server.js
 ```
@@ -212,14 +212,14 @@ Sessions always connect *out* to the server, so their machines open no ports.
 On every machine where a coordinator or a worker will run. Inside `claude`:
 
 ```
-/plugin marketplace add roke22/Squadra
+/plugin marketplace add roke22/SquadraHQ
 /plugin install squadra@squadra
 ```
 
 Or from the terminal (handy on servers, in WSL or in scripts):
 
 ```bash
-claude plugin marketplace add roke22/Squadra
+claude plugin marketplace add roke22/SquadraHQ
 claude plugin install squadra@squadra
 ```
 
@@ -233,7 +233,7 @@ Then point it at your server, with the command the server printed at startup:
 - **Start Claude Code again afterwards.** The plugin reads its configuration when a session starts, and the SquadraHQ channel has to be enabled at launch anyway (next step).
 - **Machines added from the dashboard** get the plugin installed and configured by themselves when you enroll them (with the server address; the join token only if you tick that option).
 - **Claude Code runs the plugin with `node`,** so Node 22.13 or later must be on the `PATH` Claude Code sees.
-- To use a local copy of this repository instead, pass its path to `marketplace add` (not on machines run by squadra-host, which only accept the roke22/Squadra marketplace).
+- To use a local copy of this repository instead, pass its path to `marketplace add` (not on machines run by squadra-host, which only accept the roke22/SquadraHQ marketplace).
 
 **Updating:** `claude plugin marketplace update squadra && claude plugin update squadra@squadra`, then restart the sessions.
 
@@ -408,7 +408,7 @@ A coordinator keeps its **plan** with `update_plan`: the tasks it is working thr
 
 A session opened from the dashboard can run [Codex CLI](https://github.com/openai/codex) or [Grok CLI](https://x.ai/cli) instead of Claude Code, as a worker or as a coordinator. The machine must have that agent (ticked in **Add machine**, or installed by you; squadra-host finds it on the `PATH` when it starts), and the dashboard marks every session with its agent: **A** Claude Code, **O** Codex CLI, **X** Grok CLI.
 
-- **The same plugin.** squadra-host installs the SquadraHQ plugin into each agent with the agent's own plugin commands, from the release tag of this squadra-host (`codex plugin marketplace add roke22/Squadra --ref v<version>` and `codex plugin add squadra@squadra`; `grok plugin install roke22/Squadra@v<version>#plugins/squadra --trust`), and updates it with `squadra-host plugin`. The rules, tools, reports, inbox and plan are the same.
+- **The same plugin.** squadra-host installs the SquadraHQ plugin into each agent with the agent's own plugin commands, from the release tag of this squadra-host (`codex plugin marketplace add roke22/SquadraHQ --ref v<version>` and `codex plugin add squadra@squadra`; `grok plugin install roke22/SquadraHQ@v<version>#plugins/squadra --trust`), and updates it with `squadra-host plugin`. The rules, tools, reports, inbox and plan are the same.
 - **Messages are typed between turns.** Neither agent has Channels: the plugin leaves each message in the session's state folder (`pending-input/`), and squadra-host pastes it into its terminal, as the same `<channel>` block Claude Code shows, once the agent waits for input. A message to a busy session waits for the end of its turn. The agent is told to end its turn once it has sent what it had to send, and each Squadra tool's answer says when messages are waiting for it.
 - **Permission prompts:** Codex CLI's `PermissionRequest` hook, and Grok CLI's `permission_prompt` notification with the call that has just started, send the call's exact input to its coordinator as a usual request. An answer is typed into the terminal (`y` or Esc for Codex, the option's number for Grok) only while the prompt shows exactly that command, or that file, on one line; a call that is long, spans several lines or names no command or file is only announced, to be answered in the terminal. A request is withdrawn once its call ran or failed, and an answer not typed within two minutes is dropped.
 - **Its tools need no approval:** Codex CLI is given the plugin's server with `-c mcp_servers.squadra.*` (the agent doesn't expand the plugin's own path in it) with its tools approved, and Grok CLI is started with `--allow 'MCPTool(squadra__*)'`. A Grok session isn't opened where the project defines its own MCP server named `squadra` (`.mcp.json`, `.grok/config.toml` or `.cursor/mcp.json`, up to the git root): Grok would run that one instead of the plugin's.

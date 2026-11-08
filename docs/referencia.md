@@ -151,7 +151,7 @@ SquadraHQ no funciona en Windows nativo: squadra-host se niega a arrancar y el p
 ### 1. Arrancar el servidor
 
 ```bash
-git clone https://github.com/roke22/Squadra.git squadra && cd squadra
+git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
 git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
 node server/server.js
 ```
@@ -212,14 +212,14 @@ Las sesiones siempre se conectan *hacia* el servidor, así que sus máquinas no 
 En cada máquina donde vaya a correr un coordinador o un worker. Dentro de `claude`:
 
 ```
-/plugin marketplace add roke22/Squadra
+/plugin marketplace add roke22/SquadraHQ
 /plugin install squadra@squadra
 ```
 
 O desde el terminal (útil en servidores, en WSL o en scripts):
 
 ```bash
-claude plugin marketplace add roke22/Squadra
+claude plugin marketplace add roke22/SquadraHQ
 claude plugin install squadra@squadra
 ```
 
@@ -233,7 +233,7 @@ Después apúntalo a tu servidor, con el comando que el servidor mostró al arra
 - **Vuelve a arrancar Claude Code después.** El plugin lee su configuración al empezar la sesión y, de todas formas, el channel de SquadraHQ se activa al arrancar (siguiente paso).
 - **Las máquinas añadidas desde el panel** instalan y configuran el plugin solas al darlas de alta (con la dirección del servidor; el token de alta solo si marcas esa opción).
 - **Claude Code ejecuta el plugin con `node`,** así que Node 22.13 o posterior tiene que estar en el `PATH` que ve Claude Code.
-- Para usar una copia local de este repositorio, pasa su ruta a `marketplace add` (no en máquinas con squadra-host, que solo aceptan el marketplace roke22/Squadra).
+- Para usar una copia local de este repositorio, pasa su ruta a `marketplace add` (no en máquinas con squadra-host, que solo aceptan el marketplace roke22/SquadraHQ).
 
 **Actualizar:** `claude plugin marketplace update squadra && claude plugin update squadra@squadra`, y reinicia las sesiones.
 
@@ -408,7 +408,7 @@ Un coordinador lleva su **plan** con `update_plan`: las tareas en las que trabaj
 
 Una sesión abierta desde el panel puede usar [Codex CLI](https://github.com/openai/codex) o [Grok CLI](https://x.ai/cli) en lugar de Claude Code, como worker o como coordinador. La máquina tiene que tener ese agente (marcado en **Añadir máquina**, o instalado por ti; squadra-host lo busca en el `PATH` al arrancar), y el panel marca cada sesión con su agente: **A** Claude Code, **O** Codex CLI, **X** Grok CLI.
 
-- **El mismo plugin.** squadra-host instala el plugin de SquadraHQ en cada agente con los comandos de plugins del propio agente, desde la etiqueta de versión de este squadra-host (`codex plugin marketplace add roke22/Squadra --ref v<versión>` y `codex plugin add squadra@squadra`; `grok plugin install roke22/Squadra@v<versión>#plugins/squadra --trust`), y lo actualiza con `squadra-host plugin`. Las reglas, herramientas, informes, bandeja y plan son los mismos.
+- **El mismo plugin.** squadra-host instala el plugin de SquadraHQ en cada agente con los comandos de plugins del propio agente, desde la etiqueta de versión de este squadra-host (`codex plugin marketplace add roke22/SquadraHQ --ref v<versión>` y `codex plugin add squadra@squadra`; `grok plugin install roke22/SquadraHQ@v<versión>#plugins/squadra --trust`), y lo actualiza con `squadra-host plugin`. Las reglas, herramientas, informes, bandeja y plan son los mismos.
 - **Los mensajes se teclean entre turno y turno.** Ninguno de los dos tiene Channels: el plugin deja cada mensaje en la carpeta de estado de la sesión (`pending-input/`), y squadra-host lo pega en su terminal, como el mismo bloque `<channel>` que muestra Claude Code, cuando el agente espera una orden. Un mensaje a una sesión ocupada espera a que termine su turno. Al agente se le dice que termine su turno cuando haya enviado lo que tenía que enviar, y la respuesta de cada herramienta de Squadra le avisa cuando tiene mensajes esperando.
 - **Permisos:** el hook `PermissionRequest` de Codex CLI, y el aviso `permission_prompt` de Grok CLI con la llamada que acaba de empezar, mandan a su coordinador la entrada exacta de la llamada como una petición normal. La respuesta se teclea en la terminal (`y` o Esc en Codex, el número de la opción en Grok) solo mientras el diálogo muestra exactamente ese comando, o ese fichero, en una línea; una llamada larga, de varias líneas o que no nombra un comando ni un fichero solo se avisa, y se responde en la terminal. Una petición se retira cuando su llamada se ha ejecutado o ha fallado, y una respuesta que no se ha podido teclear en dos minutos se descarta.
 - **Sus herramientas no piden aprobación:** a Codex CLI se le da el servidor del plugin con `-c mcp_servers.squadra.*` (el agente no expande en él la ruta del propio plugin) con sus herramientas aprobadas, y Grok CLI arranca con `--allow 'MCPTool(squadra__*)'`. No se abre una sesión de Grok donde el proyecto define su propio servidor MCP llamado `squadra` (`.mcp.json`, `.grok/config.toml` o `.cursor/mcp.json`, hasta la raíz de git): Grok usaría ese en lugar del del plugin.

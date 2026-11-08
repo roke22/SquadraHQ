@@ -221,7 +221,7 @@ export function createMachines(platform, { sessions, observation }) {
       sha256: sha,
       server_key: SERVER_KEY.hash,
       // The Squadra plugin release that goes with this server (squadra-host pins the same one).
-      plugin_command: `claude plugin marketplace add roke22/Squadra#v${VERSION} && claude plugin install squadra@squadra`,
+      plugin_command: `claude plugin marketplace add roke22/SquadraHQ#v${VERSION} && claude plugin install squadra@squadra`,
       // One command per system: the installer prepares the machine (tmux, Node,
       // Claude Code) and runs squadra-host with this code. (Windows: inside WSL.)
       install: {

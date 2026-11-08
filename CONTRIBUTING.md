@@ -4,14 +4,14 @@ Thanks for helping. Squadra is small on purpose: one Node.js server with no depe
 
 ## Before you start
 
-- **Bugs:** open an [issue](https://github.com/roke22/Squadra/issues/new/choose) with the bug template. Include your OS, Node version, how you run the server (node or Docker) and the relevant lines of `squadra-server` or `squadra-host` output.
-- **Ideas:** open an issue with the feature template, or start a [discussion](https://github.com/roke22/Squadra/discussions) if it is still vague.
+- **Bugs:** open an [issue](https://github.com/roke22/SquadraHQ/issues/new/choose) with the bug template. Include your OS, Node version, how you run the server (node or Docker) and the relevant lines of `squadra-server` or `squadra-host` output.
+- **Ideas:** open an issue with the feature template, or start a [discussion](https://github.com/roke22/SquadraHQ/discussions) if it is still vague.
 - **Security:** do not open a public issue. Email the address on the [GitHub profile](https://github.com/roke22) instead.
 
 ## Running it locally
 
 ```bash
-git clone https://github.com/roke22/Squadra.git squadra && cd squadra
+git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
 node server/server.js            # dashboard at http://127.0.0.1:7787
 npm test                         # module rules, end-to-end, host, security and upgrade tests (needs tmux)
 npm install && npm run test:ui   # the dashboard in a browser (uses your Chrome)

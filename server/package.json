@@ -15,8 +15,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roke22/Squadra.git",
+    "url": "git+https://github.com/roke22/SquadraHQ.git",
     "directory": "server"
   },
-  "homepage": "https://github.com/roke22/Squadra"
+  "homepage": "https://github.com/roke22/SquadraHQ"
 }

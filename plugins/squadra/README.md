@@ -9,7 +9,7 @@ Lets Claude Code sessions message each other through a `squadra-server`, with on
 Install (inside Claude Code):
 
 ```
-/plugin marketplace add roke22/Squadra   # or a local path to this repo
+/plugin marketplace add roke22/SquadraHQ   # or a local path to this repo
 /plugin install squadra@squadra
 ```
 

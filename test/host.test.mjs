@@ -177,11 +177,11 @@ test('a machine enrolls with a one-time code and connects', { skip: !hasTmux && 
 
   // The Squadra plugin was installed in Claude Code, from its fixed marketplace.
   const calls = readFileSync(pluginCalls, 'utf8')
-  assert.match(calls, /plugin marketplace add roke22\/Squadra/)
+  assert.match(calls, /plugin marketplace add roke22\/SquadraHQ#/)
   assert.match(calls, /plugin install squadra@squadra/)
   assert.deepEqual(h.info.plugin, { installed: true, enabled: true, version: VERSION })
   // Pinned to this program's release tag.
-  assert.equal(readFileSync(marketplaceFile, 'utf8').trim(), `roke22/Squadra#v${VERSION}`)
+  assert.equal(readFileSync(marketplaceFile, 'utf8').trim(), `roke22/SquadraHQ#v${VERSION}`)
 
   // Credential saved with private permissions; the plugin configured.
   const creds = JSON.parse(readFileSync(join(hostDir, 'credentials.json'), 'utf8'))
@@ -362,7 +362,8 @@ test('without the Squadra plugin, the machine refuses to open sessions', { skip:
 })
 
 test('squadra-host plugin re-pins a marketplace that follows the default branch', { skip: !hasTmux && 'tmux not installed' }, async () => {
-  // As if the user had added it by hand, without a version.
+  // As if the user had added it by hand, without a version, under the
+  // repository's old name (it moves to the new one).
   writeFileSync(marketplaceFile, 'roke22/Squadra\n')
   writeFileSync(pluginState, '')
   writeFileSync(pluginCalls, '')
@@ -372,9 +373,9 @@ test('squadra-host plugin re-pins a marketplace that follows the default branch'
   })
   const calls = readFileSync(pluginCalls, 'utf8')
   assert.match(calls, /plugin marketplace remove squadra/)
-  assert.ok(calls.includes(`plugin marketplace add roke22/Squadra#v${VERSION}`), calls)
+  assert.ok(calls.includes(`plugin marketplace add roke22/SquadraHQ#v${VERSION}`), calls)
   assert.match(calls, /plugin install squadra@squadra/)
-  assert.equal(readFileSync(marketplaceFile, 'utf8').trim(), `roke22/Squadra#v${VERSION}`)
+  assert.equal(readFileSync(marketplaceFile, 'utf8').trim(), `roke22/SquadraHQ#v${VERSION}`)
   assert.ok(existsSync(pluginState), 'plugin installed again')
   // Already pinned: nothing is removed the next time.
   writeFileSync(pluginCalls, '')

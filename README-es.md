@@ -5,15 +5,15 @@
 <p align="center"><b>Un agente coordinador que dirige equipos de agentes de Claude Code: rápido, desatendido y a la vista en directo.</b></p>
 
 <p align="center">
-  <a href="https://github.com/roke22/Squadra/releases"><img src="https://img.shields.io/github/v/release/roke22/Squadra?label=release&color=C15F3C" alt="Última versión"></a>
-  <a href="https://github.com/roke22/Squadra/actions/workflows/test.yml"><img src="https://github.com/roke22/Squadra/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/roke22/SquadraHQ/releases"><img src="https://img.shields.io/github/v/release/roke22/SquadraHQ?label=release&color=C15F3C" alt="Última versión"></a>
+  <a href="https://github.com/roke22/SquadraHQ/actions/workflows/test.yml"><img src="https://github.com/roke22/SquadraHQ/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="Licencia MIT"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white" alt="Node.js 22+">
   <img src="https://img.shields.io/badge/server%20dependencies-0-success" alt="El servidor no tiene dependencias">
-  <a href="https://github.com/roke22/Squadra/stargazers"><img src="https://img.shields.io/github/stars/roke22/Squadra?style=social" alt="Estrellas en GitHub"></a>
+  <a href="https://github.com/roke22/SquadraHQ/stargazers"><img src="https://img.shields.io/github/stars/roke22/SquadraHQ?style=social" alt="Estrellas en GitHub"></a>
 </p>
 
-<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/Squadra/">Web</a> · <a href="https://roke22.github.io/Squadra/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/Squadra/discussions">Discussions</a> · v0.0.7</p>
+<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/SquadraHQ/">Web</a> · <a href="https://roke22.github.io/SquadraHQ/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a> · v0.0.7</p>
 
 ---
 
@@ -30,7 +30,7 @@ SquadraHQ es **orquestación multiagente para Claude Code**: varias sesiones de 
 ## Inicio rápido
 
 ```bash
-git clone https://github.com/roke22/Squadra.git squadra && cd squadra
+git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
 git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
 node server/server.js          # panel en http://127.0.0.1:7787
 ```
@@ -132,7 +132,7 @@ En los ordenadores donde trabajan los agentes se instala todo lo demás solo, al
 ## 1. Instala el panel
 
 ```bash
-git clone https://github.com/roke22/Squadra.git squadra && cd squadra
+git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
 git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
 node server/server.js
 ```
@@ -187,7 +187,7 @@ Después:
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-es.jpg"><img src="docs/screenshots/org-chart-light-es.jpg" alt="El organigrama de SquadraHQ: los equipos de Desarrollo, QA y Contenidos, cada coordinador con sus workers" width="1440"></picture>
 
-Los **[ejemplos](https://roke22.github.io/Squadra/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
+Los **[ejemplos](https://roke22.github.io/SquadraHQ/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
 
 ## Buenos consejos
 
@@ -234,13 +234,13 @@ Los Channels son la función de Claude Code que entrega mensajes dentro de una s
 
 ## Saber más
 
-- [Ejemplos](https://roke22.github.io/Squadra/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
+- [Ejemplos](https://roke22.github.io/SquadraHQ/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
 - [docs/referencia.md](docs/referencia.md): configurar agentes a mano sin el panel, todas las opciones del servidor y cómo funciona todo por dentro.
 - [PLAN.md](PLAN.md): la guía técnica completa.
 
 ## Contribuir
 
-Los errores y las ideas van a [Issues](https://github.com/roke22/Squadra/issues); las preguntas y lo que hayas montado con SquadraHQ, a [Discussions](https://github.com/roke22/Squadra/discussions). En [CONTRIBUTING.md](CONTRIBUTING.md) está cómo ejecutar los tests y enviar un pull request. Si SquadraHQ te resulta útil, una estrella en GitHub ayuda a que lo encuentre más gente.
+Los errores y las ideas van a [Issues](https://github.com/roke22/SquadraHQ/issues); las preguntas y lo que hayas montado con SquadraHQ, a [Discussions](https://github.com/roke22/SquadraHQ/discussions). En [CONTRIBUTING.md](CONTRIBUTING.md) está cómo ejecutar los tests y enviar un pull request. Si SquadraHQ te resulta útil, una estrella en GitHub ayuda a que lo encuentre más gente.
 
 ## Licencia
 

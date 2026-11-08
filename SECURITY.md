@@ -4,7 +4,7 @@ Squadra relays messages between Claude Code sessions and exposes a web dashboard
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue. Use [GitHub private vulnerability reporting](https://github.com/roke22/Squadra/security/advisories/new) or email the address on the [maintainer's profile](https://github.com/roke22). You will get an answer within a few days, and a fix in a release before any public disclosure.
+Please do **not** open a public issue. Use [GitHub private vulnerability reporting](https://github.com/roke22/SquadraHQ/security/advisories/new) or email the address on the [maintainer's profile](https://github.com/roke22). You will get an answer within a few days, and a fix in a release before any public disclosure.
 
 ## Supported versions
 
