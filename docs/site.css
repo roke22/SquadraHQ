@@ -60,6 +60,14 @@ code { font-family: var(--mono); font-size: .88em; background: var(--raised); pa
 .hero .lead { max-width: 720px; margin: 0 auto 34px; font-size: clamp(18px, 2.2vw, 22px); line-height: 1.5; color: var(--muted); text-wrap: pretty; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 .note { margin: 18px 0 0; font-size: 14px; color: var(--muted); }
+.agents { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 12px; margin: 26px auto 0; font-size: 14.5px; color: var(--muted); }
+.agents > span:first-child { margin-right: 2px; }
+.agents .ag { display: inline-flex; align-items: center; gap: 9px; padding: 6px 12px 6px 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text); font-weight: 550; }
+.agents .ag small { font-size: 12px; font-weight: 500; color: var(--muted); }
+/* The dashboard's own marks for each agent (not the labs' logos). */
+.mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; font: 700 13px/1 var(--sans); color: #fff; }
+.mark.claude { background: #b8664a; } .mark.codex { background: #14805f; } .mark.grok { background: #4a5260; }
+@media (prefers-color-scheme: dark) { .mark.claude { background: #c7785b; } .mark.grok { background: #6b7482; } }
 
 /* A screenshot in a window, in the reader's theme. */
 .window { margin: 56px auto 0; border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
