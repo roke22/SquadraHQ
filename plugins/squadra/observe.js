@@ -555,7 +555,10 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
     try {
       if (event === 'PermissionRequest' && !input.agent_id) { askedAt = Date.now(); onPermissionAsk(String(input.tool_name ?? ''), input.tool_input ?? null) }
       else if (event === 'Notification' && input.notification_type === 'permission_prompt') {
-        const calls = [...running.values()]
+        // (Grok runs the PreToolUse hook to its end before it asks, so the call
+        // asked about has just started: an older one still running, e.g. in
+        // the background, is not it, nor one whose hook didn't get here.)
+        const calls = [...running.values()].filter(c => Date.now() - c.at < 10_000)
         // (An agent with both says it twice, in either order: the hook's, with the call, counts.)
         const at = Date.now()
         setTimeout(() => {

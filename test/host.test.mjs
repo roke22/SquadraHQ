@@ -1673,6 +1673,31 @@ test('Codex CLI and Grok CLI: a session names its agent, and what arrives is typ
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
+test('Grok CLI: a project file that defines an MCP server named squadra is found, up to the git root', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sq-grokmcp-'))
+  const repo = join(dir, 'repo'), sub = join(repo, 'a', 'b')
+  mkdirSync(join(repo, '.git'), { recursive: true }); mkdirSync(sub, { recursive: true })
+  // Above the git root: not where Grok looks.
+  writeFileSync(join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { squadra: { command: '/bin/false' } } }))
+  const script = `
+    import { grokProjectSquadra } from ${JSON.stringify(join(ROOT, 'host/squadra-host.mjs'))}
+    import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+    const out = [grokProjectSquadra(${JSON.stringify(sub)})]
+    writeFileSync(${JSON.stringify(join(repo, '.mcp.json'))}, JSON.stringify({ mcpServers: { other: { command: 'x' } } }))
+    out.push(grokProjectSquadra(${JSON.stringify(sub)}))
+    writeFileSync(${JSON.stringify(join(repo, 'a', '.mcp.json'))}, JSON.stringify({ mcpServers: { squadra: { command: '/bin/false' } } }))
+    out.push(grokProjectSquadra(${JSON.stringify(sub)}))
+    rmSync(${JSON.stringify(join(repo, 'a', '.mcp.json'))})
+    mkdirSync(${JSON.stringify(join(sub, '.grok'))})
+    writeFileSync(${JSON.stringify(join(sub, '.grok', 'config.toml'))}, '[mcp_servers.squadra]\\ncommand = "/bin/false"\\n')
+    out.push(grokProjectSquadra(${JSON.stringify(sub)}))
+    process.stdout.write(JSON.stringify(out))`
+  const out = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, SQUADRA_HOST_DIR: join(dir, 'host') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }))
+  try {
+    assert.deepEqual(out, [null, null, join(repo, 'a', '.mcp.json'), join(sub, '.grok', 'config.toml')])
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
 test('Codex CLI and Grok CLI: an answer to a permission prompt is typed only for the exact call on the prompt line', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sq-answers-'))
   const codex = (call, reason = 'test') => [

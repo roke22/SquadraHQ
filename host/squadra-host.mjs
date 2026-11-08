@@ -1432,6 +1432,8 @@ function codexCommand(s, prep, env, dir) {
     '-c', `mcp_servers.squadra.command=${toml(process.execPath)}`,
     '-c', `mcp_servers.squadra.args=[${toml(server)}]`,
     '-c', `mcp_servers.squadra.env={${mcpEnv.map(([k, v]) => `${k}=${toml(v)}`).join(',')}}`,
+    // (enabled too: a project's own config could turn it off.)
+    '-c', 'mcp_servers.squadra.enabled=true',
     '-c', 'mcp_servers.squadra.default_tools_approval_mode="approve"',
     '-c', 'mcp_servers.squadra.startup_timeout_sec=30',
     ...(conversation ? [conversation] : []),
@@ -1445,7 +1447,28 @@ const grokHome = () => join(HOME, '.grok')
 
 // Grok runs the plugin's server itself (it sets CLAUDE_PLUGIN_ROOT); its
 // tools are allowed without asking (they only message the squad).
+// A project file defining an MCP server named squadra (from the folder up to
+// its git root, where Grok looks): Grok would run it instead of the plugin's,
+// the session would never join, and its tools would get the --allow below.
+export function grokProjectSquadra(folder) {
+  const defines = file => {
+    try {
+      const st = lstatSync(file)
+      if (!st.isFile() || st.size > 1024 * 1024) return false
+      const text = readFileSync(file, 'utf8')
+      if (file.endsWith('.json')) { const j = JSON.parse(text); return !!j && typeof j === 'object' && j.mcpServers && Object.hasOwn(j.mcpServers, 'squadra') }
+      return /^\s*\[\s*mcp_servers\s*\.\s*"?squadra"?\s*[\].]|^\s*mcp_servers\s*\.\s*"?squadra"?\s*[.=]|^\s*squadra\s*=\s*\{/m.test(text) && /mcp_servers/.test(text)
+    } catch { return false }
+  }
+  for (let d = folder; ; d = dirname(d)) {
+    for (const f of [join(d, '.mcp.json'), join(d, '.grok', 'config.toml'), join(d, '.cursor', 'mcp.json')]) if (defines(f)) return f
+    if (existsSync(join(d, '.git')) || dirname(d) === d || withinById(HOME, d) && withinById(d, HOME)) return null
+  }
+}
+
 function grokCommand(s, prep, env, dir) {
+  const planted = grokProjectSquadra(s.folder)
+  if (planted) throw new Error(`${planted} defines an MCP server named "squadra": Grok CLI would run it instead of the Squadra plugin. Remove it from that file to open Grok sessions in this folder`)
   // (Grok keeps each conversation in <home>/sessions/<folder>/<id>/updates.jsonl.)
   const conversation = typedConversation(s, dir, (id, t) => t.endsWith(`${sep}${id}${sep}updates.jsonl`) && within(t, join(grokHome(), 'sessions')))
   const argv = [prep.program, '--allow', 'MCPTool(squadra__*)', ...(conversation ? ['--resume', conversation] : [])]
