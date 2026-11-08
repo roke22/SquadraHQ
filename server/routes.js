@@ -117,7 +117,17 @@ export function createRoutes(server, companies, accounts) {
       // (Who it is now, once the body has arrived.)
       const who = actor.token ? actor : accounts.actorOf(req)
       const list = companies.list().filter(c => c.status !== 'deleting')
-      return sendJson(res, 200, { ok: true, result: await people.run({ actor: who, params, req, list, companyOf: named }) })
+      const result = await people.run({ actor: who, params, req, list, companyOf: named })
+      // Written down in each company it changed too, under the name the
+      // company's own screen uses: its log is whole, whichever screen was used.
+      const touched = what === 'people/set' ? [[params.company, params.role == null ? 'members/remove' : 'members/role', params.user]]
+        : what === 'people/invite' ? (Array.isArray(params.roles) ? params.roles : []).map(r => [r?.company, 'members/invite', params.email])
+        : what === 'people/invitations/cancel' ? (result?.companies ?? []).map(c => [c, 'invitations/cancel', result.email])
+        : []
+      for (const [id, action, target] of touched) {
+        companies.get(String(id ?? ''))?.platform.audit(who, action, target == null ? null : cleanText(String(target).slice(0, 400)).slice(0, 200), clientIp(req))
+      }
+      return sendJson(res, 200, { ok: true, result: what === 'people/invitations/cancel' ? { cancelled: true } : result })
     }
     if (!actor.token && !actor.is_platform_admin) throw new ApiError(403, 'Forbidden: this is for administrators of the server')
     if (what === 'machines') {

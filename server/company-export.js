@@ -66,11 +66,12 @@ function copyDatabase(file, copy) {
   })
 }
 
-export async function streamExport(company, about, res) {
+// oneCopy(fn): runs the copy, one at a time in the server (see companies.js).
+export async function streamExport(company, about, res, { oneCopy = fn => fn() } = {}) {
   const { dataDir } = company.platform
   const copy = join(dataDir, `export-${randomBytes(8).toString('hex')}.db`)
   try {
-    await copyDatabase(join(dataDir, 'squadra.db'), copy)
+    await oneCopy(() => copyDatabase(join(dataDir, 'squadra.db'), copy))
     const files = []
     for (const f of readdirSync(join(dataDir, 'files'))) {
       const path = join(dataDir, 'files', f)

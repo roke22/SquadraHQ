@@ -202,7 +202,17 @@ export function createCompanies(server) {
   }
 
   // What is about the company itself, for those in it. (See routes.js for who.)
+  // Companies whose export is being sent, and whether a database copy is
+  // under way in the server: only the copy takes a disk and a processor, so
+  // only it is one at a time in the whole server. Sending it, at the pace the
+  // reader takes, holds nobody else up.
   const exporting = new Set()
+  let copying = false
+  const oneCopy = async fn => {
+    if (copying) throw new ApiError(409, 'Conflict: an export is being prepared on this server; try again in a moment')
+    copying = true
+    try { return await fn() } finally { copying = false }
+  }
   const companyMethods = {
     'company/audit': {
       role: 'manager', method: 'GET',
@@ -231,11 +241,11 @@ export function createCompanies(server) {
     'company/export': {
       role: 'owner', method: 'GET', streams: true,
       async run({ company, res }) {
-        // (One at a time in the whole server: it takes a disk and a processor.)
-        if (exporting.size) throw new ApiError(409, 'Conflict: an export is under way on this server; try again when it ends')
+        if (exporting.has(company.id)) throw new ApiError(409, 'Conflict: an export of this company is under way; try again when it ends')
+        if (copying) throw new ApiError(409, 'Conflict: an export is being prepared on this server; try again in a moment')
         if (!company.platform.allow('export', 'all', 5, 3600_000)) throw new ApiError(429, 'Too Many Requests: at most 5 exports an hour')
         exporting.add(company.id)
-        try { await streamExport(company, { id: company.id, name: row(company.id).name, squadra: VERSION }, res) } finally { exporting.delete(company.id) }
+        try { await streamExport(company, { id: company.id, name: row(company.id).name, squadra: VERSION }, res, { oneCopy }) } finally { exporting.delete(company.id) }
       },
     },
     'company/delete': {

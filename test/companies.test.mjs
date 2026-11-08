@@ -309,7 +309,7 @@ test('on a disk about to fill up, sessions can add nothing, and can still be del
   }
 })
 
-test('exports: the copy is not made on the thread that answers everyone, and one runs at a time in the server', async () => {
+test('exports: the copy is not made on the thread that answers everyone, one copy at a time, and a slow reader holds up no other company', async () => {
   assert.doesNotMatch(readFileSync(join(ROOT, 'server/company-export.js'), 'utf8').split('const COPY_DATABASE')[0], /VACUUM/)
   const [a, b] = [await newCompany('Export one'), await newCompany('Export two')]
   // Enough that the answer doesn't fit in what the sockets hold while nobody reads it.
@@ -319,14 +319,16 @@ test('exports: the copy is not made on the thread that answers everyone, and one
   const open = c => fetch(`${URL_}/${api(c, 'company/export')}`, { headers: { Authorization: `Bearer ${ADMIN}` } })
   const first = await open(a)
   assert.equal(first.status, 200)
-  // Other companies go on being answered, and a second export waits for its turn.
+  // Other companies go on being answered. While the first is still being read
+  // (its copy is done), another company's export starts; the same company's waits.
   await read(b, 'state')
+  const same = await open(a)
+  assert.equal(same.status, 409)
+  await same.text()
   const second = await open(b)
-  assert.equal(second.status, 409)
-  await second.text()
+  assert.equal(second.status, 200)
+  assert.ok((await second.arrayBuffer()).byteLength > 0)
   assert.ok((await first.arrayBuffer()).byteLength > 1024 * 1024)
-  const again = await waitFor(async () => { const r = await open(b); if (r.status === 200) return r; await r.text(); return false }, { what: 'its turn' })
-  assert.ok((await again.arrayBuffer()).byteLength > 0)
   assert.deepEqual(readdirSync(join(dataDir, 'companies', a.id)).filter(f => f.startsWith('export-')), [])
 })
 

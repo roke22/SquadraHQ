@@ -2792,7 +2792,15 @@ test('a name that moves to another company starts its list of who may write agai
   assert.ok(JSON.parse(readFileSync(access, 'utf8')).allowFrom.includes('reviewer'))
   same.close()
   await sleep(300)
-  // The identity removed, as the plugin suggests, and now in the other one.
+  // A folder from before scope.json existed, with its own identity: kept too.
+  rmSync(join(stateDir, 'scope.json'))
+  const old = await start(a.join_token, configDir)
+  assert.ok(JSON.parse(readFileSync(access, 'utf8')).allowFrom.includes('reviewer'))
+  old.close()
+  await sleep(300)
+  // The identity removed, as the plugin suggests, and now in the other one
+  // (also from a folder without scope.json: its new identity is newer than its lists).
+  rmSync(join(stateDir, 'scope.json'))
   rmSync(join(stateDir, 'identity.json'))
   const moved = await start(b.join_token, configDir)
   assert.ok(!existsSync(access) || !JSON.parse(readFileSync(access, 'utf8')).allowFrom.includes('reviewer'))

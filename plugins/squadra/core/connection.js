@@ -1,6 +1,6 @@
 // Joining the server and staying there.
 
-import { readFileSync, renameSync, rmSync } from 'node:fs'
+import { readFileSync, renameSync, rmSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { proveKey } from '../signing.js'
 import { agent } from './agent.js'
@@ -16,15 +16,32 @@ import { checkCoordinator, handleInbound, RetryLater } from './inbound.js'
 // By the time it returns the session may have been logged out: the caller checks.
 // Who may write to this name was approved where it was then. In another server
 // or company, those names can be anyone's: the list starts again, kept aside.
+// Lists from before scope.json existed say nothing of where they were made:
+// kept if they were written since this identity was (the same identity then);
+// if its identity file is newer than all of them (a new registration, here or
+// elsewhere, or lists written by hand before the first one), their names start
+// again, and what isn't a name (the policy, which groups) stays.
 function setAsideIfMoved(s) {
   const file = join(s.stateDir, 'scope.json')
   const scope = { server: SERVER_URL, company: companyOf(s.secret) }
   let was = null
   try { was = JSON.parse(readFileSync(file, 'utf8')) } catch {}
-  if (was && (was.server !== scope.server || was.company !== scope.company)) {
+  const mtime = f => { try { return statSync(f).mtimeMs } catch { return null } }
+  const lists = [s.accessFile, s.allowPinsFile, s.coordinatorPinFile].map(mtime).filter(t => t != null)
+  const unknown = !existsSync(file) && lists.length > 0 && (mtime(s.identityFile) ?? 0) > Math.max(...lists)
+  const moved = was && (was.server !== scope.server || was.company !== scope.company)
+  if (unknown || moved) {
+    let kept = null
+    if (unknown) { try { kept = JSON.parse(readFileSync(s.accessFile, 'utf8')) } catch {} }
     const stamp = Date.now()
     for (const f of [s.accessFile, s.allowPinsFile, s.coordinatorPinFile]) { try { renameSync(f, `${f}.other-${stamp}`) } catch {} }
-    log(`"${s.name}" is now in another server or company: who may write to it starts again (the old lists are kept next to them, as .other-${stamp})`)
+    if (kept && typeof kept === 'object' && !Array.isArray(kept)) {
+      const { allowFrom, pending, permissionApprovers, linkedCoordinators, ...rest } = kept
+      const groups = Object.fromEntries(Object.entries(rest.groups && typeof rest.groups === 'object' ? rest.groups : {})
+        .map(([g, v]) => [g, { ...(v && typeof v === 'object' ? v : {}), allowFrom: [], invite: [] }]))
+      try { writePrivateFile(s.accessFile, JSON.stringify({ ...rest, allowFrom: [], pending: {}, groups }, null, 2) + '\n') } catch {}
+    }
+    log(`"${s.name}" ${moved ? 'is now in another server or company' : 'has a new identity and its lists say nothing of where they were made'}: who may write to it starts again (the old lists are kept next to them, as .other-${stamp})`)
   }
   writePrivateFile(file, JSON.stringify(scope) + '\n')
 }

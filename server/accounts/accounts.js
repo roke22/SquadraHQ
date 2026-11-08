@@ -225,8 +225,25 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
   // Pending invitations to this company for someone whose place in it was just decided.
   // Whoever could manage a company stopped being able to: what they made stops too,
   // and a later promotion doesn't bring it back.
-  const dropInvitationsBy = (company, userId) => q("DELETE FROM invitations WHERE kind = 'invite' AND company_id = ? AND created_by = ? AND used_at IS NULL").run(company, userId)
-  const dropInvitationsFor = (company, email) => q("DELETE FROM invitations WHERE kind = 'invite' AND company_id = ? AND email = ? AND used_at IS NULL").run(company, email)
+  // (An invitation can be for several companies: only this one's part goes.)
+  const dropInvitationsBy = (company, userId) => { for (const r of pendingInvites('created_by = ?', userId)) withoutCompany(r, company) }
+  const dropInvitationsFor = (company, email) => { for (const r of pendingInvites('email = ?', email)) withoutCompany(r, company) }
+
+  // Pending invitations, as rows; each company one names, with the role it gives there.
+  const pendingInvites = (where, ...args) => q(`SELECT * FROM invitations WHERE kind = 'invite' AND used_at IS NULL AND ${where}`).all(...args)
+  const invitedTo = row => [[row.company_id, row.role], ...alsoOf(row).map(a => [a.company, a.role])].filter(([c]) => c)
+  const roleInInvite = (row, company) => invitedTo(row).find(([c]) => c === company)?.[1] ?? null
+  // That company taken out of an invitation; the rest of it stays. One left
+  // with no company (and not for an administrator) is gone.
+  function withoutCompany(row, company) {
+    const rest = invitedTo(row).filter(([c]) => c !== company)
+    if (rest.length === invitedTo(row).length) return false
+    if (!rest.length && !row.is_platform_admin) { q('DELETE FROM invitations WHERE token_hash = ?').run(row.token_hash); return true }
+    const [first, ...also] = rest
+    q('UPDATE invitations SET company_id = ?, role = ?, also = ? WHERE token_hash = ?')
+      .run(first?.[0] ?? null, first?.[1] ?? null, also.length ? JSON.stringify(also.map(([c, r]) => ({ company: c, role: r }))) : null, row.token_hash)
+    return true
+  }
 
   // A link of one use, to copy by hand: there is no mail in this server.
   function newLink(req, kind, fields, ttl, by) {
@@ -507,17 +524,19 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
     },
     invitations: {
       role: 'manager', method: 'GET',
-      run: ({ company }) => q("SELECT token_hash, email, role, created_by, expires_at FROM invitations WHERE kind = 'invite' AND company_id = ? AND used_at IS NULL AND expires_at > ? ORDER BY expires_at").all(company.id, now())
+      // (Also those for several companies that name this one.)
+      run: ({ company }) => pendingInvites('expires_at > ? ORDER BY expires_at', now()).filter(r => roleInInvite(r, company.id))
         // (The id is a hash of a hash: it can cancel, but it can't be used as the link.)
-        .map(r => ({ id: sha256(r.token_hash), email: r.email, role: r.role, expires_at: r.expires_at })),
+        .map(r => ({ id: sha256(r.token_hash), email: r.email, role: roleInInvite(r, company.id), expires_at: r.expires_at })),
     },
     'invitations/cancel': {
       role: 'manager', method: 'POST',
       run({ company, actor, actorRole, params, req }) {
-        const row = q("SELECT token_hash, email, role FROM invitations WHERE kind = 'invite' AND company_id = ? AND used_at IS NULL").all(company.id).find(r => sha256(r.token_hash) === String(params.id ?? ''))
+        const row = pendingInvites('1').find(r => sha256(r.token_hash) === String(params.id ?? '') && roleInInvite(r, company.id))
         if (!row) throw bad('no such invitation')
-        if (!canGrant(actorRole, row.role)) throw new ApiError(403, 'Forbidden: you can\'t cancel that one')
-        q('DELETE FROM invitations WHERE token_hash = ?').run(row.token_hash)
+        if (!canGrant(actorRole, roleInInvite(row, company.id))) throw new ApiError(403, 'Forbidden: you can\'t cancel that one')
+        // (Only this company's part: an invitation for others too still holds there.)
+        withoutCompany(row, company.id)
         audit(actor, 'invitation-cancelled', company.id, req, row.email)
         return { cancelled: true }
       },
@@ -703,14 +722,19 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
     'people/invitations/cancel': {
       method: 'POST',
       run({ actor, params, req, list }) {
-        const row = q("SELECT token_hash, email, company_id, role, also FROM invitations WHERE kind = 'invite' AND used_at IS NULL").all().find(r => sha256(r.token_hash) === String(params.id ?? ''))
+        const row = pendingInvites('1').find(r => sha256(r.token_hash) === String(params.id ?? ''))
         if (!row) throw bad('no such invitation')
         const ids = new Set(managedBy(actor, list).map(c => c.id))
-        const all = [[row.company_id, row.role], ...alsoOf(row).map(a => [a.company, a.role])].filter(([c]) => c)
-        if (!isAdmin(actor) && !all.every(([c, r]) => ids.has(c) && canGrant(managing(actor, c), r))) throw new ApiError(403, 'Forbidden: you can\'t cancel that one')
-        q('DELETE FROM invitations WHERE token_hash = ?').run(row.token_hash)
-        for (const [c] of all) audit(actor, 'invitation-cancelled', c, req, row.email)
-        return { cancelled: true }
+        const all = invitedTo(row)
+        // An administrator cancels all of it; a manager, the part for the
+        // companies they manage (the rest still holds).
+        const mine = isAdmin(actor) ? all : all.filter(([c, r]) => ids.has(c) && canGrant(managing(actor, c), r))
+        if (!mine.length && !isAdmin(actor)) throw new ApiError(403, 'Forbidden: you can\'t cancel that one')
+        if (isAdmin(actor) || mine.length === all.length) q('DELETE FROM invitations WHERE token_hash = ?').run(row.token_hash)
+        else for (const [c] of mine) withoutCompany(pendingInvites('token_hash = ?', row.token_hash)[0], c)
+        for (const [c] of mine) audit(actor, 'invitation-cancelled', c, req, row.email)
+        // (Which companies, for their own logs: see routes.js.)
+        return { cancelled: true, companies: (isAdmin(actor) ? all : mine).map(([c]) => c), email: row.email }
       },
     },
   }

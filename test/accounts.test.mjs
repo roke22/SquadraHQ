@@ -689,4 +689,30 @@ test('people across companies: one invitation for several, and each sees and cha
   assert.ok(db.prepare("SELECT 1 FROM platform_audit WHERE action = 'member-added' AND target = ?").get(cc.id))
   assert.ok(db.prepare("SELECT 1 FROM platform_audit WHERE action = 'member-removed' AND target = ?").get(cc.id))
   db.close()
+
+  // An invitation for A and B shows in B too, and B's manager takes B out of
+  // it, not A: accepted, it gives A only.
+  ok(await owner.post('api/people/set', { user: multi.id, company: cb.id, role: 'manager' }))
+  const { link: both } = ok(await owner.post('api/people/invite', { email: 'both@example.com', roles: [{ company: ca.id, role: 'observer' }, { company: cb.id, role: 'observer' }] }))
+  const inB = ok(await nb.get(`api/c/${cb.id}/invitations`)).find(i => i.email === 'both@example.com')
+  assert.equal(inB.role, 'observer')
+  ok(await nb.post(`api/c/${cb.id}/invitations/cancel`, { id: inB.id }))
+  assert.ok(!ok(await nb.get(`api/c/${cb.id}/invitations`)).some(i => i.email === 'both@example.com'))
+  assert.ok(ok(await nb.get(`api/c/${ca.id}/invitations`)).some(i => i.email === 'both@example.com'))
+  const nb2 = browser()
+  const me2 = ok(await nb2.post('auth/invite/accept', { token: both.split('/#/invite/')[1], name: 'Both', password: PASSWORD }))
+  if (me2.stage === 'totp_setup') await setUpCodes(nb2)
+  assert.deepEqual(ok(await owner.get('api/people')).users.find(u => u.email === 'both@example.com').roles, { [ca.id]: 'observer' })
+  // Someone taken out of B while an invitation naming B after A is pending: B's part goes.
+  ok(await owner.post('api/people/invite', { email: 'multi@example.com', roles: [{ company: ca.id, role: 'operator' }, { company: cb.id, role: 'manager' }] }))
+  ok(await owner.post('api/people/set', { user: multi.id, company: cb.id, role: null }))
+  const left = ok(await owner.get('api/people')).invitations.find(i => i.email === 'multi@example.com')
+  assert.deepEqual(left.roles, { [ca.id]: 'operator' })
+  // What Settings > People changes is in each company's own log too.
+  const bothId = ok(await owner.get('api/people')).users.find(u => u.email === 'both@example.com').id
+  ok(await owner.post('api/people/set', { user: bothId, company: ca.id, role: 'operator' }))
+  ok(await owner.post('api/people/set', { user: bothId, company: ca.id, role: null }))
+  ok(await owner.post('api/people/invitations/cancel', { id: ok(await owner.get('api/people')).invitations.find(i => i.email === 'multi@example.com').id }))
+  const logA = ok(await nb.get(`api/c/${ca.id}/company/audit`)).map(e => e.action)
+  for (const a of ['members/invite', 'members/role', 'members/remove', 'invitations/cancel']) assert.ok(logA.includes(a), a)
 })
