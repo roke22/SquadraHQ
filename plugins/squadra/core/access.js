@@ -160,6 +160,8 @@ export function readLaunch(name) {
       staticAccess: l.access_mode === 'static',
       relayOff: l.permission_relay === false, // the machine doesn't allow remote permission answers
       persona: l.role === 'solo' ? null : launchPersona(l.persona),
+      // The agent it runs, if not Claude Code.
+      agent: l.agent === 'codex' || l.agent === 'grok' ? l.agent : null,
     }
   } catch { return null }
 }

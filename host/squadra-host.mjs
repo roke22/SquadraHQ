@@ -243,6 +243,8 @@ function writeJson(file, data, mode = 0o600) {
 //   coordinators      if set, the only coordinator names a worker may be given
 //                     (and a coordinator here may be linked with)
 //   claude_command    the Claude Code executable
+//   codex_command     the Codex CLI executable (default "codex")
+//   grok_command      the Grok CLI executable (default "grok")
 // Each warning about settings.json once (until the file changes), not on
 // every message.
 const settingsWarned = new Set()
@@ -300,6 +302,8 @@ function loadSettings() {
     s.coordinators = NO_COORDINATOR
   }
   s.claude_command = typeof s.claude_command === 'string' && s.claude_command ? s.claude_command : 'claude'
+  s.codex_command = typeof s.codex_command === 'string' && s.codex_command ? s.codex_command : 'codex'
+  s.grok_command = typeof s.grok_command === 'string' && s.grok_command ? s.grok_command : 'grok'
   return s
 }
 
@@ -621,6 +625,7 @@ async function listTerminals() {
       folder: spec.folder ?? null,
       compact_window: spec.compact_window ?? null,
       persona: spec.persona ?? null,
+      agent: AGENT_IDS.includes(spec.agent) ? spec.agent : 'claude',
       created_at: Number(created) * 1000,
     })
   }
@@ -641,7 +646,7 @@ function insideAllowed(real, folders) {
 // The only thing a server can ask for. Anything unexpected is refused.
 export function validateSpec(spec, settings, current) {
   if (!spec || typeof spec !== 'object' || Array.isArray(spec)) throw new Error('invalid request')
-  const allowed = new Set(['name', 'role', 'coordinator', 'folder', 'compact_window', 'resume', 'identity', 'persona', 'links'])
+  const allowed = new Set(['name', 'role', 'coordinator', 'folder', 'compact_window', 'resume', 'identity', 'persona', 'links', 'agent'])
   for (const k of Object.keys(spec)) if (!allowed.has(k)) throw new Error(`unknown field "${plain(k).slice(0, 40)}"`)
   const name = String(spec.name ?? '')
   if (!NAME_RE.test(name)) throw new Error('name must match [A-Za-z0-9_-]{1,32}')
@@ -675,6 +680,9 @@ export function validateSpec(spec, settings, current) {
   // Only the id of a skill or agent listed for that folder: the machine looks
   // it up again when the session opens (see personas below).
   if (spec.persona != null && spec.persona !== '' && !(typeof spec.persona === 'string' && PERSONA_RE.test(spec.persona))) throw new Error('invalid persona')
+  // The agent it runs: Claude Code unless it says another this machine has.
+  const agent = spec.agent == null || spec.agent === '' ? 'claude' : spec.agent
+  if (!AGENT_IDS.includes(agent)) throw new Error(`agent must be one of ${AGENT_IDS.join(', ')}`)
   // A coordinator's links: coordinators of other squads it may talk with.
   const links = spec.links == null ? [] : checkLinks(spec.links, name, role, settings)
   const real = checkFolder(spec.folder, settings)
@@ -683,7 +691,7 @@ export function validateSpec(spec, settings, current) {
   // Which folder exactly (device and inode), to check after the start that
   // the session is in this one and not in another put at the same path.
   const id = statSync(real)
-  return { name, role, coordinator, folder: real, folderId: `${id.dev}:${id.ino}`, compact_window: compact, resume: spec.resume === true, identity: spec.identity ?? null, persona: spec.persona || null, links, home: isHome(real) }
+  return { name, role, coordinator, folder: real, folderId: `${id.dev}:${id.ino}`, compact_window: compact, resume: spec.resume === true, identity: spec.identity ?? null, persona: spec.persona || null, links, home: isHome(real), agent }
 }
 
 // The coordinators of other squads a coordinator is linked with (each one
@@ -734,6 +742,9 @@ function checkFolder(folder, settings) {
   if (folderOfAnotherCompany(real)) throw new Error(`sessions cannot be opened in ${real}: it belongs to another company on this machine`)
   return real
 }
+
+// The agents a session can run (see Claude Code, and Codex CLI and Grok CLI, below).
+const AGENT_IDS = ['claude', 'codex', 'grok']
 
 // A persona as the server asks for it (see Claude Code, below).
 const PERSONA_RE = /^(skill|agent):(project|user):[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
@@ -1225,6 +1236,258 @@ const claudeCode = {
   },
 }
 
+// --- Codex CLI and Grok CLI -----------------------------------------------------------
+//
+// Sessions can also run Codex CLI or Grok CLI. Both run the same Squadra
+// plugin (they read Claude Code's plugin format), installed with their own
+// plugin commands from the same release tag, but they have no channels: the
+// plugin leaves what arrives in <state>/pending-input/, and this program types
+// it in the session's terminal while the agent waits for input (see
+// typeWaiting). The rest of the file uses them only through the codexCli and
+// grokCli objects at the end of this section, and AGENTS.
+
+// An executable by name (from the trusted PATH folders) or by absolute path,
+// checked like Claude Code's. null when it isn't there.
+function typedProgram(cmd) {
+  const ok = p => { try { accessSync(p, FS.X_OK); return statSync(p).isFile() } catch { return false } }
+  if (cmd.includes('/')) return isAbsolute(cmd) && ok(cmd) && !untrustedExecutable(cmd) ? throughDispatcher(cmd, basename(cmd)) : null
+  for (const dir of String(process.env.PATH ?? '').split(':')) {
+    if (!isAbsolute(dir)) continue
+    const p = join(dir, cmd)
+    if (ok(p) && !untrustedExecutable(p)) return throughDispatcher(p, cmd)
+  }
+  return null
+}
+const runTyped = (cmd, args, opts = {}) => run(cmd, args, { cwd: HOME, timeout: 30_000, ...opts, env: { ...process.env, PATH: trustedPath() } })
+
+async function typedVersion(cmd) {
+  try { return (await runTyped(cmd, ['--version'], { timeout: 10_000 })).stdout.trim().split('\n')[0].slice(0, 80) } catch { return null }
+}
+
+// Where the plugin comes from: this project's repository at this program's
+// release tag, never what the server says.
+const TYPED_REPO = 'roke22/Squadra'
+const ourSource = src => typeof src === 'string' && (isAbsolute(src) || src.toLowerCase().includes(TYPED_REPO.toLowerCase()))
+
+// Codex's config folder.
+const codexHome = () => { const c = process.env.CODEX_HOME; return c && isAbsolute(c) ? c : join(HOME, '.codex') }
+
+async function codexPluginStatus(cmd = typedProgram(loadSettings().codex_command)) {
+  if (!cmd) return null
+  try {
+    const list = JSON.parse((await runTyped(cmd, ['plugin', 'list', '--json'])).stdout)
+    const p = (list?.installed ?? []).find(x => x?.pluginId === 'squadra@squadra')
+    if (!p) return { installed: false, version: null, enabled: false, root: null }
+    // A plugin called squadra from somewhere else is not ours.
+    if (!ourSource(p.marketplaceSource?.source)) throw new Error(`a different marketplace named "squadra" is installed in Codex (${plain(p.marketplaceSource?.source ?? 'unknown source')}). Remove it with: codex plugin marketplace remove squadra`)
+    const version = typeof p.version === 'string' ? p.version : null
+    const root = p.source?.source === 'local' && isAbsolute(String(p.source.path ?? '')) ? p.source.path : version && /^[\w.-]+$/.test(version) ? join(codexHome(), 'plugins', 'cache', 'squadra', 'squadra', version) : null
+    return { installed: p.installed !== false, version, enabled: p.enabled !== false, root }
+  } catch (err) {
+    if (/different marketplace/.test(err.message)) throw err
+    return null
+  }
+}
+
+async function ensureCodexPlugin({ update = false } = {}) {
+  const cmd = typedProgram(loadSettings().codex_command)
+  if (!cmd) throw new Error('Codex CLI ("codex") was not found on the PATH')
+  let st = await codexPluginStatus(cmd)
+  if (st === null) throw new Error(`cannot run "${cmd} plugin list --json": update Codex CLI`)
+  if (!st.installed || update || (st.version && olderVersion(st.version, VERSION))) {
+    // ("add" fails if the marketplace is there already: the plugin install decides.)
+    try { await runTyped(cmd, ['plugin', 'marketplace', 'add', TYPED_REPO, '--ref', `v${VERSION}`], { timeout: 180_000 }) } catch {}
+    if (st.installed) { try { await runTyped(cmd, ['plugin', 'marketplace', 'upgrade', 'squadra'], { timeout: 180_000 }) } catch {} }
+    await runTyped(cmd, ['plugin', 'add', 'squadra@squadra'], { timeout: 180_000 })
+    st = await codexPluginStatus(cmd)
+  }
+  if (!st?.installed) throw new Error('the plugin did not install in Codex')
+  return st
+}
+
+async function grokPluginStatus(cmd = typedProgram(loadSettings().grok_command)) {
+  if (!cmd) return null
+  try {
+    const list = JSON.parse((await runTyped(cmd, ['plugin', 'list', '--json'])).stdout)
+    const p = (Array.isArray(list) ? list : []).find(x => x?.name === 'squadra')
+    if (!p) return { installed: false, version: null, enabled: false, root: null }
+    if (!ourSource(p.source)) throw new Error(`a different plugin named "squadra" is installed in Grok (${plain(p.source ?? 'unknown source')}). Remove it with: grok plugin uninstall squadra`)
+    return { installed: true, version: typeof p.version === 'string' ? p.version : null, enabled: p.status !== 'disabled', root: typeof p.path === 'string' ? p.path : null }
+  } catch (err) {
+    if (/different plugin/.test(err.message)) throw err
+    return null
+  }
+}
+
+async function ensureGrokPlugin({ update = false } = {}) {
+  const cmd = typedProgram(loadSettings().grok_command)
+  if (!cmd) throw new Error('Grok CLI ("grok") was not found on the PATH')
+  let st = await grokPluginStatus(cmd)
+  if (st === null) throw new Error(`cannot run "${cmd} plugin list --json": update Grok CLI`)
+  if (st.installed && (update || (st.version && olderVersion(st.version, VERSION)))) {
+    await runTyped(cmd, ['plugin', 'uninstall', 'squadra'], { timeout: 180_000 })
+    st = { installed: false }
+  }
+  if (!st.installed) {
+    // (The plugin is a folder of the repository: #subdir.)
+    await runTyped(cmd, ['plugin', 'install', `${TYPED_REPO}@v${VERSION}#plugins/squadra`, '--trust'], { timeout: 180_000 })
+    st = await grokPluginStatus(cmd)
+  }
+  if (st?.installed && !st.enabled) { await runTyped(cmd, ['plugin', 'enable', 'squadra'], { timeout: 60_000 }); st = await grokPluginStatus(cmd) }
+  if (!st?.installed) throw new Error('the plugin did not install in Grok')
+  return st
+}
+
+// What must hold before a session opens: the program, and the plugin in it
+// (installed now if it is missing: sessions opened from the dashboard must
+// work unattended). Returns { program, root }.
+async function prepareTyped(a, s) {
+  const program = typedProgram(a.command(loadSettings()))
+  if (!program) throw new Error(`${a.name} ("${a.command(loadSettings())}") was not found on this machine`)
+  if (s.persona) throw new Error(`personas are only for Claude Code sessions for now: open this ${a.name} session without one`)
+  let st = await a.plugin.status(program)
+  if (!st?.installed || !st.enabled || (st.version && olderVersion(st.version, VERSION))) {
+    log(`installing the Squadra plugin in ${a.name}`)
+    st = await a.plugin.ensure()
+  }
+  if (s.resume) log(`"${plain(s.name)}" starts a new conversation: continuing one is only for Claude Code sessions for now`)
+  return { program, root: st.root }
+}
+
+// TOML strings for Codex's -c (JSON's escapes are TOML's).
+const toml = v => JSON.stringify(String(v))
+
+// The command a session runs, after the "env" that starts it. env: the
+// session's variables (the plugin needs them: Codex gives an MCP server only
+// what it is told).
+function codexCommand(s, prep, env) {
+  const server = join(String(prep.root ?? ''), 'server.js')
+  if (!prep.root || !existsSync(server)) throw new Error(`the Squadra plugin in Codex is not where expected (${server}): run "${cli()} plugin"`)
+  const mcpEnv = Object.entries(env).filter(([k]) => /^(SQUADRA_[A-Z_]+|CLAUDE_CONFIG_DIR)$/.test(k))
+  // Codex doesn't expand ${CLAUDE_PLUGIN_ROOT} in the plugin's own server, so
+  // the server is given here, under the same name (it replaces that one), and
+  // its tools need no approval (they only message the squad).
+  return [prep.program,
+    '-c', `mcp_servers.squadra.command=${toml(process.execPath)}`,
+    '-c', `mcp_servers.squadra.args=[${toml(server)}]`,
+    '-c', `mcp_servers.squadra.env={${mcpEnv.map(([k, v]) => `${k}=${toml(v)}`).join(',')}}`,
+    '-c', 'mcp_servers.squadra.default_tools_approval_mode="approve"',
+    '-c', 'mcp_servers.squadra.startup_timeout_sec=30',
+  ]
+}
+
+// Grok runs the plugin's server itself (it sets CLAUDE_PLUGIN_ROOT); its
+// tools are allowed without asking (they only message the squad).
+const grokCommand = (s, prep) => [prep.program, '--allow', 'MCPTool(squadra__*)']
+
+// The screen of a session (its last lines).
+const screenOf = async target => (await tmux(['capture-pane', '-p', '-J', '-t', target])).stdout.split('\n').filter(l => l.trim()).slice(-24).join('\n')
+
+// Text pasted in a session's input, then sent: as a paste, so its lines stay
+// one message (Codex and Grok take bracketed paste).
+async function pasteAndSend(target, text) {
+  const buffer = `sq-${randomBytes(6).toString('hex')}`
+  ensurePrivateDir(join(CONFIG_DIR, 'paste'))
+  const file = join(CONFIG_DIR, 'paste', `${buffer}.txt`)
+  writeFileSync(file, text, { mode: 0o600, flag: 'wx' })
+  try {
+    await tmux(['load-buffer', '-b', buffer, file])
+    await tmux(['paste-buffer', '-p', '-d', '-b', buffer, '-t', target])
+  } finally { rmSync(file, { force: true }) }
+  await new Promise(r => setTimeout(r, 500))
+  await tmux(['send-keys', '-t', target, 'Enter'])
+}
+
+// What the plugin left for the terminal (see plugins/squadra/typed), typed
+// when the agent waits for input. Oldest first, a few at a time.
+const PENDING_RE = /^\d{14}-\d{6}-\d+\.txt$/
+const typingNow = new Set()
+async function typeWaiting(t, a) {
+  if (typingNow.has(t.id)) return
+  typingNow.add(t.id)
+  try {
+    const dir = join(claudeCode.plugin.stateDir(t.id), 'pending-input')
+    let files
+    try { files = readdirSync(dir).filter(f => PENDING_RE.test(f)).sort().slice(0, 10) } catch { return }
+    if (!files.length) return
+    const target = `=${PREFIX}${t.id}:`
+    if (!a.waiting(await screenOf(target))) return
+    const parts = []
+    for (const f of files) {
+      // (A session can write there: only small plain files are read.)
+      try { const st = lstatSync(join(dir, f)); if (st.isFile() && st.size <= 64 * 1024) parts.push(readFileSync(join(dir, f), 'utf8').trim()) } catch {}
+    }
+    const text = parts.filter(Boolean).join('\n\n')
+    if (text) await pasteAndSend(target, text)
+    for (const f of files) rmSync(join(dir, f), { force: true })
+    if (text) log(`typed ${files.length} Squadra message${files.length === 1 ? '' : 's'} in "${plain(t.id)}" (${a.name})`)
+  } catch (err) {
+    log(`could not type the messages of "${plain(t.id)}": ${err.message}`)
+  } finally { typingNow.delete(t.id) }
+}
+
+// When each one waits for input: its input box shows, it isn't working, and
+// it isn't asking anything (a menu, a permission, a trust question).
+const codexWaiting = screen => /^\s*›/m.test(screen) && !/esc to interrupt/i.test(screen) &&
+  !/enter to submit|enter confirm|esc to cancel|Hooks need review|\(y\/n\)|press enter/i.test(screen)
+const grokWaiting = screen => /│ ❯/.test(screen) && !/\[stop\]|Ctrl\+c:cancel|Waiting for response/i.test(screen) &&
+  !/Tab:next option|\d+\/\d+:select|Do you trust|Yes, proceed|\(y\/n\)/i.test(screen)
+
+// A line typed in a session (an answer from the user's inbox, /clear), as the user would.
+async function typeTypedLine(a, target, line) {
+  if (!a.waiting(await screenOf(target))) throw new Error('it is busy or waiting for an answer on its screen')
+  await tmux(['send-keys', '-t', target, '-l', line])
+  await new Promise(r => setTimeout(r, 300))
+  await tmux(['send-keys', '-t', target, 'Enter'])
+}
+function typedAnswer(a) {
+  return (target, text) => {
+    const line = String(text).replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!line || line.length > 2200) throw new Error('the answer must be one line of up to 2200 characters')
+    return typeTypedLine(a, target, line)
+  }
+}
+
+// Not cleared from outside: their /new and /clear start a new session with a
+// new plugin process while the old one stays (holding the session's name), and
+// the new one would ask the user to confirm joining.
+const noClear = a => Promise.reject(new Error(`clearing the context of a ${a.name} session from here is not supported yet: give it the new task as it is`))
+
+const codexCli = {
+  id: 'codex',
+  name: 'Codex CLI',
+  command: settings => settings.codex_command,
+  program: () => typedProgram(loadSettings().codex_command),
+  version: typedVersion,
+  prepare: s => prepareTyped(codexCli, s),
+  sessionCommand: codexCommand,
+  waiting: codexWaiting,
+  typeWaiting: t => typeWaiting(t, codexCli),
+  clearContext: () => noClear(codexCli),
+  typeAnswer: null,
+  plugin: { status: codexPluginStatus, ensure: ensureCodexPlugin, commands: `codex plugin marketplace add ${TYPED_REPO} --ref v${VERSION} && codex plugin add squadra@squadra` },
+}
+codexCli.typeAnswer = typedAnswer(codexCli)
+
+const grokCli = {
+  id: 'grok',
+  name: 'Grok CLI',
+  command: settings => settings.grok_command,
+  program: () => typedProgram(loadSettings().grok_command),
+  version: typedVersion,
+  prepare: s => prepareTyped(grokCli, s),
+  sessionCommand: grokCommand,
+  waiting: grokWaiting,
+  typeWaiting: t => typeWaiting(t, grokCli),
+  clearContext: () => noClear(grokCli),
+  typeAnswer: null,
+  plugin: { status: grokPluginStatus, ensure: ensureGrokPlugin, commands: `grok plugin install ${TYPED_REPO}@v${VERSION}#plugins/squadra --trust` },
+}
+grokCli.typeAnswer = typedAnswer(grokCli)
+
+// The agents a session can run besides Claude Code, by id.
+const TYPED = { codex: codexCli, grok: grokCli }
+
 // --- opening and closing sessions -----------------------------------------------------
 
 // A private file in a private folder, never through a symlink: written to a
@@ -1286,39 +1549,43 @@ function openTerminal(spec) {
 async function openTerminalNow(spec) {
   const settings = loadSettings()
   const s = validateSpec(spec, settings, await listTerminals())
-  const claude = await claudeCode.prepareSession(s, settings)
+  // Codex CLI or Grok CLI (see their section), or Claude Code.
+  const typed = s.agent === 'claude' ? null : TYPED[s.agent]
+  const claude = typed ? await typed.prepare(s) : await claudeCode.prepareSession(s, settings)
   // Where the plugin keeps this name's state: its launch file (role and
   // coordinator, read instead of environment variables) and, when the server
   // reserved the name for this machine, its identity.
   const dir = claudeCode.plugin.stateDir(s.name)
   // (A session in the home folder reaches everything of this user: its
   // permission prompts are answered only in its own terminal.)
-  const relay = settings.permission_relay && !s.home && s.role !== 'solo'
+  // (Codex and Grok answer theirs in their terminal for now.)
+  const relay = settings.permission_relay && !s.home && s.role !== 'solo' && !typed
   // (The plugin tells the session's squad which persona it follows.)
   const persona = s.personaInfo ? { kind: s.personaInfo.kind, name: s.personaInfo.name, description: s.personaInfo.description } : null
   s.launchStart = randomBytes(16).toString('hex')
-  writePrivate(dir, 'launch.json', { name: s.name, role: s.role, coordinator: s.coordinator, start: s.launchStart, ...(relay ? {} : { permission_relay: false }), ...(persona ? { persona } : {}) })
+  writePrivate(dir, 'launch.json', { name: s.name, role: s.role, coordinator: s.coordinator, start: s.launchStart, ...(relay ? {} : { permission_relay: false }), ...(persona ? { persona } : {}), ...(typed ? { agent: s.agent } : {}) })
   // (Its links, kept while it runs: the dashboard can change them, see "links".)
   if (s.role === 'coordinator') writePrivate(dir, 'links.json', { name: s.name, coordinators: s.links })
   else rmSync(join(dir, 'links.json'), { force: true })
   // If anything below fails, no ticket (launch.json) is left for a later start.
-  try { return await startSession(s, settings, claude, dir) } catch (err) {
+  try { return await startSession(s, settings, claude, dir, typed) } catch (err) {
     rmSync(join(dir, 'launch.json'), { force: true })
     throw err
   }
 }
 
-async function startSession(s, settings, claude, dir) {
+async function startSession(s, settings, claude, dir, typed) {
   if (s.identity) writePrivate(dir, 'identity.json', { name: s.name, secret: s.identity, server: claudeCode.plugin.serverUrl() })
   const tname = PREFIX + s.name
   const env = { SQUADRA_NAME: s.name, SQUADRA_LAUNCH_START: s.launchStart, ...claudeCode.sessionEnv(s) }
-  if (!settings.permission_relay || s.home || s.role === 'solo') env.SQUADRA_PERMISSION_RELAY = 'off'
+  if (!settings.permission_relay || s.home || s.role === 'solo' || typed) env.SQUADRA_PERMISSION_RELAY = 'off'
+  if (typed) env.SQUADRA_AGENT = s.agent
   // Fixed command. Two or more arguments make tmux exec it directly, no shell.
   // "env -u TMUX" hides the tmux server from the session: its tools can't
   // simply run "tmux send-keys" into another session. (They run as the same
   // user, so this is a speed bump, not a wall: see the README.)
-  const argv = ['/usr/bin/env', '-u', 'TMUX', '-u', 'TMUX_PANE', ...claudeCode.sessionCommand(s, claude, dir, env)]
-  const meta = JSON.stringify({ owner: OWNER_TAG, role: s.role, coordinator: s.coordinator, folder: s.folder, compact_window: s.compact_window, persona: s.personaInfo ? { id: s.personaInfo.id, kind: s.personaInfo.kind, name: s.personaInfo.name } : null })
+  const argv = ['/usr/bin/env', '-u', 'TMUX', '-u', 'TMUX_PANE', ...(typed ? typed.sessionCommand(s, claude, env) : claudeCode.sessionCommand(s, claude, dir, env))]
+  const meta = JSON.stringify({ owner: OWNER_TAG, role: s.role, coordinator: s.coordinator, folder: s.folder, compact_window: s.compact_window, persona: s.personaInfo ? { id: s.personaInfo.id, kind: s.personaInfo.kind, name: s.personaInfo.name } : null, ...(typed ? { agent: s.agent } : {}) })
   await tmux([
     'start-server', ';',
     'set-option', '-g', 'history-limit', '10000', ';',
@@ -1347,7 +1614,7 @@ async function startSession(s, settings, claude, dir) {
     rmSync(join(dir, 'launch.json'), { force: true }) // no ticket left for a later start
     throw new Error(where ? `the session started in ${where} instead of ${s.folder}; closed it` : 'could not check where the session started; closed it')
   }
-  log(`opened "${plain(s.name)}" (${s.role}${s.personaInfo ? `, ${s.personaInfo.kind} "${plain(s.personaInfo.name)}"` : ''}) in ${s.folder}`)
+  log(`opened "${plain(s.name)}" (${s.role}${typed ? `, ${typed.name}` : ''}${s.personaInfo ? `, ${s.personaInfo.kind} "${plain(s.personaInfo.name)}"` : ''}) in ${s.folder}`)
   return { id: s.name, name: s.name }
 }
 
@@ -1387,7 +1654,7 @@ async function answerSession(id, text) {
   const t = (await listTerminals()).find(x => x.id === id)
   if (!t) throw new Error('no such session on this machine')
   if (t.role !== 'coordinator') throw new Error(`"${id}" is not a coordinator`)
-  await claudeCode.typeAnswer(`=${PREFIX}${id}:`, text)
+  await (TYPED[t.agent] ?? claudeCode).typeAnswer(`=${PREFIX}${id}:`, text)
   log(`typed an answer from the user's inbox in "${plain(id)}"`)
   return { typed: true }
 }
@@ -1402,7 +1669,7 @@ async function clearSession(id, coordinator) {
   const t = (await listTerminals()).find(x => x.id === id)
   if (!t) throw new Error('no such session on this machine')
   if (t.role !== 'worker' || t.coordinator !== coordinator) throw new Error(`"${id}" is not a worker of "${coordinator}" on this machine`)
-  await claudeCode.clearContext(`=${PREFIX}${id}:`)
+  await (TYPED[t.agent] ?? claudeCode).clearContext(`=${PREFIX}${id}:`)
   log(`cleared the context of "${plain(id)}" for its coordinator "${plain(coordinator)}"`)
   return { cleared: true }
 }
@@ -1627,7 +1894,7 @@ async function hostInfo() {
     tmux: tv?.text ?? null,
     claude: CLAUDE_VERSION,
     // The agents sessions can run here, each with its version.
-    agents: [...(CLAUDE_VERSION ? [{ id: 'claude', version: CLAUDE_VERSION }] : [])],
+    agents: [...(CLAUDE_VERSION ? [{ id: 'claude', version: CLAUDE_VERSION }] : []), ...Object.entries(TYPED_VERSIONS).filter(([, v]) => v).map(([id, version]) => ({ id, version }))],
     plugin: PLUGIN,
     version: VERSION,
     folders: settings.folders,
@@ -1646,7 +1913,23 @@ async function hostInfo() {
 }
 
 let PLUGIN = null // { installed, version, enabled }, or null when it can't be told
+
+// Every second, the messages waiting for the Codex and Grok sessions (only on
+// a machine that has one of them).
+let typePendingBusy = false
+async function typePending() {
+  if (typePendingBusy || !Object.values(TYPED_VERSIONS).some(Boolean)) return
+  typePendingBusy = true
+  try {
+    for (const t of await listTerminals()) if (TYPED[t.agent]) await TYPED[t.agent].typeWaiting(t)
+  } catch {} finally { typePendingBusy = false }
+}
 let CLAUDE_VERSION = null
+// Codex CLI's and Grok CLI's versions (null: not on this machine).
+const TYPED_VERSIONS = { codex: null, grok: null }
+async function readTypedVersions() {
+  for (const [id, a] of Object.entries(TYPED)) { const p = a.program(); TYPED_VERSIONS[id] = p ? await a.version(p) : null }
+}
 
 let CREDS_SERVER = null // the server this machine is enrolled with
 async function connect(creds) {
@@ -2190,6 +2473,15 @@ async function enroll(server, code, { plugin = true, insecure = false, service =
       log(`⚠️  could not install the Squadra plugin (${err.message.split('\n')[0]}). Install it with: ${claudeCode.plugin.commands}`)
     }
   }
+  // And in Codex CLI and Grok CLI, if this machine has them.
+  if (plugin) {
+    await readTypedVersions()
+    for (const [id, a] of Object.entries(TYPED)) {
+      if (!TYPED_VERSIONS[id]) continue
+      try { const st = await a.plugin.ensure(); log(`Squadra plugin ${st.version ?? ''} ready in ${a.name}`) }
+      catch (err) { log(`⚠️  could not install the Squadra plugin in ${a.name} (${err.message.split('\n')[0]}). Install it with: ${a.plugin.commands}`) }
+    }
+  }
   // The "squadra-host" command and the service (not for a custom
   // SQUADRA_HOST_DIR: a second, separate setup, such as the tests').
   let launcher = null, svc = null
@@ -2202,7 +2494,7 @@ async function enroll(server, code, { plugin = true, insecure = false, service =
     else if (service) { try { svc = await installService() } catch (err) { svc = { ok: false, why: err.message } } }
   }
   if (!info.tmux) log(`⚠️  tmux is not installed: install it (${TMUX_INSTALL}) before opening sessions.`)
-  if (!info.claude) log(`⚠️  Claude Code was not found ("claude" is not on the PATH). Install it, then run: ${cli()} plugin`)
+  if (!info.claude && !Object.values(TYPED_VERSIONS).some(Boolean)) log(`⚠️  No agent was found (Claude Code, Codex CLI or Grok CLI is not on the PATH). Install one, then run: ${cli()} plugin`)
   if (svc && !svc.ok) log(`⚠️  could not leave it running in the background (${svc.why}): it runs here while this terminal stays open.`)
   process.stderr.write(`
 squadra-host: this machine is now "${plain(r.name)}" on ${server}.
@@ -2639,9 +2931,21 @@ async function main() {
   const tv = await tmuxVersion()
   if (tv && (tv.major < 3 || (tv.major === 3 && tv.minor < 2))) die(`${tv.text} is too old: squadra-host needs tmux 3.2 or newer`, 2)
   CLAUDE_VERSION = claudeCode.programOrNull() ? await claudeCode.version(claudeCode.programOrNull()) : null
+  await readTypedVersions()
   if (cmd === 'plugin') {
-    try { const st = await claudeCode.plugin.ensure({ update: true }); return log(`Squadra plugin ${st.version ?? ''} is installed and up to date. Restart open sessions to use a new version.`) }
-    catch (err) { die(`${err.message.split('\n')[0]}\nInstall it by hand with: ${claudeCode.plugin.commands}`) }
+    // In each agent this machine has.
+    let failed = false
+    if (CLAUDE_VERSION || !Object.values(TYPED_VERSIONS).some(Boolean)) {
+      try { const st = await claudeCode.plugin.ensure({ update: true }); log(`Squadra plugin ${st.version ?? ''} is installed and up to date in Claude Code.`) }
+      catch (err) { failed = true; log(`${err.message.split('\n')[0]}\nInstall it by hand with: ${claudeCode.plugin.commands}`) }
+    }
+    for (const [id, a] of Object.entries(TYPED)) {
+      if (!TYPED_VERSIONS[id]) continue
+      try { const st = await a.plugin.ensure({ update: true }); log(`Squadra plugin ${st.version ?? ''} is installed and up to date in ${a.name}.`) }
+      catch (err) { failed = true; log(`${err.message.split('\n')[0]}\nInstall it by hand with: ${a.plugin.commands}`) }
+    }
+    if (failed) die('the plugin could not be installed everywhere')
+    return log('Restart open sessions to use a new version.')
   }
   if (cmd === 'enroll') {
     // Enrolled and left running as a service: nothing more to do here.
@@ -2674,7 +2978,9 @@ async function main() {
   PLUGIN = await claudeCode.plugin.status()
   if (PLUGIN && !PLUGIN.installed) log(`⚠️  the Squadra plugin is not installed in Claude Code: sessions cannot be opened until it is. Run: ${cli()} plugin`)
   // Keep what the dashboard shows about the plugin current (installed or updated by hand).
-  setInterval(async () => { const st = await claudeCode.plugin.status(); if (st) PLUGIN = st }, 5 * 60_000).unref()
+  setInterval(async () => { const st = await claudeCode.plugin.status(); if (st) PLUGIN = st; await readTypedVersions() }, 5 * 60_000).unref()
+  // What arrives for Codex and Grok sessions is typed in their terminals.
+  setInterval(typePending, 1000).unref()
   await connect(creds)
 }
 

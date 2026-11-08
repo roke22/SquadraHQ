@@ -1,7 +1,7 @@
 // Whether Claude Code was started so that it delivers this channel.
 
 import { execFileSync } from 'node:child_process'
-import { PS_BIN } from '../core/index.js'
+import { PS_BIN, agent } from '../core/index.js'
 
 // Claude Code only delivers channel notifications if the session was started
 // with --dangerously-load-development-channels (or --channels) naming this
@@ -9,6 +9,8 @@ import { PS_BIN } from '../core/index.js'
 // Look at the parent process command line to tell the user up front.
 export function channelLaunchStatus() {
   if (process.env.SQUADRA_ASSUME_CHANNEL === '1') return { ok: true }
+  // (Codex CLI and Grok CLI have no channels: squadra-host types what arrives.)
+  if (agent.kind && agent.kind !== 'claude') return { ok: true }
   try {
     let pid = process.ppid
     for (let i = 0; i < 3 && pid > 1; i++) {

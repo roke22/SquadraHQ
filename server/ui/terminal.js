@@ -77,7 +77,9 @@ export class TermView {
   renderFoot() {
     const h = hosts.get(this.host)
     const ro = h?.info?.allow_input === false
-    this.foot.innerHTML = (ro ? `<span class="ro">${T.readOnly}</span><span>${esc(T.typingOff)}</span>` : this.compact ? '' : `<span>${esc(T.termHint(h?.name ?? this.host))}</span>`) +
+    // (Codex CLI and Grok CLI: no channels prompt, no image paste.)
+    const agent = (h?.info?.terminals ?? []).find(x => x?.id === this.term)?.agent
+    this.foot.innerHTML = (ro ? `<span class="ro">${T.readOnly}</span><span>${esc(T.typingOff)}</span>` : this.compact ? '' : `<span>${esc(agent && agent !== 'claude' ? T.termHintTyped(h?.name ?? this.host, T.agentName[agent] ?? agent) : T.termHint(h?.name ?? this.host))}</span>`) +
       (this.notice ? `<span class="ro">${T.machineSays}: ${esc(this.notice)}</span>` : '')
   }
 

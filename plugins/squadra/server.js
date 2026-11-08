@@ -20,15 +20,24 @@
  * file joins them.
  */
 
-import { log, shutdown, useAgent } from './core/index.js'
+import { log, shutdown, useAgent, readLaunch } from './core/index.js'
 import { startMcp, deliver, givePermission, takePermissionReply } from './claude/index.js'
+import * as typed from './typed/index.js'
 
 // Last-resort safety net — without these the process dies silently on any
 // unhandled promise rejection. With them it logs and keeps serving tools.
 process.on('unhandledRejection', err => log(`unhandled rejection: ${err}`))
 process.on('uncaughtException', err => log(`uncaught exception: ${err}`))
 
-useAgent({ kind: 'claude', deliver, givePermission, takePermissionReply })
+// The agent this session runs: what squadra-host wrote for this start, else
+// SQUADRA_AGENT, else Claude Code. Codex CLI and Grok CLI run this same MCP
+// server, but have no channels: what arrives is typed in their terminal.
+const launched = readLaunch(process.env.SQUADRA_NAME)?.agent ?? process.env.SQUADRA_AGENT
+if (typed.TYPED_AGENTS.includes(launched)) {
+  useAgent({ kind: launched, deliver: typed.deliver, givePermission: typed.givePermission, takePermissionReply: typed.takePermissionReply })
+} else {
+  useAgent({ kind: 'claude', deliver, givePermission, takePermissionReply })
+}
 startMcp()
 
 // When Claude Code closes the MCP connection, stdin gets EOF. Without this the

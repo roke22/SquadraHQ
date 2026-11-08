@@ -1,6 +1,6 @@
 // What any agent could reuse: the connection to the server, who may talk to this
 // session, and what arrives. It knows the agent only through agent.js.
-export { useAgent } from './agent.js'
+export { useAgent, agent } from './agent.js'
 export {
   PS_BIN, log, COORDINATOR_WORDS, defaultObserve, SERVER_URL, transportProblem, CONFIG_DIR_IGNORED, DEFAULT_COORDINATOR,
   NAME_RE, OBSERVE_ORDER, RUN_DIR, VERSION, SERVER_TOKEN, ROOT_ENV_FILE, REPORTS, GROUP_ID_RE,

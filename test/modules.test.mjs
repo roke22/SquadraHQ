@@ -24,7 +24,7 @@ const SERVER_MODULES = {
   ui: [],
 }
 const SERVER_OTHER_FOLDERS = ['vendor']
-const PLUGIN_MODULES = { core: [], claude: ['core'] }
+const PLUGIN_MODULES = { core: [], claude: ['core'], typed: ['core'] }
 // Plain helpers at the plugin's top, which hook.js uses too and which import
 // no module: these the modules may use.
 const PLUGIN_HELPERS = ['observe.js', 'paths.js', 'signing.js']
@@ -163,14 +163,18 @@ test('modules: the checks the plugin and the host each keep are the same', () =>
   assert.deepEqual(byIdentity(body(HOST, 'withinById')), byIdentity(body(PATHS, 'within')))
 })
 
-test('modules: the host uses Claude Code only through its claudeCode object', () => {
+test('modules: the host uses each agent only through its object', () => {
   const source = readFileSync(join(ROOT, 'host/squadra-host.mjs'), 'utf8')
-  const start = source.indexOf('// --- Claude Code ---'), end = source.indexOf('// --- opening and closing sessions ---')
-  assert.ok(start > 0 && end > start)
-  const section = source.slice(start, end), outside = source.slice(0, start) + source.slice(end)
-  const names = [...section.matchAll(/^(?:export )?(?:async )?(?:function|const|let) (\w+)/gm)].map(m => m[1]).filter(n => n !== 'claudeCode')
-  assert.ok(names.includes('claudeBinary') && names.includes('ensurePlugin'))
-  for (const name of names) assert.doesNotMatch(outside, new RegExp(`(?<![.\\w])${name}\\b`), name)
+  const claude = source.indexOf('// --- Claude Code ---'), typed = source.indexOf('// --- Codex CLI and Grok CLI ---'), end = source.indexOf('// --- opening and closing sessions ---')
+  assert.ok(claude > 0 && typed > claude && end > typed)
+  // [section, the objects the rest of the file may use]
+  for (const [from, to, objects, must] of [[claude, typed, ['claudeCode'], ['claudeBinary', 'ensurePlugin']], [typed, end, ['codexCli', 'grokCli', 'TYPED'], ['typeWaiting', 'ensureCodexPlugin']]]) {
+    const section = source.slice(from, to), outside = source.slice(0, from) + source.slice(to)
+    const names = [...section.matchAll(/^(?:export )?(?:async )?(?:function|const|let) (\w+)/gm)].map(m => m[1]).filter(n => !objects.includes(n))
+    for (const m of must) assert.ok(names.includes(m), m)
+    // (Another agent's object may have a key of the same name: "typeAnswer: …".)
+    for (const name of names) assert.doesNotMatch(outside, new RegExp(`(?<![.\\w])${name}\\b(?!:)`), name)
+  }
 })
 
 test('modules: nothing unknown, nothing that can not be checked, no reaching out', () => {

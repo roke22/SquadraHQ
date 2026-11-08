@@ -55,7 +55,7 @@ function memberRow(m, i) {
       <label class="nt-name"><span class="sr-only">${esc(T.ntNameOf(T.roleName[m.role]))}</span><input type="text" value="${esc(m.name)}" maxlength="32" spellcheck="false" autocomplete="off" data-name="${i}" ${draft.running ? 'disabled' : ''}></label>
       <span class="nt-role">${esc(T.roleName[m.role])}</span>
       ${agentsOf(draft.host).length > 1 ? `<label class="nt-agent"><span class="sr-only">${esc(T.agent)}</span><select data-agent="${i}" ${draft.running ? 'disabled' : ''}>${agentsOf(draft.host).map(a => `<option value="${a}" ${a === (m.agent ?? 'claude') ? 'selected' : ''}>${esc(T.agentName[a])}</option>`).join('')}</select></label>` : ''}
-      <label class="nt-persona"><span class="sr-only">${esc(T.persona)}</span><select data-persona="${i}" ${draft.running ? 'disabled' : ''}><option value="">${esc(T.personaNone)}</option>${personaOptions(personas.list, m.persona, false)}</select></label>
+      ${(m.agent ?? 'claude') === 'claude' ? `<label class="nt-persona"><span class="sr-only">${esc(T.persona)}</span><select data-persona="${i}" ${draft.running ? 'disabled' : ''}><option value="">${esc(T.personaNone)}</option>${personaOptions(personas.list, m.persona, false)}</select></label>` : '<span class="nt-persona"></span>'}
       ${m.role === 'worker' && !draft.running ? `<button type="button" class="icon-btn" data-remove="${i - 1}" aria-label="${esc(T.ntRemove(m.name))}">${icon('close')}</button>` : '<span class="nt-gap"></span>'}
       ${res ? `<span class="nt-res ${res.ok ? 'ok' : res.ok === false ? 'bad' : ''}" role="status">${esc(res.text)}</span>` : ''}
     </li>`
@@ -93,7 +93,7 @@ export function renderNewTeam() {
   const folders = host?.info?.folders ?? []
   // (What had the focus keeps it: a click that redraws the page doesn't lose your place.)
   const focused = document.activeElement?.closest?.('#newteam') ? document.activeElement : null
-  const focusSel = focused ? (focused.name ? `[name="${focused.name}"]` : ['data-name', 'data-persona', 'data-start', 'data-remove'].map(a => focused.hasAttribute(a) ? `[${a}="${CSS.escape(focused.getAttribute(a))}"]` : '').find(Boolean)) : null
+  const focusSel = focused ? (focused.name ? `[name="${focused.name}"]` : ['data-name', 'data-agent', 'data-persona', 'data-start', 'data-remove'].map(a => focused.hasAttribute(a) ? `[${a}="${CSS.escape(focused.getAttribute(a))}"]` : '').find(Boolean)) : null
   $('newteam').innerHTML = `<form class="nt" novalidate>
       <ol class="nt-steps" aria-label="${esc(T.ntSteps)}">${stepsHtml()}</ol>
 
@@ -186,7 +186,12 @@ $('newteam').addEventListener('change', e => {
   if (t.name === 'host') { draft.host = t.value; draft.folder = hosts.get(t.value)?.info?.folders?.[0] ?? '' }
   else if (t.name === 'folder') draft.folder = t.value
   else if (t.dataset.persona != null) { const i = Number(t.dataset.persona); if (i === 0) draft.coord.persona = t.value; else draft.workers[i - 1].persona = t.value; return }
-  else if (t.dataset.agent != null) { const i = Number(t.dataset.agent); if (i === 0) draft.coord.agent = t.value; else draft.workers[i - 1].agent = t.value; return }
+  else if (t.dataset.agent != null) {
+    // (Personas are Claude Code's for now: another agent opens without one.)
+    const m = Number(t.dataset.agent) === 0 ? draft.coord : draft.workers[Number(t.dataset.agent) - 1]
+    m.agent = t.value
+    if (m.agent !== 'claude') m.persona = ''
+  }
   else return
   renderNewTeam()
 })

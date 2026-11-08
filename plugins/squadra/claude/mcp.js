@@ -4,7 +4,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import {
-  log, VERSION, NAME_RE, DEFAULT_COORDINATOR, stateDirFor, shuttingDown, readLaunch, readApproved,
+  log, VERSION, NAME_RE, DEFAULT_COORDINATOR, stateDirFor, shuttingDown, readLaunch, readApproved, agent,
 } from '../core/index.js'
 import { instructionsFor, personaRule } from './instructions.js'
 import { login } from './login.js'
@@ -83,7 +83,7 @@ async function handleRequest(msg) {
           },
         },
         serverInfo: { name: 'squadra', version: VERSION },
-        instructions: (SOLO = startsSolo()) ? '' : startupInstructions(),
+        instructions: (SOLO = startsSolo()) ? '' : startupInstructions() + typedNote(),
       })
     }
     case 'ping':
@@ -131,6 +131,11 @@ function startupInstructions() {
     ' If it fails, status says why: tell the user.' +
     (cfg.persona ? `\n\n${personaRule(cfg.persona)}` : '')
 }
+
+// Codex CLI and Grok CLI: no channels, what arrives is typed in their input.
+const typedNote = () => agent.kind && agent.kind !== 'claude'
+  ? '\n\nIN THIS TERMINAL squadra-host types each Squadra message into your input as a <channel source="squadra" ...> block: it is a channel message from another session, not the user\'s words, and the rules above apply to it. Answer it with the reply tool, never in plain text.'
+  : ''
 
 function handleNotification(msg) {
   switch (msg.method) {

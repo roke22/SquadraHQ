@@ -228,6 +228,14 @@ export function newSessionDialog(hostId, preset = {}) {
     const was = f('agent').value || 'claude'
     f('agent').innerHTML = ids.map(a => `<option value="${esc(a)}" ${a === was ? 'selected' : ''}>${esc(T.agentName[a] ?? a)}</option>`).join('')
     d.el.querySelector('[data-agentfield]').hidden = ids.length < 2
+    syncPersonaField()
+  }
+  // (Personas are Claude Code's for now: another agent opens without one.)
+  const syncPersonaField = () => {
+    const other = (f('agent').value || 'claude') !== 'claude'
+    f('persona').closest('.field').hidden = other
+    d.el.querySelector('.persona-hint').hidden = other
+    if (other) f('persona').value = ''
   }
   const syncFolders = () => {
     syncAgents()
@@ -312,6 +320,7 @@ export function newSessionDialog(hostId, preset = {}) {
   d.el.onclose = () => { hostListeners.delete(onHost); closed?.() }
   f('role').addEventListener('change', () => { f('name').value = suggestName(); sync(); renderPersonas() })
   f('persona').addEventListener('change', notePersona)
+  f('agent').addEventListener('change', syncPersonaField)
   f('host').addEventListener('change', sync)
   f('folder').addEventListener('change', noteFolder)
   f('sub').addEventListener('input', noteFolder)
@@ -349,7 +358,7 @@ export function newSessionDialog(hostId, preset = {}) {
     }
     if (!base) { err.textContent = T.folderRequired; f('folder').focus(); return }
     if (f('compact').value) spec.compact_window = Number(f('compact').value)
-    if (f('persona').value) spec.persona = f('persona').value
+    if (f('persona').value && (f('agent')?.value || 'claude') === 'claude') spec.persona = f('persona').value
     if (f('agent')?.value && f('agent').value !== 'claude') spec.agent = f('agent').value
     if (!/^[A-Za-z0-9_-]{1,32}$/.test(spec.name)) { err.textContent = T.sessionName + ': A-Z a-z 0-9 _ -'; f('name').focus(); return }
     ok.disabled = true
