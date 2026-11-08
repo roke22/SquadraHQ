@@ -1,0 +1,134 @@
+/* The inbox: what waits on you across the page, like a mail client's list;
+   the one picked opens on the right, and closes back to the list. */
+
+#inbox { flex: 1; min-height: 0; display: flex; }
+.ibx { flex: 1; min-height: 0; display: flex; }
+.ibx-list { flex: 1; min-width: 0; overflow-y: auto; padding: 8px 20px 32px; }
+.ibx-col { max-width: 860px; margin: 0 auto; }
+.ibx-detail { display: none; flex: 1; min-width: 0; overflow-y: auto; padding: 20px 28px 48px; }
+.ibx.has-pick .ibx-list { flex: 0 0 400px; padding: 8px 12px 24px; border-right: 1px solid var(--line); }
+.ibx.has-pick .ibx-detail, .ibx.none .ibx-detail, .ibx.fresh .ibx-detail { display: block; }
+.ibx.none .ibx-list, .ibx.fresh .ibx-list { display: none; }
+.ibx-detail.enter { animation: ibx-in var(--t-slow) var(--ease); }
+@keyframes ibx-in { from { opacity: 0; transform: translateX(10px); } }
+.ibx-col > .empty { padding: 40px 0 8px; }
+
+/* Each group is one card; its entries part with a hairline that starts at the text. */
+.ibx-group { margin: 0 0 6px; }
+.ibx-group ul { list-style: none; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
+.ibx-group li { position: relative; }
+.ibx-group li + li::before { content: ""; position: absolute; top: 0; left: 36px; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
+.ibx-group li:has(.on)::before, .ibx-group li:has(.on) + li::before { opacity: 0; }
+.ibx-group-h { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 16px 4px 8px 16px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+details.ibx-group > summary { cursor: pointer; list-style: none; }
+details.ibx-group > summary::-webkit-details-marker { display: none; }
+details.ibx-group > summary:hover { color: var(--text); }
+.ibx-none { padding: 20px; color: var(--muted); }
+
+.ibx-item { display: flex; gap: 12px; padding: 13px 16px; color: inherit; text-decoration: none; transition: background-color var(--t-fast) var(--ease); }
+.ibx-item:hover { background: color-mix(in srgb, var(--raised) 60%, var(--panel)); }
+.ibx-item.on { background: var(--raised); }
+.ibx-item:focus-visible { outline-offset: -2px; border-radius: var(--r-lg); }
+.ibx-item .dot { margin-top: 6px; }
+.ibx-item-b { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ibx-item-t { font-weight: 500; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.ibx.has-pick .ibx-item-t { -webkit-line-clamp: 2; }
+.ibx-item.done .ibx-item-t { font-weight: 400; color: var(--muted); }
+.ibx-item-m { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 7px; font-size: var(--fs-sm); color: var(--muted); }
+.ibx-who { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 12px; }
+.ibx-who .role { width: 12px; height: 12px; }
+.ibx-upd { color: var(--warn); font-weight: 500; }
+
+.ibx-back { display: none; }
+
+/* The one open: a card, headed like a message (who, team, what, when), then
+   what it says and how to answer, then its facts in a quiet footer. */
+.ibx-card { max-width: 760px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 1px 2px rgba(15, 17, 20, .04), 0 10px 30px rgba(15, 17, 20, .05); }
+.ibx-head { display: flex; align-items: center; gap: 12px; padding: 14px 14px 14px 20px; border-bottom: 1px solid var(--line); }
+.ibx-avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--raised); }
+.ibx-avatar.coord { background: var(--coord-soft); }
+.ibx-avatar.worker { background: var(--worker-soft); }
+.ibx-avatar .role { width: 17px; height: 17px; }
+.ibx-from { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.ibx-from b { font: 600 13px/1.3 var(--mono); }
+.ibx-from > span { font-size: var(--fs-sm); color: var(--muted); }
+.ibx-head .btn { flex: none; }
+.ibx-head .ibx-s { display: none; }
+.ibx-from > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ibx-body { padding: 22px 24px 6px; }
+.ibx-link { color: var(--text); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.ibx-link:hover { text-decoration-color: currentColor; }
+.ibx-changed { margin-bottom: 14px; padding: 9px 12px; border-radius: var(--r-md); background: color-mix(in srgb, var(--warn) 14%, var(--panel)); color: var(--text); font-weight: 500; }
+.ibx-q { margin: 0 0 18px; font-size: 20px; line-height: 1.38; font-weight: 500; letter-spacing: -.012em; text-wrap: pretty; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ibx-q.tell { font-size: var(--fs-lg); line-height: 1.5; font-weight: 400; }
+.ibx-perm { margin: 0 0 14px; padding: 10px 12px; border-radius: var(--r-md); background: var(--term); color: var(--term-text); font: 12.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.ibx-opts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.ibx-opt {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 9px 12px;
+  border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--panel); color: var(--text); text-align: left;
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.ibx-opt:hover { background: var(--raised); border-color: var(--muted); }
+.ibx-opt:active { transform: scale(.995); }
+.ibx-opt.rec { border-color: var(--ok); }
+.ibx-opt span:not(.tag) { flex: 1; }
+.ibx-opt .tag { color: var(--ok); border-color: currentColor; }
+.ibx-optlist { margin: 0 0 16px; padding-left: 20px; }
+.ibx-optlist li { margin: 3px 0; }
+.ibx-rec { margin: 0 0 16px; color: var(--muted); }
+.ibx-rec .tag { color: var(--ok); border-color: currentColor; margin-right: 4px; }
+
+.ibx-answer .field { margin-bottom: 10px; }
+.ibx-answer textarea { min-height: 76px; }
+.ibx-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 18px; }
+.ibx-actions .row { display: flex; gap: 8px; margin-left: auto; }
+.ibx-actions > .btn:only-child { margin-left: 0; }
+.ibx-note { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-sm); }
+.ibx-actions .ibx-note { margin: 0; }
+.ibx-result { margin: 0 0 14px; padding: 9px 12px; border-radius: var(--r-md); background: var(--raised); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.ibx-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 18px; margin: 0; padding: 14px 24px 16px; border-top: 1px solid var(--line); border-radius: 0 0 var(--r-lg) var(--r-lg); background: color-mix(in srgb, var(--raised) 45%, var(--panel)); font-size: var(--fs-sm); }
+.ibx-facts dt { color: var(--muted); }
+.ibx-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+#inbox .empty { height: 100%; justify-content: center; }
+#inbox .empty .empty-ic { width: 40px; height: 40px; stroke-width: 1.3; color: var(--line-2); margin-bottom: 4px; }
+#inbox .empty span { max-width: 340px; }
+.ic.flip { transform: rotate(180deg); }
+
+/* A phone: the list, or the one picked over the whole screen with a way back. */
+@media (max-width: 900px) {
+  .ibx-list, .ibx.has-pick .ibx-list { flex: 1; padding: 4px 12px 32px; border-right: 0; }
+  .ibx-detail { padding: 8px 12px 32px; }
+  .ibx-head { padding: 12px 12px 12px 16px; }
+  .ibx-head .ibx-l { display: none; }
+  .ibx-head .ibx-s { display: inline; }
+  .ibx-body { padding: 18px 16px 4px; }
+  .ibx-facts { padding: 12px 16px 14px; }
+  .ibx.has-pick .ibx-list { display: none; }
+  .ibx-close { display: none; }
+  .ibx-detail.enter { animation: none; }
+  .ibx-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 0 6px -6px; padding: 0 6px; color: var(--text); text-decoration: none; font-weight: 500; }
+  .ibx-q { font-size: 19px; }
+  .ibx-answer textarea { font-size: 16px; }
+  .ibx-opt { min-height: 48px; }
+  .ibx-item-t, .ibx.has-pick .ibx-item-t { -webkit-line-clamp: 2; }
+}
+
+/* The first steps, while nothing is open yet. */
+.fs { max-width: 560px; margin: 8vh auto 0; }
+.fs-title { margin: 0 0 4px; font-size: var(--fs-2xl); font-weight: 600; letter-spacing: -.02em; }
+.fs-sub { margin: 0 0 20px; color: var(--muted); }
+.fs-steps { list-style: none; margin: 0 0 14px; padding: 0; }
+.fs-step { display: flex; gap: 12px; padding: 14px 16px; }
+.fs-step + .fs-step { border-top: 1px solid var(--line); }
+.fs-step b { font-weight: 500; }
+.fs-step p { margin: 4px 0 10px; color: var(--muted); font-size: var(--fs-sm); }
+.fs-mark { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border: 1px solid var(--line-2); border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
+.fs-step.done .fs-mark { border-color: var(--ok); color: var(--ok); }
+.fs-step.done b { color: var(--muted); }
+.fs-step.now .fs-mark { background: var(--info); border-color: var(--info); color: var(--on-accent); }
+.fs-step:not(.done):not(.now) b { color: var(--muted); font-weight: 400; }
+.fs-hint { font-size: var(--fs-sm); color: var(--muted); }
+

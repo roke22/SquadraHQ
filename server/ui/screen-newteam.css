@@ -1,0 +1,90 @@
+/* A new team: one page, four steps, nothing opens until the last. */
+
+#newteam { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 20px 48px; }
+.nt { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.nt-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; font-size: var(--fs-sm); color: var(--muted); }
+.nt-step { display: inline-flex; align-items: center; gap: 7px; }
+.nt-step b { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line-2); border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; }
+.nt-step.done { color: var(--text); }
+.nt-step.done b { border-color: var(--ok); color: var(--ok); }
+
+.nt-sec h2 { margin: 0 0 12px; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.01em; }
+.nt-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px; margin-bottom: 14px; }
+.nt-choice { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--panel); color: var(--text); text-align: left; transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease); }
+.nt-choice:hover { background: var(--raised); }
+.nt-choice.on { border-color: var(--info); box-shadow: 0 0 0 1px var(--info); }
+.nt-choice b { font-weight: 600; }
+.nt-choice span { font-size: var(--fs-sm); color: var(--muted); }
+
+.nt-card { overflow: hidden; }
+.nt-card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 8px 6px 16px; border-bottom: 1px solid var(--line); }
+.nt-card-h h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.nt-members { list-style: none; margin: 0; padding: 4px 0; }
+.nt-member { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 12px 7px 16px; }
+.nt-member + .nt-member { border-top: 1px solid var(--line); }
+.nt-name input { width: 170px; height: 32px; padding: 4px 9px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--text); font: 500 12.5px var(--mono); }
+.nt-name input:focus-visible, .nt-persona select:focus-visible { outline: none; border-color: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 22%, transparent); }
+.nt-role { font-size: var(--fs-sm); color: var(--muted); min-width: 84px; }
+.nt-persona { flex: 1 1 200px; min-width: 0; }
+.nt-persona select { width: 100%; height: 32px; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--text); }
+.nt-gap { width: 28px; }
+.nt-res { flex-basis: 100%; padding-left: 24px; font-size: var(--fs-sm); color: var(--muted); }
+.nt-res.ok { color: var(--ok); }
+.nt-res.bad { color: var(--err); }
+.nt-note { margin: 0; padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
+.nt-sec > .nt-note { border-top: 0; padding: 0; }
+.nt-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 0 12px; }
+
+.nt-go { padding-top: 4px; }
+.nt-issues { margin: 0 0 12px; color: var(--err); font-size: var(--fs-sm); }
+.nt-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+@media (max-width: 700px) {
+  #newteam { padding: 16px 12px 40px; }
+  .nt-name input { width: 100%; }
+  .nt-name { flex: 1 1 140px; }
+}
+
+/* A new machine: the same page, its way in four steps; what isn't due yet, dimmed. */
+#addmachine { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 20px 48px; }
+.nt-sec.later { opacity: .45; }
+.nt-sec.later h2 { color: var(--muted); }
+.am-note { margin: 0 0 10px; font-size: var(--fs-sm); color: var(--muted); }
+.am-intro { margin-top: -6px; }
+.am-warn { color: var(--err); }
+.am-os { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; font-size: var(--fs-sm); color: var(--muted); }
+.am-run { margin: 0 0 6px; }
+.am .cmdrow { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 10px; }
+.am .cmdrow .cmd { flex: 1; min-width: 0; margin: 0; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+.am-adv { margin-top: 4px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); }
+.am-adv > summary { cursor: pointer; font-weight: 500; }
+.am-adv[open] > summary { margin-bottom: 12px; }
+.am-adv .check { margin-bottom: 10px; }
+.am-wait { display: flex; align-items: center; gap: 9px; margin: 0 0 10px; font-weight: 500; }
+.am-wait.ok { color: var(--ok); }
+.am-wait.bad { color: var(--err); }
+.am-folders { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 16px; padding: 12px 14px; }
+.am-folders b { font-weight: 500; }
+
+/* Each step in its own card (what is inside a step sits on the page's colour). */
+.nt-steps { margin-bottom: 6px; }
+.nt-sec { padding: 20px 22px 22px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 1px 2px rgba(15, 17, 20, .04); }
+.nt-sec > :last-child { margin-bottom: 0; }
+.nt-sec .nt-card, .nt-sec .nt-choice, .nt-sec .am-adv, .nt-sec .am-folders { background: var(--bg); }
+.nt-sec .nt-choice.on { background: color-mix(in srgb, var(--info) 6%, var(--bg)); }
+.nt-sec .nt-actions { margin-top: 14px; }
+@media (max-width: 900px) { .nt-sec { padding: 16px; } }
+.nt-sec.nt-go { padding: 4px 0 0; background: none; border: 0; box-shadow: none; }
+.nt-agent select { height: 32px; padding: 4px 8px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--text); }
+/* The agents to install: a card each, ticked to install it. */
+.am-agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 8px; margin: 0 0 16px; padding: 0; border: 0; }
+.am-agents legend { padding: 0; margin-bottom: 8px; font-size: var(--fs-sm); font-weight: 500; color: var(--muted); }
+.am-agent { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: start; gap: 8px 10px; padding: 12px; border: 1px solid var(--line-2); border-radius: var(--r-md); background: var(--bg); cursor: pointer; transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease); }
+.am-agent:hover { border-color: var(--muted); }
+.am-agent.on { border-color: var(--info); box-shadow: 0 0 0 1px var(--info); background: color-mix(in srgb, var(--info) 6%, var(--bg)); }
+.am-agent input { margin: 2px 0 0; accent-color: var(--info); }
+.am-agent .agent { width: 18px; height: 18px; font-size: 10px; border-radius: 5px; }
+.am-agent b { display: block; font-weight: 600; line-height: 1.3; }
+.am-agent span > span { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--muted); line-height: 1.4; }
+.am-signin { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.am-signin li { display: flex; align-items: center; gap: 8px; }

@@ -1,27 +1,31 @@
-// Upgrading a server that ran 0.0.1: it starts on the old data, and the
-// one-time cleaning of what the old version stored goes through every row
-// (more than one batch), also when it was interrupted halfway.
+// Upgrading a server: from 0.0.1, the one-time cleaning of what that version
+// stored goes through every row (more than one batch); from 0.0.7, the last
+// release, machines, sessions and what it held go on working.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
+import { totpCode, totpStep } from '../server/accounts/totp.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'upgrade-admin-token-0123456789'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-let oldServerDir = null
-try {
-  oldServerDir = mkdtempSync(join(tmpdir(), 'squadra-old-'))
-  execFileSync('sh', ['-c', `git -C "${ROOT}" archive v0.0.1 server | tar -x -C "${oldServerDir}"`], { stdio: 'ignore' })
-  // (Without the tag — a shallow clone, as in CI — nothing is extracted; macOS's
-  // tar doesn't fail on the empty input.)
-  if (!existsSync(join(oldServerDir, 'server', 'server.js'))) oldServerDir = null
-} catch { oldServerDir = null }
+function serverOf(tag) {
+  try {
+    const dir = mkdtempSync(join(tmpdir(), 'squadra-old-'))
+    execFileSync('sh', ['-c', `git -C "${ROOT}" archive ${tag} server | tar -x -C "${dir}"`], { stdio: 'ignore' })
+    // (Without the tag — a shallow clone, as in CI — nothing is extracted; macOS's
+    // tar doesn't fail on the empty input.)
+    return existsSync(join(dir, 'server', 'server.js')) ? dir : null
+  } catch { return null }
+}
+const oldServerDir = serverOf('v0.0.1')
+const lastRelease = serverOf('v0.0.7')
 
 async function run(script, dataDir, port) {
   const proc = spawn(process.execPath, [script], {
@@ -78,4 +82,103 @@ test('a 0.0.1 database: the new server starts and cleans every old row', { skip:
 
   // And it starts again (nothing left half done).
   await stop(await run(join(ROOT, 'server/server.js'), dataDir, port))
+})
+
+test('a 0.0.7 server: machines, sessions and tokens go on working, with nothing to do on them', { skip: !lastRelease && 'the v0.0.7 tag is not available' }, async () => {
+  const dataDir = mkdtempSync(join(tmpdir(), 'squadra-up7-'))
+  const port = 23000 + Math.floor(Math.random() * 2000)
+  const at = path => `http://127.0.0.1:${port}/${path}`
+  const post = (path, body, auth) => fetch(at(path), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}) }, body: JSON.stringify(body ?? {}) }).then(x => x.json())
+  const ok = r => { assert.ok(r.ok, r.description); return r.result }
+
+  const old = await run(join(lastRelease, 'server/server.js'), dataDir, port)
+  let join_, key, session, host
+  try {
+    join_ = readFileSync(join(dataDir, 'join-token'), 'utf8').trim()
+    key = ok(await fetch(at('server-identity?nonce=0123456789abcdef')).then(x => x.json())).key
+    session = ok(await post('register', { name: 'veteran' }, join_)).secret
+    const en = ok(await post('api/hosts/enroll', { name: 'old-machine' }, ADMIN))
+    host = ok(await post('host/enroll', { code: en.code, info: { hostname: 'old-machine' } }))
+  } finally { await stop(old) }
+
+  const now = await run(join(ROOT, 'server/server.js'), dataDir, port)
+  try {
+    assert.equal(ok(await fetch(at('server-identity?nonce=0123456789abcdef')).then(x => x.json())).key, key)
+    assert.equal(ok(await post('getMe', {}, session)).id, 'veteran')
+    assert.ok(ok(await post('host/ticket', {}, host.secret)).ticket)
+    ok(await post('register', { name: 'newcomer' }, join_))
+    const state = ok(await fetch(at('api/state'), { headers: { Authorization: `Bearer ${ADMIN}` } }).then(x => x.json()))
+    assert.deepEqual(state.sessions.map(s => s.name).sort(), ['newcomer', 'veteran'])
+    assert.deepEqual(state.hosts.map(h => h.name), ['old-machine'])
+    // What was there is the first company, and a new one starts empty.
+    const fresh = ok(await post('admin/createCompany', { name: 'Compañía nueva' }, ADMIN))
+    assert.deepEqual(ok(await fetch(at(`api/c/${fresh.id}/state`), { headers: { Authorization: `Bearer ${ADMIN}` } }).then(x => x.json())).sessions, [])
+    assert.ok(existsSync(join(dataDir, 'squadra-before-companies.db')))
+  } finally { await stop(now) }
+})
+
+test('a 0.0.7 server: what it held is all there for its first owner, and its coordinators use the inbox', { skip: !lastRelease && 'the v0.0.7 tag is not available' }, async () => {
+  const dataDir = mkdtempSync(join(tmpdir(), 'squadra-up7b-'))
+  const port = 23000 + Math.floor(Math.random() * 2000)
+  const at = path => `http://127.0.0.1:${port}/${path}`
+  const post = (path, body, auth, instance) => fetch(at(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Squadra-Instance': instance } : {}) },
+    body: JSON.stringify(body ?? {}),
+  }).then(x => x.json())
+  const get = (path, auth) => fetch(at(path), { headers: { Authorization: `Bearer ${auth}` } }).then(x => x.json())
+  const ok = r => { assert.ok(r.ok, r.description); return r.result }
+  // A session as the plugin is: its secret and the instance it claimed.
+  const session = async (name, role, coordinator) => {
+    const secret = ok(await post('register', { name }, ADMIN)).secret
+    const instance = `inst-${name}-000001`
+    const call = (method, body) => post(method, body, secret, instance)
+    ok(await call('claimSession', { instance, role, ...(coordinator ? { coordinator } : {}) }))
+    return call
+  }
+
+  const old = await run(join(lastRelease, 'server/server.js'), dataDir, port)
+  let boss
+  try {
+    boss = await session('boss', 'coordinator')
+    await session('hand', 'worker', 'boss')
+    ok(await boss('sendMessage', { chat_id: 'hand', text: 'a task from the 0.0.7 days' }))
+    ok(await post('api/org/squad', { coordinator: 'boss', title: 'Shop', goal: 'Sell more' }, ADMIN))
+    ok(await post('api/templates/save', { name: 'Shop team', coordinator: { name: 'boss', folder: '/srv/shop' }, workers: [{ name: 'hand', folder: '/srv/shop' }] }, ADMIN))
+  } finally { await stop(old) }
+
+  const now = await run(join(ROOT, 'server/server.js'), dataDir, port)
+  try {
+    // Its coordinator goes on where it was, and the inbox is there for it.
+    ok(await boss('claimSession', { instance: 'inst-boss-000001', role: 'coordinator' }))
+    const asked = ok(await boss('askUser', { text: 'Stack the discounts?', options: ['Stack', 'Biggest'] }))
+    assert.ok(asked.id)
+
+    // The token makes the first owner, who sees all of it in the first company.
+    const origin = `http://127.0.0.1:${port}`
+    let cookie = ''
+    const browser = async (method, path, body, headers = {}) => {
+      const r = await fetch(at(path), {
+        method,
+        headers: { ...(cookie ? { Cookie: cookie } : {}), ...(method === 'POST' ? { 'Content-Type': 'application/json', Origin: origin } : {}), ...headers },
+        ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
+      })
+      const set = r.headers.get('set-cookie')
+      if (set) cookie = set.split(';')[0]
+      return r.json()
+    }
+    assert.equal(ok(await browser('GET', 'auth/status')).needs_owner, true)
+    ok(await browser('POST', 'bootstrap', { email: 'owner@example.com', name: 'Owner', password: 'a long enough password 1' }, { Authorization: `Bearer ${ADMIN}` }))
+    const { secret } = ok(await browser('POST', 'auth/totp/setup'))
+    assert.equal(ok(await browser('POST', 'auth/totp/enable', { code: totpCode(secret, totpStep()) })).stage, 'ok')
+    const state = ok(await browser('GET', 'api/c/default/state'))
+    assert.deepEqual(state.sessions.map(s => s.name).sort(), ['boss', 'hand'])
+    assert.deepEqual(state.squads.map(q => [q.coordinator, q.title, q.goal]), [['boss', 'Shop', 'Sell more']])
+    assert.deepEqual(state.templates.map(t => t.name), ['Shop team'])
+    assert.deepEqual(state.inbox.map(i => [i.id, i.text, i.version]), [[asked.id, 'Stack the discounts?', 1]])
+    const messages = ok(await browser('GET', 'api/c/default/messages?session=hand'))
+    assert.ok(messages.some(m => m.text === 'a task from the 0.0.7 days'))
+    // From then on the token no longer opens the dashboard.
+    assert.equal((await get('api/state', ADMIN)).error_code, 401)
+  } finally { await stop(now) }
 })

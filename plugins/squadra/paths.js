@@ -30,6 +30,7 @@ export function claudeConfigDir() {
   try { home = userInfo().homedir || homedir() } catch { home = homedir() }
   const c = process.env.CLAUDE_CONFIG_DIR
   configDirNote = null
+  if (c && !isAbsolute(c)) configDirNote = `CLAUDE_CONFIG_DIR ${c} not used: it is not an absolute path`
   if (c && isAbsolute(c)) {
     const dir = realNearest(c), h = realNearest(home)
     // (Without a working folder — deleted — where the project is can't be
@@ -65,7 +66,7 @@ export function within(p, d) {
   let id
   try { const st = statSync(d, { bigint: true }); id = `${st.dev}:${st.ino}` } catch { return false }
   for (let x = p; ; x = dirname(x)) {
-    try { const st = statSync(x, { bigint: true }); if (`${st.dev}:${st.ino}` === id) return true } catch {}
+    try { const st = statSync(x, { bigint: true }); if (`${st.dev}:${st.ino}` === id && st.ino !== 0n) return true } catch {}
     if (dirname(x) === x) return false
   }
 }
@@ -100,7 +101,7 @@ export function privateGroup(gid) {
     const others = passwd.filter(f => f.length > 3 && Number(f[3]) === gid && f[0] !== me)
     if (passwd.some(f => f[0] === me)) ok = alone(local) && others.length === 0
     else if (gid === process.getuid() && others.length === 0 && local.every(f => f[0] === me)) {
-      const getent = ['/usr/bin/getent', '/bin/getent'].find(f => existsSync(f))
+      const getent = ['/usr/bin/getent', '/bin/getent', '/run/current-system/sw/bin/getent'].find(f => existsSync(f))
       if (getent) ok = alone(lines(execFileSync(getent, ['group', String(gid)], { encoding: 'utf8', timeout: 5000 })))
     }
   } catch {}

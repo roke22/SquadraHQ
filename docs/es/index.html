@@ -3,136 +3,208 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Squadra: Claude Code multiagente con un coordinador y un panel en directo</title>
-<meta name="description" content="Squadra dirige escuadras de agentes de Claude Code en cualquiera de tus equipos. Un agente coordinador reparte el trabajo, aprueba las acciones seguras y solo te pregunta lo importante. Panel web en directo, terminal web, servidor Node autoalojado sin dependencias. Código abierto, MIT.">
-<link rel="canonical" href="https://roke22.github.io/Squadra/es/">
-<link rel="alternate" hreflang="en" href="https://roke22.github.io/Squadra/">
-<link rel="alternate" hreflang="es" href="https://roke22.github.io/Squadra/es/">
-<link rel="alternate" hreflang="x-default" href="https://roke22.github.io/Squadra/">
+<title>SquadraHQ: tus agentes de IA, trabajando en equipo</title>
+<meta name="description" content="SquadraHQ pone a trabajar equipos de agentes de IA (Claude Code, y Codex CLI o Grok CLI) en cualquiera de tus máquinas. Un coordinador reparte el trabajo, aprueba lo seguro y te deja en la bandeja solo las decisiones que son tuyas. Panel en directo, autoalojado y de código abierto.">
+<link rel="canonical" href="https://roke22.github.io/SquadraHQ/es/">
+<link rel="alternate" hreflang="en" href="https://roke22.github.io/SquadraHQ/">
+<link rel="alternate" hreflang="es" href="https://roke22.github.io/SquadraHQ/es/">
+<link rel="alternate" hreflang="x-default" href="https://roke22.github.io/SquadraHQ/">
 <link rel="icon" href="../squadra-logo.svg" type="image/svg+xml">
+<link rel="preload" href="../fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../site.css">
+<meta name="theme-color" content="#f6f6f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1114" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Squadra: Claude Code multiagente con un coordinador y un panel en directo">
-<meta property="og:description" content="Un agente coordinador dirige escuadras de agentes de Claude Code en cualquiera de tus equipos: reparte el trabajo, aprueba las acciones seguras y solo te pregunta lo importante.">
-<meta property="og:url" content="https://roke22.github.io/Squadra/es/">
-<meta property="og:locale" content="es_ES">
-<meta property="og:image" content="https://roke22.github.io/Squadra/social-preview.png">
+<meta property="og:title" content="SquadraHQ: tus agentes de IA, trabajando en equipo">
+<meta property="og:description" content="Un coordinador dirige equipos de agentes de IA (Claude Code, Codex CLI, Grok CLI) en cualquiera de tus máquinas y te deja en la bandeja solo las decisiones que son tuyas.">
+<meta property="og:url" content="https://roke22.github.io/SquadraHQ/es/">
+<meta property="og:image" content="https://roke22.github.io/SquadraHQ/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Squadra: Claude Code multiagente con un coordinador y un panel en directo">
-<meta name="twitter:description" content="Escuadras de agentes de Claude Code en cualquier equipo, un coordinador que las dirige sin vigilancia y un panel web en directo. Código abierto, MIT.">
-<meta name="twitter:image" content="https://roke22.github.io/Squadra/social-preview.png">
+<meta name="twitter:title" content="SquadraHQ: tus agentes de IA, trabajando en equipo">
+<meta name="twitter:description" content="Equipos de agentes de IA (Claude Code, Codex CLI, Grok CLI) en cualquier máquina, un coordinador que los dirige y una bandeja solo con lo que te toca decidir. Código abierto.">
+<meta name="twitter:image" content="https://roke22.github.io/SquadraHQ/social-preview.png">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "Squadra",
+  "name": "SquadraHQ",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Linux, macOS, Windows (WSL)",
-  "description": "Un agente coordinador que dirige escuadras de agentes de Claude Code en cualquier equipo, con un panel web en directo y terminal web. Servidor Node.js autoalojado sin dependencias.",
-  "url": "https://roke22.github.io/Squadra/es/",
-  "inLanguage": "es",
-  "codeRepository": "https://github.com/roke22/Squadra",
+  "description": "Un coordinador que dirige equipos de agentes de IA (Claude Code, Codex CLI, Grok CLI) en cualquier máquina, con una bandeja para las decisiones del usuario y un panel web en directo. Servidor Node.js autoalojado y sin dependencias.",
+  "url": "https://roke22.github.io/SquadraHQ/es/",
+  "codeRepository": "https://github.com/roke22/SquadraHQ",
   "license": "https://opensource.org/licenses/MIT",
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
   "author": {"@type": "Person", "name": "Jose J. Anton", "url": "https://github.com/roke22"}
 }
 </script>
-<style>
-:root{--accent:#C15F3C;--ink:#1F1E1C;--muted:#5d5955;--bg:#FBF7F3;--card:#fff;--line:#eadfd7}
-@media (prefers-color-scheme:dark){:root{--ink:#f3efe9;--muted:#b3aca4;--bg:#17150f;--card:#221f19;--line:#3a342c}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-a{color:var(--accent)}
-.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
-header{padding:56px 0 24px;text-align:center}
-header img.logo{width:88px;height:88px}
-h1{font-size:clamp(28px,5vw,46px);line-height:1.15;margin:16px 0 12px;letter-spacing:-.5px}
-.lead{font-size:clamp(18px,2.4vw,22px);color:var(--muted);max-width:760px;margin:0 auto 28px}
-.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.btn{display:inline-block;padding:12px 22px;border-radius:10px;font-weight:600;text-decoration:none;border:2px solid var(--accent)}
-.btn.primary{background:var(--accent);color:#fff}
-.btn.ghost{color:var(--accent)}
-.shot{display:block;width:100%;border-radius:14px;border:1px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.12);margin:40px 0}
-h2{font-size:clamp(24px,3.4vw,32px);margin:56px 0 18px;letter-spacing:-.3px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
-.card h3{margin:0 0 6px;font-size:19px}
-.card p{margin:0;color:var(--muted)}
-pre{background:#1F1E1C;color:#f3efe9;padding:18px 20px;border-radius:12px;overflow:auto;font-size:15px}
-table{width:100%;border-collapse:collapse;font-size:16px}
-th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-weight:600}
-td strong{color:var(--accent)}
-.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:18px 0 0}
-footer{color:var(--muted);text-align:center;padding:56px 0 40px;font-size:15px}
-@media (max-width:640px){table{display:block;overflow-x:auto}}
-</style>
 </head>
 <body>
-<div class="wrap">
-<header>
-  <img class="logo" src="../squadra-logo.svg" alt="Squadra logo" onerror="this.style.display='none'">
-  <h1>Claude Code multiagente,<br>con un coordinador y un panel en directo</h1>
-  <p class="lead">Squadra dirige <strong>escuadras de agentes de Claude Code</strong> en cualquiera de tus equipos. Un agente coordinador reparte el trabajo, aprueba las acciones seguras y solo te pregunta lo importante. Tú lo ves todo en directo en el navegador.</p>
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/roke22/Squadra/blob/main/README-es.md#1-instala-el-panel">Empezar en GitHub</a>
-    <a class="btn ghost" href="ejemplos.html">Ver ejemplos</a>
-    <a class="btn ghost" href="https://github.com/roke22/Squadra/blob/main/docs/referencia.md">Leer la referencia</a>
-    <a class="btn ghost" href="../">In English</a>
-  </div>
-  <div class="badges">
-    <a href="https://github.com/roke22/Squadra/releases"><img src="https://img.shields.io/github/v/release/roke22/Squadra?label=release&color=C15F3C" alt="Latest release"></a>
-    <a href="https://github.com/roke22/Squadra/actions/workflows/test.yml"><img src="https://github.com/roke22/Squadra/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
-    <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
-    <img src="https://img.shields.io/badge/dependencies-0-success" alt="Zero dependencies">
-    <a href="https://github.com/roke22/Squadra/stargazers"><img src="https://img.shields.io/github/stars/roke22/Squadra?style=social" alt="Stars"></a>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="../squadra-logo.svg" alt="" width="26" height="26">SquadraHQ</a>
+    <nav aria-label="Secciones">
+      <a href="#inbox">Bandeja</a>
+      <a href="#teams">Equipos</a>
+      <a href="#start">Empezar</a>
+      <a href="ejemplos.html">Ejemplos</a>
+      <a href="https://github.com/roke22/SquadraHQ/blob/main/docs/referencia.md">Documentación</a>
+      <a href="https://github.com/roke22/SquadraHQ">GitHub</a>
+    </nav>
+    <a class="lang" href="../" hreflang="en" lang="en">English</a>
   </div>
 </header>
 
-<img class="shot" src="../screenshots/mosaic-squads.jpg" alt="Panel de Squadra: dos escuadras lado a lado, cada coordinador con sus workers" width="1436" height="800">
-
-<h2>Qué puedes hacer con él</h2>
-<div class="grid">
-  <div class="card"><h3>Una funcionalidad en varios repositorios a la vez</h3><p>Backend, web y app móvil, cada uno con su worker, coordinados entre sí.</p></div>
-  <div class="card"><h3>Partir un trabajo grande en paralelo</h3><p>Una migración, una refactorización o más tests: un worker de Claude Code por módulo, todos a la vez.</p></div>
-  <div class="card"><h3>Dejarlo trabajando solo</h3><p>Los workers deciden los detalles técnicos; el coordinador aprueba sus acciones seguras y solo te escala lo crítico.</p></div>
-  <div class="card"><h3>Vigilarlo desde cualquier sitio</h3><p>Todos los agentes en directo en tu navegador, una terminal web a cada uno y una barra «Te necesitan» con quien espera.</p></div>
-  <div class="card"><h3>Usar todos tus equipos y cuentas</h3><p>Cada agente funciona en cualquier máquina que añadas, con la sesión de Claude Code de esa máquina. Los agentes conectan hacia fuera; sin abrir puertos.</p></div>
-  <div class="card"><h3>Autoalojado, sin dependencias</h3><p>Un servidor Node.js, o una imagen Docker. HTTPS automático cuando le das un dominio. Licencia MIT.</p></div>
+<main>
+<div class="hero">
+  <div class="wrap">
+    <p class="eyebrow"><b>Nuevo</b><span class="long">Una bandeja para tus decisiones, y un plan para cada equipo</span><span class="short">Una bandeja para tus decisiones</span></p>
+    <h1>Tus agentes de IA, trabajando en equipo.</h1>
+    <p class="lead">Un coordinador reparte el trabajo entre sus workers, en cualquiera de tus máquinas, y aprueba lo que es seguro. Lo que te toca decidir te espera en la bandeja, así que puedes estar en otra parte.</p>
+    <div class="cta">
+      <a class="btn primary" href="#start">Empezar</a>
+      <a class="btn" href="https://github.com/roke22/SquadraHQ">Ver en GitHub</a>
+    </div>
+    <p class="note">Código abierto, MIT. Autoalojado: un servidor Node.js, sin dependencias.</p>
+    <div class="agents"><span>Funciona con</span><span class="ag"><img class="logo" src="../brand/anthropic.svg" alt="" width="20" height="20">Claude Code</span><span class="ag"><picture><source srcset="../brand/OAI_OpenAI-Blossom_White.svg" media="(prefers-color-scheme: dark)"><img class="logo" src="../brand/OAI_OpenAI-Blossom_Black.svg" alt="" width="20" height="20" data-pad></picture>Codex CLI <small>experimental</small></span><span class="ag"><picture><source srcset="../brand/Grok_Logomark_Light.svg" media="(prefers-color-scheme: dark)"><img class="logo" src="../brand/Grok_Logomark_Dark.svg" alt="" width="20" height="20"></picture>Grok CLI <small>experimental</small></span></div>
+    <div class="window">
+      <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+      <picture><source srcset="../screenshots/phone-inbox-dark-es.jpg" media="(max-width: 700px) and (prefers-color-scheme: dark)"><source srcset="../screenshots/phone-inbox-light-es.jpg" media="(max-width: 700px)"><source srcset="../screenshots/inbox-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/inbox-light-es.jpg" alt="La bandeja de SquadraHQ: un permiso pendiente y dos decisiones del coordinador de Desarrollo, una abierta con sus opciones y la recomendada marcada" width="2880" height="1800" fetchpriority="high"></picture>
+    </div>
+  </div>
 </div>
 
-<h2>Monta tu organización</h2>
-<p>Una escuadra funciona como un departamento: un coordinador y sus workers, cada uno con su persona. Enlaza las escuadras que se necesitan y sus coordinadores se reparten el trabajo, y cada uno pasa lo que asume a sus propios workers. Los <a href="ejemplos.html">ejemplos</a> muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto.</p>
-<img class="shot" src="../screenshots/org-chart.jpg" alt="Organigrama de Squadra: las escuadras Personal brand, Marketing y Product, enlazadas" width="1433" height="401">
+<section id="inbox">
+  <div class="wrap split">
+    <div>
+      <p class="kicker">La bandeja</p>
+      <h2>Solo lo que te toca decidir.</h2>
+      <p class="sub">Los coordinadores te dejan una pregunta por decisión, con sus opciones y lo que recomiendan. Todo lo demás lo resuelven ellos, y mientras esperan siguen con lo suyo.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Responde con un toque.</b> Elige una opción y añade un detalle si quieres, desde tu mesa o desde el móvil.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>Nunca con información vieja.</b> Si un coordinador descubre algo nuevo, actualiza la pregunta y ves que ha cambiado.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l3-8h10l3 8v6H4z"/><path d="M4 13h5l1.5 2.5h3L15 13h5"/></svg><span><b>También los permisos.</b> Un worker que espera para ejecutar un comando aparece aquí, con lo que quiere ejecutar exactamente.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span><b>O apártala.</b> Descarta una pregunta y a su coordinador se le dice que no espere respuesta.</span></li>
+      </ul>
+    </div>
+    <div class="phone"><picture><source srcset="../screenshots/phone-decision-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/phone-decision-light-es.jpg" alt="Una decisión en el móvil: la pregunta, dos opciones con la recomendada marcada y sitio para responder con tus palabras" width="780" height="1688" loading="lazy"></picture></div>
+  </div>
+</section>
 
-<h2>Comparado con lo que trae Claude Code</h2>
-<table>
-<tr><th></th><th>Subagentes de Claude Code</th><th>Agent Teams de Claude Code</th><th>Squadra</th></tr>
-<tr><td>Los agentes corren en</td><td>la misma sesión</td><td>el mismo equipo</td><td><strong>cualquier equipo que añadas</strong>, cada uno con su sesión</td></tr>
-<tr><td>Verlos</td><td>una terminal</td><td>una terminal por agente</td><td><strong>un panel web en directo</strong>, desde cualquier navegador</td></tr>
-<tr><td>Trabajo desatendido</td><td>apruebas cada aviso</td><td>apruebas cada aviso</td><td><strong>el coordinador aprueba las acciones seguras</strong></td></tr>
-<tr><td>Abrir y reabrir sesiones</td><td>a mano</td><td>a mano</td><td><strong>desde el panel</strong>, con terminal web</td></tr>
-<tr><td>Varios repositorios</td><td>no</td><td>el directorio del lead</td><td><strong>un worker por repositorio</strong>, donde esté</td></tr>
-</table>
-<p>Squadra no sustituye a Claude Code: cada agente es un <code>claude</code> interactivo normal, así que puedes entrar y escribir en cualquiera en cualquier momento.</p>
+<section id="teams">
+  <div class="wrap split rev">
+    <div>
+      <p class="kicker">Equipos</p>
+      <h2>Cada equipo, con su plan a la vista.</h2>
+      <p class="sub">Un equipo es un coordinador y sus workers, cada uno en su repositorio y con su persona. El coordinador mantiene su plan al día: qué está hecho, qué está en curso, qué está bloqueado y qué espera tu decisión.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span><b>Cuánto le falta, de un vistazo.</b> Cada tarea con quién la tiene, su estado y de dónde viene.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M12 8.5V12M5 15.5V12h14v3.5"/></svg><span><b>Equipos enlazados.</b> Diseño y marketing, por ejemplo, se pasan trabajo a través de sus coordinadores.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg><span><b>Plantillas.</b> Guarda un equipo y vuelve a abrirlo igual, en cualquier máquina, de una vez.</span></li>
+      </ul>
+    </div>
+    <div class="window" style="margin: 0"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="../screenshots/team-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/team-light-es.jpg" alt="La página de un equipo: su plan con tres de siete tareas hechas, una en curso, una bloqueada y una que espera tu decisión, y los últimos informes de sus workers" width="2880" height="1800" loading="lazy"></picture></div>
+  </div>
+</section>
 
-<h2>Instalación en dos pasos</h2>
-<pre><code>git clone https://github.com/roke22/Squadra.git squadra &amp;&amp; cd squadra
-git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
-node server/server.js        # panel en http://127.0.0.1:7787</code></pre>
-<p>Después abre <strong>Máquinas → Añadir máquina</strong> en el panel y ejecuta el comando que te muestra en cada equipo donde quieras agentes. Las instrucciones completas, Docker y HTTPS están en el <a href="https://github.com/roke22/Squadra/blob/main/README-es.md">README en español</a>.</p>
+<section>
+  <div class="wrap center">
+    <p class="kicker">En directo</p>
+    <h2>Míralos a todos a la vez.</h2>
+    <p class="sub">Cada agente es una sesión normal e interactiva de Claude Code: ves su conversación, sus herramientas y su terminal en directo, y puedes entrar a escribir cuando quieras.</p>
+    <div class="window"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="../screenshots/live-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/live-light-es.jpg" alt="Un equipo a la vez: la terminal del coordinador y las de sus workers, una al lado de otra" width="2880" height="1800" loading="lazy"></picture></div>
+  </div>
+</section>
 
-<img class="shot" src="../screenshots/squad-view.jpg" alt="Una escuadra: el coordinador y sus workers, cada uno en una terminal en directo" width="1436" height="800">
+<section id="timeline">
+  <div class="wrap split">
+    <div>
+      <p class="kicker">Cada agente</p>
+      <h2>Lo que ha hecho, sin leerlo todo.</h2>
+      <p class="sub">Junto a la terminal de cada agente, qué hace ahora y una línea de tiempo con lo importante. La terminal sigue exactamente igual.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg><span><b>Ahora, de un vistazo.</b> Su estado, cuánto contexto lleva y su tarea del plan.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Lo importante.</b> Sus órdenes, los ficheros que editó, pruebas y commits, permisos y sus informes, lo último primero.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg><span><b>Sin gastar tokens.</b> Sale de lo que cada sesión ya informa: no se le pide nada al modelo.</span></li>
+      </ul>
+    </div>
+    <div class="window" style="margin: 0"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="../screenshots/timeline-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/timeline-light-es.jpg" alt="La terminal de un worker y a su lado lo que hace ahora y su línea de tiempo: un informe, pruebas en verde, un fichero editado y la orden que recibió" width="2350" height="1116" loading="lazy"></picture></div>
+  </div>
+</section>
 
-<h2>Qué necesitas</h2>
-<ul>
-  <li>Una cuenta de <a href="https://claude.com/product/claude-code">Claude Code</a>: un plan de claude.ai (Pro, Max, Team o Enterprise) o una clave de API de Anthropic Console.</li>
-  <li>Un equipo para el panel con <a href="https://nodejs.org">Node.js 22</a> o Docker. Puede ser el mismo donde trabajan tus agentes.</li>
-</ul>
+<section>
+  <div class="wrap center">
+    <p class="kicker">Todo lo demás</p>
+    <h2>Hecho para dejarlo trabajando.</h2>
+    <div class="features">
+      <div class="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M9 20h6M12 16v4"/></svg><h3>Todas tus máquinas</h3><p>Cada agente funciona en cualquier ordenador que añadas, con la sesión iniciada en ese ordenador: Claude Code, o Codex CLI y Grok CLI (experimental). Las máquinas se conectan hacia fuera: sin puertos abiertos.</p></div>
+      <div class="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg><h3>Seguro de serie</h3><p>El coordinador solo aprueba lo que no tiene efectos; lo destructivo, irreversible o con coste te llega antes a ti.</p></div>
+      <div class="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><h3>Ctrl+K desde cualquier sitio</h3><p>Ve a cualquier sesión, equipo o decisión, o abre una acción, con el teclado.</p></div>
+      <div class="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3 3 0 0 1 0 6M18 14c2 .8 3 2.8 3 6"/></svg><h3>Empresas y personas</h3><p>Varias empresas en un mismo servidor, cada una aparte; cuentas con códigos y un rol para cada persona.</p></div>
+      <div class="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg><h3>Tus propias skills</h3><p>Da a cada agente una skill o un agente de su proyecto como persona: diseño, marketing, revisión de código…</p></div>
+      <div class="feature"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg><h3>Autoalojado</h3><p>Un servidor Node.js o una imagen de Docker, con HTTPS automático cuando le das un dominio. Licencia MIT.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <p class="kicker">Empezar</p>
+    <h2>En marcha en tres pasos.</h2>
+    <div class="steps">
+      <div class="step"><h3>Arranca el panel</h3><p>En cualquier ordenador con Node.js 22, o con Docker. La primera vez, su token te convierte en propietario.</p></div>
+      <div class="step"><h3>Añade tus máquinas</h3><p>Máquinas → Añadir máquina te guía: un comando para cada ordenador donde trabajarán los agentes, y te dice cuándo se ha conectado.</p></div>
+      <div class="step"><h3>Abre un equipo</h3><p>Nuevo equipo: para qué es, quiénes lo forman y dónde trabaja. Después dale a su coordinador la primera orden.</p></div>
+    </div>
+    <pre class="code"><code>git clone https://github.com/roke22/SquadraHQ.git squadra &amp;&amp; cd squadra
+git checkout "$(git tag --sort=-v:refname | head -1)"   <span class="c"># la última versión</span>
+node server/server.js                                    <span class="c"># http://127.0.0.1:7787</span></code></pre>
+    <p class="note">Docker, HTTPS en un dominio y todo lo demás: el <a href="https://github.com/roke22/SquadraHQ/blob/main/README-es.md">README</a> y la <a href="https://github.com/roke22/SquadraHQ/blob/main/docs/referencia.md">referencia</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">Comparado</p>
+    <h2>Más que una terminal.</h2>
+    <table class="compare">
+      <thead><tr><th scope="col"><span class="sr-only">Qué</span></th><th scope="col">Subagentes de Claude Code</th><th scope="col">Agent Teams de Claude Code</th><th scope="col">SquadraHQ</th></tr></thead>
+      <tbody>
+        <tr><td>Los agentes trabajan en</td><td>la misma sesión</td><td>la misma máquina</td><td>cualquier máquina que añadas, cada una con su sesión</td></tr>
+        <tr><td>Los sigues</td><td>en una terminal</td><td>en una terminal cada uno</td><td>en un panel en directo, desde cualquier navegador o móvil</td></tr>
+        <tr><td>Tus decisiones</td><td>te las pregunta en la terminal</td><td>te las pregunta en la terminal</td><td>en tu bandeja, una por decisión, con opciones</td></tr>
+        <tr><td>Trabajo desatendido</td><td>apruebas cada permiso</td><td>apruebas cada permiso</td><td>el coordinador aprueba lo seguro</td></tr>
+        <tr><td>Varios repositorios</td><td>no</td><td>la carpeta del líder</td><td>un worker por repositorio, donde está</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="kicker">Qué necesitas</p>
+    <h2>Claude Code y un ordenador.</h2>
+    <div class="need">
+      <div><b>Una cuenta de Claude Code</b>Cualquier plan de claude.ai con Claude Code (Pro, Max, Team o Enterprise) o una clave de API de Anthropic Console.</div>
+      <div><b>Un ordenador para el panel</b>Con Node.js 22 o Docker. Puede ser el mismo donde trabajan tus agentes: Linux, macOS o Windows con WSL.</div>
+    </div>
+    <p class="note">Cualquier coordinador o worker puede usar también Codex CLI o Grok CLI, con la cuenta propia de ese agente: es experimental, mira <a href="https://github.com/roke22/SquadraHQ/blob/main/README-es.md#codex-cli-y-grok-cli-experimental">en qué cambia</a>.</p>
+  </div>
+</section>
+
+<div class="closing">
+  <div class="wrap">
+    <h2>Pon a trabajar a tu primer equipo.</h2>
+    <div class="cta"><a class="btn primary" href="#start">Empezar</a><a class="btn" href="ejemplos.html">Ver ejemplos</a></div>
+  </div>
+</div>
+</main>
 
 <footer>
-  <p><a href="https://github.com/roke22/Squadra">GitHub</a> · <a href="ejemplos.html">Ejemplos</a> · <a href="https://github.com/roke22/Squadra/releases">Releases</a> · <a href="https://github.com/roke22/Squadra/discussions">Discussions</a> · <a href="https://github.com/roke22/Squadra/issues">Issues</a></p>
-  <p>Squadra es código abierto con licencia MIT, de <a href="https://github.com/roke22">Jose J. Anton</a>. Claude y Claude Code son marcas de Anthropic; Squadra es un proyecto independiente.</p>
+  <div class="wrap">
+    <nav aria-label="Más"><a href="https://github.com/roke22/SquadraHQ">GitHub</a><a href="ejemplos.html">Ejemplos</a><a href="https://github.com/roke22/SquadraHQ/blob/main/docs/referencia.md">Referencia</a><a href="https://github.com/roke22/SquadraHQ/releases">Versiones</a><a href="https://github.com/roke22/SquadraHQ/discussions">Debates</a></nav>
+    <p>SquadraHQ es código abierto con licencia MIT, de <a href="https://github.com/roke22">Jose J. Anton</a>. Claude, Claude Code y su logotipo son marcas de Anthropic; OpenAI, Codex y el logotipo de OpenAI, de OpenAI; Grok y su logotipo, de xAI. Se muestran solo para indicar con qué agentes funciona SquadraHQ: SquadraHQ es un proyecto independiente, sin afiliación ni respaldo de ninguno de ellos.</p>
+  </div>
 </footer>
-</div>
 </body>
 </html>

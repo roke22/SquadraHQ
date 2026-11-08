@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Squadra: prepare this Mac and join it to a Squadra server. The dashboard
-# gives you the exact command, with your code:
+# gives you the exact command, with your code. It downloads this script, checks
+# it, and leaves the code in a file for it:
 #
-#   curl -fsSL https://your-server/install/macos.sh | bash -s -- https://your-server CODE [options]
+#   bash install.sh https://your-server --code-file code [options]
 #
-# It installs what is missing (tmux with Homebrew, Node.js 22, Claude Code),
+# It installs what is missing (tmux with Homebrew, Node.js 22, and the agents
+# chosen: Claude Code unless --no-claude, Codex CLI with --codex, Grok CLI with --grok),
 # then squadra-host, which joins the machine, installs the Squadra plugin, the
 # "squadra-host" command and a service that keeps it running.
 # Options are passed to squadra-host: --allow-home, --insecure, --no-service.
@@ -12,20 +14,35 @@ set -eu
 
 # (All in a function: piped into bash, the whole script is read before anything runs.)
 main() {
-  SERVER="${1:-}"; CODE="${2:-}"
-  if [ -z "$SERVER" ] || [ -z "$CODE" ]; then
-    echo "usage: macos.sh <server-url> <code> [--allow-home] [--insecure] [--no-service]" >&2
-    exit 2
-  fi
-  shift 2
+  SERVER="${1:-}"; [ $# -gt 0 ] && shift
+  # The code comes in a file, so it is in no program's arguments, which anyone
+  # on this machine can read (or after the URL, as older commands gave it).
+  CODE=""; CODE_FILE=""
+  case "${1:-}" in ""|-*) ;; *) CODE="$1"; shift ;; esac
   SHA=""
+  WANT_CLAUDE=1; WANT_CODEX=""; WANT_GROK=""
   ARGS=()
   while [ $# -gt 0 ]; do
     case "$1" in
-      --sha256) SHA="${2:-}"; shift 2 ;;
+      --sha256) [ $# -ge 2 ] || { echo "--sha256 needs a value" >&2; exit 2; }; SHA="$2"; shift 2 ;;
+      --code-file) [ $# -ge 2 ] || { echo "--code-file needs a path" >&2; exit 2; }; CODE_FILE="$2"; shift 2 ;;
+      --os-user*) echo "--os-user is for Linux. On macOS: create the user, log in as it, and run this command there." >&2; exit 2 ;;
+      # The agents to install.
+      --no-claude) WANT_CLAUDE=""; shift ;;
+      --codex) WANT_CODEX=1; shift ;;
+      --grok) WANT_GROK=1; shift ;;
       *) ARGS+=("$1"); shift ;;
     esac
   done
+  if [ -n "$CODE_FILE" ]; then
+    [ -f "$CODE_FILE" ] || { echo "--code-file: $CODE_FILE is not there" >&2; exit 2; }
+    CODE="$(cat "$CODE_FILE")"
+    rm -f "$CODE_FILE"
+  fi
+  if [ -z "$SERVER" ] || [ -z "$CODE" ]; then
+    echo "usage: macos.sh <server-url> --code-file <file> [--allow-home] [--insecure] [--no-service]" >&2
+    exit 2
+  fi
 
   say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
@@ -59,18 +76,27 @@ main() {
     node_ok || { echo "Node.js 22 could not be installed: install Node.js 22.13 or later, then run this command again." >&2; exit 1; }
   fi
 
-  # 3. Claude Code
+  # 3. The agents chosen, each in this user's home, each from its maker:
+  # Claude Code and Grok CLI with their own installers, Codex CLI from npm.
   export PATH="$HOME/.local/bin:$PATH"
-  if ! command -v claude >/dev/null 2>&1; then
+  if [ -n "$WANT_CLAUDE" ] && ! command -v claude >/dev/null 2>&1; then
     say "Installing Claude Code"
     curl -fsSL https://claude.ai/install.sh | bash
   fi
+  if [ -n "$WANT_CODEX" ] && ! command -v codex >/dev/null 2>&1; then
+    say "Installing Codex CLI"
+    npm install -g --prefix "$HOME/.local" @openai/codex
+  fi
+  if [ -n "$WANT_GROK" ] && ! command -v grok >/dev/null 2>&1; then
+    say "Installing Grok CLI"
+    curl -fsSL https://x.ai/cli/install.sh | bash
+  fi
 
-  # New terminals find the "claude" and "squadra-host" commands in ~/.local/bin.
+  # New terminals find the agents and "squadra-host" in ~/.local/bin.
   for rc in "$HOME/.zshrc" "$HOME/.bash_profile"; do
     if [ "$rc" = "$HOME/.zshrc" ] || [ -f "$rc" ]; then
-      touch "$rc"
-      grep -q '\.local/bin' "$rc" || printf '\n# Added by the Squadra installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"
+      # (Managed elsewhere and read-only, as with home-manager: not worth stopping for.)
+      { touch "$rc" && { grep -q '\.local/bin' "$rc" || printf '\n# Added by the Squadra installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"; }; } 2>/dev/null || echo "Could not add ~/.local/bin to $rc: add it to your PATH yourself." >&2
     fi
   done
 
@@ -82,10 +108,14 @@ main() {
   if [ -n "$SHA" ]; then
     echo "$SHA  squadra-host.mjs" | shasum -a 256 -c - >/dev/null || { echo "squadra-host.mjs does not match the dashboard's checksum: stopped." >&2; exit 1; }
   fi
-  node squadra-host.mjs enroll "$SERVER" "$CODE" ${ARGS[@]+"${ARGS[@]}"}
+  printf %s "$CODE" > code
+  node squadra-host.mjs enroll "$SERVER" --code-file=code ${ARGS[@]+"${ARGS[@]}"}
 
   say "Done"
-  echo "If you haven't yet: run 'claude' once in a terminal and sign in, so the sessions can start."
+  echo "If you haven't yet, sign in to each agent once in a terminal, so its sessions can start:"
+  [ -z "$WANT_CLAUDE" ] || echo "  claude        (then /login if it asks)"
+  [ -z "$WANT_CODEX" ] || echo "  codex login"
+  [ -z "$WANT_GROK" ] || echo "  grok login"
 }
 
 main "$@"

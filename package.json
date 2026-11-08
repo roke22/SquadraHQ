@@ -1,6 +1,6 @@
 {
   "name": "squadra",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -9,11 +9,16 @@
   },
   "scripts": {
     "server": "node server/server.js",
-    "test": "node --test test/e2e.test.mjs test/host.test.mjs test/security.test.mjs test/upgrade.test.mjs"
+    "test": "node --test test/modules.test.mjs test/e2e.test.mjs test/host.test.mjs test/security.test.mjs test/upgrade.test.mjs test/companies.test.mjs test/accounts.test.mjs",
+    "test:ui": "playwright test -c test/ui/playwright.config.mjs",
+    "screenshots": "playwright test -c test/ui/screenshots.config.mjs"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roke22/Squadra.git"
+    "url": "git+https://github.com/roke22/SquadraHQ.git"
   },
-  "homepage": "https://github.com/roke22/Squadra"
+  "homepage": "https://github.com/roke22/SquadraHQ",
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
 }

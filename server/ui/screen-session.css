@@ -1,0 +1,99 @@
+/* A session: its conversation, and beside it its team and where it runs. */
+
+.head h1 .role { width: 15px; height: 15px; }
+.sv-name { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+
+.sv { flex: 1; min-height: 0; display: flex; }
+.sv-thread { flex: 3 1 480px; min-width: 0; display: flex; flex-direction: column; }
+.sv-aside { flex: 0 1 300px; min-width: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding: 20px; border-left: 1px solid var(--line); }
+.sv-info { display: flex; flex-direction: column; gap: 18px; }
+.sv-info:empty { display: none; }
+.sv-aside section + section, .sv-info:not(:empty) + .sv-tl { padding-top: 16px; border-top: 1px solid var(--line); }
+.sv-aside:empty { display: none; }
+.sv-members { list-style: none; margin: 0 0 8px; padding: 0; }
+.sv-member { display: flex; align-items: center; gap: 8px; min-height: 32px; margin: 0 -8px; padding: 4px 8px; border-radius: var(--r); color: inherit; text-decoration: none; }
+.sv-member:hover, .sv-member.on { background: var(--raised); }
+.sv-member.offline .sv-mname { opacity: .62; }
+.sv-mname { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+.sv-mwhat { flex: 1; min-width: 0; text-align: right; font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-small { font-size: var(--fs-sm); }
+.sv-quiet { color: var(--muted); margin: 0; }
+.sv-facts { margin: 0; padding: 0; border-top: 0; border-radius: 0; background: none; }
+.sv-mono { font-family: var(--mono); font-size: 12px; }
+
+/* The conversation, as in a document: who said it over what was said. */
+#session .chat { background: var(--bg); }
+#session .full .items, .full .items { max-width: 780px; gap: 16px; padding: 24px 24px 32px; }
+#session .row-user { align-self: stretch; max-width: none; }
+#session .bubble-head { text-align: left; margin: 0 0 4px; font-size: var(--fs-sm); color: var(--muted); }
+#session .bubble { border-radius: var(--r-md); padding: 10px 12px; background: var(--raised); }
+#session .bubble.in { background: var(--panel); border: 1px solid var(--line); }
+#session .assistant { line-height: 1.6; text-wrap: pretty; }
+.assistant pre, .tool details pre { background: var(--raised); border-color: var(--line); }
+.sent { border: 1px solid var(--line); border-left: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 12px; background: var(--panel); }
+.sent .h { font-size: var(--fs-sm); }
+.sysline { font-size: var(--fs-sm); }
+.divider { font-size: var(--fs-xs); letter-spacing: .02em; }
+.divider::before, .divider::after { border-top-style: solid; }
+
+.tools { border-radius: var(--r-md); background: var(--panel); }
+.tools > summary { padding: 7px 12px; font: 500 var(--fs-sm)/1.4 var(--sans); }
+.tools > summary::before { content: ""; width: 7px; height: 7px; flex: none; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform var(--t) var(--ease); margin-right: 2px; }
+.tools[open] > summary::before { content: ""; transform: rotate(45deg); }
+.tool { padding: 4px 12px; }
+.tool .tn { font-weight: 600; }
+.res.run { display: inline-flex; align-items: center; gap: 6px; }
+.status { font-size: var(--fs-sm); background: var(--bg); }
+.jump { border-radius: var(--r-pill); box-shadow: var(--shadow-pop); }
+
+@media (max-width: 1100px) {
+  .sv-aside { display: none; }
+}
+@media (max-width: 900px) {
+  #session .full .items, .full .items { padding: 16px 14px 24px; }
+}
+
+/* A session's terminal, as it is, and beside it what it is doing now and what
+   mattered so far, as a timeline. The panel folds to a thin edge. */
+.tv { position: relative; flex: 1; min-height: 0; display: flex; }
+.tv-term { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.tv-aside { position: relative; flex: 0 0 320px; min-height: 0; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line); color: var(--text); }
+.tv-body { display: flex; flex-direction: column; gap: 18px; padding: 18px 20px 24px; }
+.tv-body > section + section { padding-top: 16px; border-top: 1px solid var(--line); }
+.tv-body > section:first-child > h2 { padding-right: 34px; }
+.tv-fold { position: absolute; top: 12px; right: 12px; z-index: 1; }
+.tv.folded .tv-aside { flex-basis: 48px; overflow: hidden; }
+.tv.folded .tv-body { display: none; }
+
+.tl-state { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-weight: 500; }
+.tl-ctx { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 12px; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tl-bar { height: 6px; border-radius: var(--r-pill); background: var(--raised); overflow: hidden; }
+.tl-bar i { display: block; height: 100%; border-radius: inherit; background: var(--info); }
+.tl-bar i.hot { background: var(--warn); }
+.tl-plan { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: var(--fs-sm); color: var(--muted); }
+.tl-task { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); }
+.tl-task .tq-label { display: block; margin: 0 0 3px; }
+.tl-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: var(--fs-sm); }
+.tl-facts dt { color: var(--muted); }
+.tl-facts dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.tl-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.tl-item { display: grid; grid-template-columns: 38px 12px minmax(0, 1fr); gap: 0 9px; padding: 0 0 14px; }
+.tl-item time { padding-top: 1px; text-align: right; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tl-mark { position: relative; }
+.tl-mark::before { content: ""; position: absolute; top: 5px; left: 1.5px; width: 9px; height: 9px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--muted); }
+.tl-item:not(:last-child) .tl-mark::after { content: ""; position: absolute; top: 18px; bottom: -12px; left: 5.5px; width: 1px; background: var(--line); }
+.tl-item.ok .tl-mark::before { background: var(--ok); box-shadow: none; }
+.tl-item.err .tl-mark::before { background: var(--err); box-shadow: none; border-radius: 2px; }
+.tl-item.warn .tl-mark::before { background: var(--warn); box-shadow: none; border-radius: 2px; transform: rotate(45deg) scale(.85); }
+.tl-item.info .tl-mark::before { background: var(--info); box-shadow: none; }
+.tl-item b { display: block; font-weight: 500; line-height: 1.35; }
+.tl-item div > span { display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--muted); }
+.tl-day { padding: 2px 0 10px 59px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.tl-kept { margin: 4px 0 0; font-size: var(--fs-xs); line-height: 1.45; color: var(--muted); }
+
+/* A phone: the panel opens over the terminal, from its edge. */
+@media (max-width: 900px) {
+  .tv-aside { position: absolute; top: 0; right: 0; bottom: 0; z-index: 3; width: min(320px, 88%); box-shadow: var(--shadow-pop); }
+  .tv.folded .tv-aside { position: relative; width: 48px; box-shadow: none; }
+}

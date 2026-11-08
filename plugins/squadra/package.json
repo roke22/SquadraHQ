@@ -1,6 +1,6 @@
 {
   "name": "claude-channel-squadra",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -12,8 +12,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roke22/Squadra.git",
+    "url": "git+https://github.com/roke22/SquadraHQ.git",
     "directory": "plugins/squadra"
   },
-  "homepage": "https://github.com/roke22/Squadra"
+  "homepage": "https://github.com/roke22/SquadraHQ"
 }

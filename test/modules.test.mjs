@@ -1,0 +1,192 @@
+// How the programs are divided into modules, checked on their imports (see
+// CONTRIBUTING.md): a module enters another only through its index.js, along
+// the arrows below, and no program reaches into another.
+
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, normalize, relative, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+// What each module of the server may use. Whatever is not listed is refused,
+// so a new module has to say where it fits.
+const SERVER_MODULES = {
+  platform: [],
+  accounts: ['platform'],
+  sessions: ['platform'],
+  messaging: ['platform', 'sessions'],
+  observation: ['platform'],
+  machines: ['platform', 'sessions', 'observation'],
+  organization: ['platform', 'sessions', 'messaging', 'observation', 'machines'],
+  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization'],
+  ui: [],
+}
+const SERVER_OTHER_FOLDERS = ['vendor']
+const PLUGIN_MODULES = { core: [], claude: ['core'], typed: ['core'] }
+// Plain helpers at the plugin's top, which hook.js uses too and which import
+// no module: these the modules may use.
+const PLUGIN_HELPERS = ['observe.js', 'paths.js', 'signing.js']
+
+// The folder a program's files live in, and the modules in it. The plugin's
+// are one way only: what is Claude's stays out of what any agent could reuse.
+const PROGRAMS = [
+  { dir: 'server', modules: SERVER_MODULES, otherFolders: SERVER_OTHER_FOLDERS },
+  { dir: 'plugins/squadra', modules: PLUGIN_MODULES, otherFolders: ['hooks', 'skills', '.claude-plugin'], helpers: PLUGIN_HELPERS },
+]
+
+// Static imports and re-exports, and import() of a literal. A dynamic import
+// of anything else can't be checked, so it is refused.
+function importsOf(source) {
+  const found = []
+  for (const m of source.matchAll(/^\s*(?:import|export)\s[^'"`;]*?\sfrom\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]|\bimport\(\s*(['"]([^'"]+)['"]|[^)]*)\s*\)/gm)) {
+    if (m[3] !== undefined && m[4] === undefined) found.push({ dynamic: m[3].trim() })
+    else found.push({ path: m[1] ?? m[2] ?? m[4] })
+  }
+  return found
+}
+
+// files: { 'server/x/y.js': source }. Every rule broken, as text.
+function violations(files, programs = PROGRAMS) {
+  const out = []
+  const programOf = p => programs.find(g => p === g.dir || p.startsWith(`${g.dir}/`))
+  const moduleOf = (g, p) => {
+    const rest = p.slice(g.dir.length + 1).split('/')
+    return rest.length > 1 ? rest[0] : null
+  }
+  for (const [file, source] of Object.entries(files)) {
+    const program = programOf(file)
+    if (!program) continue
+    const from = moduleOf(program, file)
+    if (from && !Object.hasOwn(program.modules, from) && !program.otherFolders.includes(from)) {
+      out.push(`${file}: "${program.dir}/${from}" is not a known module: add it, with what it may use, to test/modules.test.mjs`)
+    }
+    // A module gets the ones below it as arguments (see server/server.js):
+    // the same rule, for what it asks for.
+    if (from) {
+      for (const m of source.matchAll(/function create\w+\(\s*\w+\s*,\s*\{([^}]*)\}/g)) {
+        for (const asked of m[1].split(',').map(x => x.trim()).filter(Boolean)) {
+          if (Object.hasOwn(program.modules, asked) && !program.modules[from]?.includes(asked)) out.push(`${file}: module "${from}" may not use "${asked}"`)
+        }
+      }
+    }
+    for (const imp of importsOf(source)) {
+      if (imp.dynamic !== undefined) { out.push(`${file}: import(${imp.dynamic}) can't be checked: import a literal path`); continue }
+      if (!imp.path.startsWith('.')) continue // node: built-ins
+      const target = normalize(join(dirname(file), imp.path)).split(sep).join('/')
+      const other = programOf(target)
+      if (other !== program) { out.push(`${file}: imports ${imp.path}, outside ${program.dir}`); continue }
+      const to = moduleOf(program, target)
+      if (to === from || !to) {
+        // Inside its module, or a file at the top of the program. Those are
+        // the entry points and what is older than the modules: a module
+        // doesn't reach back to them.
+        if (from && !to && !program.helpers?.includes(target.slice(program.dir.length + 1))) out.push(`${file}: a module doesn't import the top of its program (${imp.path})`)
+        continue
+      }
+      if (from && !(program.modules[from] ?? []).includes(to)) out.push(`${file}: module "${from}" may not use "${to}"`)
+      if (target !== `${program.dir}/${to}/index.js`) out.push(`${file}: enters "${to}" through ${imp.path}, not its index.js`)
+    }
+  }
+  return out
+}
+
+function sourcesIn(dir) {
+  const files = {}
+  for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true, recursive: true })) {
+    if (!e.isFile() || !/\.m?js$/.test(e.name)) continue
+    const rel = relative(ROOT, join(e.parentPath, e.name)).split(sep).join('/')
+    if (rel.startsWith('server/vendor/') || rel.includes('/node_modules/')) continue
+    files[rel] = readFileSync(join(ROOT, rel), 'utf8')
+  }
+  return files
+}
+
+test('modules: the programs follow the rules', () => {
+  assert.deepEqual(violations({ ...sourcesIn('server'), ...sourcesIn('plugins/squadra') }), [])
+})
+
+test('modules: a module uses another through its index.js', () => {
+  const ok = { 'server/messaging/send.js': `import { x } from '../sessions/index.js'` }
+  assert.deepEqual(violations(ok), [])
+  const inside = { 'server/messaging/send.js': `import { x } from '../sessions/leases.js'` }
+  assert.match(violations(inside).join(), /through \.\.\/sessions\/leases\.js, not its index\.js/)
+})
+
+test('modules: only along the arrows, and never in a circle', () => {
+  const back = { 'server/sessions/x.js': `export { y } from '../messaging/index.js'` }
+  assert.match(violations(back).join(), /"sessions" may not use "messaging"/)
+  for (const [name, uses] of Object.entries(SERVER_MODULES)) {
+    for (const u of uses) assert.ok(!SERVER_MODULES[u].includes(name), `${name} and ${u} use each other`)
+  }
+  const asked = { 'server/sessions/x.js': `export function createSessions(platform, { messaging }) {}` }
+  assert.match(violations(asked).join(), /"sessions" may not use "messaging"/)
+  const claude = { 'plugins/squadra/core/x.js': `import('../claude/index.js')` }
+  assert.match(violations(claude).join(), /"core" may not use "claude"/)
+})
+
+test('modules: core speaks to the agent only through agent.js', () => {
+  const core = Object.entries(sourcesIn('plugins/squadra/core'))
+  assert.ok(core.length)
+  for (const [file, source] of core) assert.doesNotMatch(source, /notifications\/claude/, file)
+  // A helper stays plain: what imports a module isn't one.
+  for (const h of PLUGIN_HELPERS) assert.doesNotMatch(readFileSync(join(ROOT, 'plugins/squadra', h), 'utf8'), /from '\.\/(core|claude)\//, h)
+})
+
+// The host is one file that can't import anything, and the plugin installs from
+// its own folder: the few security checks both need are written twice, and stay
+// the same here. (What only shares a name, like checkLinks, isn't on this list.)
+test('modules: the checks the plugin and the host each keep are the same', () => {
+  const lines = file => readFileSync(join(ROOT, file), 'utf8').split('\n')
+  const definition = (file, name) => lines(file).find(l => new RegExp(`^(export )?const ${name} = `).test(l))?.replace(/^export /, '')
+  // A function's lines without its signature and its comments.
+  const body = (file, name) => {
+    const src = lines(file)
+    const start = src.findIndex(l => new RegExp(`^(export )?function ${name}\\(`).test(l))
+    assert.notEqual(start, -1, `${name} in ${file}`)
+    return src.slice(start + 1, src.indexOf('}', start)).filter(l => !l.trim().startsWith('//')).map(l => l.replace(/\s+\/\/ .*$/, ''))
+  }
+  const HOST = 'host/squadra-host.mjs', PATHS = 'plugins/squadra/paths.js'
+  for (const [name, file] of [['NAME_RE', 'plugins/squadra/core/settings.js'], ['LINKS_MAX', 'plugins/squadra/core/access.js'], ['HOME', 'plugins/squadra/core/sendable.js']]) {
+    assert.ok(definition(HOST, name), name)
+    assert.equal(definition(file, name), definition(HOST, name), name)
+  }
+  assert.deepEqual(body(HOST, 'privateChain'), body(PATHS, 'safeChain'))
+  assert.deepEqual(body(HOST, 'realNearest'), body(PATHS, 'realNearest'))
+  assert.deepEqual(body(HOST, 'serverSigned'), body('plugins/squadra/signing.js', 'signedBy'))
+  // (Remembered differently in each.)
+  const noMemo = list => list.filter(l => !/privateGroupMemo|privateGroupCache|\bcached\b/.test(l))
+  assert.deepEqual(noMemo(body(HOST, 'privateGroup')), noMemo(body(PATHS, 'privateGroup')))
+  // (By the folders' identity. The first line, comparing the spelling, is each one's own.)
+  const byIdentity = list => list.slice(1).map(l => l.replaceAll(/\bpath\b/g, 'p').replaceAll(/\bdir\b/g, 'd'))
+  assert.deepEqual(byIdentity(body(HOST, 'withinById')), byIdentity(body(PATHS, 'within')))
+})
+
+test('modules: the host uses each agent only through its object', () => {
+  const source = readFileSync(join(ROOT, 'host/squadra-host.mjs'), 'utf8')
+  const claude = source.indexOf('// --- Claude Code ---'), typed = source.indexOf('// --- Codex CLI and Grok CLI ---'), end = source.indexOf('// --- opening and closing sessions ---')
+  assert.ok(claude > 0 && typed > claude && end > typed)
+  // [section, the objects the rest of the file may use]
+  for (const [from, to, objects, must] of [[claude, typed, ['claudeCode'], ['claudeBinary', 'ensurePlugin']], [typed, end, ['codexCli', 'grokCli', 'TYPED'], ['typeWaiting', 'ensureCodexPlugin']]]) {
+    const section = source.slice(from, to), outside = source.slice(0, from) + source.slice(to)
+    const names = [...section.matchAll(/^(?:export )?(?:async )?(?:function|const|let) (\w+)/gm)].map(m => m[1]).filter(n => !objects.includes(n))
+    for (const m of must) assert.ok(names.includes(m), m)
+    // (Another agent's object may have a key of the same name: "typeAnswer: …".)
+    for (const name of names) assert.doesNotMatch(outside, new RegExp(`(?<![.\\w])${name}\\b(?!:)`), name)
+  }
+})
+
+test('modules: nothing unknown, nothing that can not be checked, no reaching out', () => {
+  assert.match(violations({ 'server/stuff/x.js': '' }).join(), /not a known module/)
+  assert.match(violations({ 'server/messaging/x.js': 'const m = await import(name)' }).join(), /can't be checked/)
+  assert.match(violations({ 'server/messaging/x.js': `import '../../plugins/squadra/signing.js'` }).join(), /outside server/)
+  assert.match(violations({ 'server/messaging/x.js': `import '../server.js'` }).join(), /doesn't import the top/)
+  assert.match(violations({ 'plugins/squadra/core/x.js': `import '../server.js'` }).join(), /doesn't import the top/)
+  assert.deepEqual(violations({ 'plugins/squadra/core/x.js': `import '../signing.js'` }), [])
+  // The entry point joins the modules; inside one, anything goes.
+  assert.deepEqual(violations({
+    'server/server.js': `import { a } from './machines/index.js'\nimport { b } from './acme.js'`,
+    'server/machines/link.js': `import { c } from './tickets.js'\nimport { createHash } from 'node:crypto'`,
+  }), [])
+})

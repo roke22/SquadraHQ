@@ -5,8 +5,8 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
+import { spawn, execFileSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -187,8 +187,44 @@ test('the dashboard page carries a strict CSP and cannot be framed; xterm is ser
   assert.match(csp, /script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/)
   assert.match(csp, /frame-ancestors 'none'/)
   assert.equal(r.headers.get('x-frame-options'), 'DENY')
-  assert.ok(!(await r.text()).includes('cdn.jsdelivr.net'), 'no third-party scripts')
+  const page = await r.text()
+  assert.ok(!page.includes('cdn.jsdelivr.net'), 'no third-party scripts')
   for (const f of ['xterm.js', 'addon-fit.js', 'xterm.css']) assert.equal((await fetch(`${URL_}/vendor/${f}`)).status, 200, f)
+  // Installable on a phone: its manifest (allowed by the CSP, from here only) and its icons.
+  assert.match(csp, /manifest-src 'self'/)
+  assert.match(page, /<link rel="manifest" href="\/manifest\.webmanifest">/)
+  const manifest = await fetch(`${URL_}/manifest.webmanifest`)
+  assert.equal(manifest.headers.get('content-type'), 'application/manifest+json')
+  const m = await manifest.json()
+  assert.equal(m.display, 'standalone')
+  for (const icon of [...m.icons.map(i => i.src), '/icons/apple-touch-icon.png']) {
+    const res = await fetch(`${URL_}${icon}`)
+    assert.deepEqual([res.status, res.headers.get('content-type')], [200, 'image/png'], icon)
+  }
+  assert.notEqual((await fetch(`${URL_}/icons/nothing.png`)).status, 200)
+})
+
+test('the dashboard is made of scripts and styles from its own folder, and nothing else is served from there', async () => {
+  const js = await fetch(`${URL_}/ui/app.js`)
+  assert.equal(js.status, 200)
+  assert.match(js.headers.get('content-type'), /^text\/javascript/)
+  assert.equal(js.headers.get('x-content-type-options'), 'nosniff')
+  assert.match((await fetch(`${URL_}/ui/styles.css`)).headers.get('content-type'), /^text\/css/)
+  for (const p of ['/ui/nope.js', '/ui/index.html', '/ui/%2e%2e%2fserver.js', '/ui/..%2fserver.js', '/ui/Dom.js', '/ui/a/b.js']) {
+    const r = await fetch(`${URL_}${p}`)
+    assert.notEqual(r.status, 200, p)
+  }
+  // Every module the page loads is there, and only by the plain names it serves.
+  const seen = new Set(), queue = ['app.js']
+  while (queue.length) {
+    const f = queue.pop()
+    if (seen.has(f)) continue
+    seen.add(f)
+    const r = await fetch(`${URL_}/ui/${f}`)
+    assert.equal(r.status, 200, f)
+    for (const m of (await r.text()).matchAll(/^(?:import|\} from).*?'\.\/([a-z0-9-]+\.js)'/gm)) queue.push(m[1])
+  }
+  assert.ok(seen.size > 10, 'the page loads its modules')
 })
 
 // A raw WebSocket client: handshake, then masked frames we build ourselves.
@@ -534,6 +570,8 @@ test('release: every version string matches', () => {
   assert.ok(JSON.parse(read('.claude-plugin/marketplace.json')).plugins.every(x => x.version === v), 'marketplace.json')
   assert.match(read('host/squadra-host.mjs'), new RegExp(`const VERSION = '${v.replace(/\./g, '\\.')}'`))
   for (const p of ['README.md', 'README-es.md']) assert.ok(read(p).includes(`· v${v}<`), p)
+  const lock = JSON.parse(read('package-lock.json'))
+  assert.deepEqual([lock.version, lock.packages[''].version], [v, v], 'package-lock.json')
 })
 
 test('sixteenth audit: a request whose body arrives after a disconnect does nothing; slow bodies are capped per session', async () => {
@@ -632,7 +670,17 @@ test('nineteenth audit: a name registered again cannot edit the old one\'s messa
   // The owner leaves: the longest-standing member owns the group and can invite.
   assert.ok((await call('inviteToGroup', { chat_id: '#gl19new', name: 'ed19b' }, other)).ok)
   assert.ok((await call('joinGroup', { chat_id: '#gl19new' }, b)).ok)
+  const pending = (await call('register', { name: 'gl19p' }, ADMIN)).result.secret
+  assert.ok((await call('inviteToGroup', { chat_id: '#gl19new', name: 'gl19p' }, other)).ok)
   assert.ok((await call('leaveChat', { chat_id: '#gl19new' }, other)).ok)
+  assert.equal((await call('joinGroup', { chat_id: '#gl19new' }, pending)).error_code, 403, 'an invitation goes with whoever made it')
+  // A member isn't invited (it could come back with it after leaving).
+  const member = (await call('register', { name: 'gl19m' }, ADMIN)).result.secret
+  assert.ok((await call('inviteToGroup', { chat_id: '#gl19new', name: 'gl19m' }, b)).ok)
+  assert.ok((await call('joinGroup', { chat_id: '#gl19new' }, member)).ok)
+  assert.ok((await call('inviteToGroup', { chat_id: '#gl19new', name: 'gl19m' }, b)).ok)
+  assert.ok((await call('leaveChat', { chat_id: '#gl19new' }, member)).ok)
+  assert.equal((await call('joinGroup', { chat_id: '#gl19new' }, member)).error_code, 403)
   assert.ok((await call('inviteToGroup', { chat_id: '#gl19new', name: 'gl19o' }, b)).ok, 'the new owner invites')
 
   // Parameters that can't be read are a 400, not a crash.
@@ -678,10 +726,10 @@ test('a machine added but never connected shows as pending and can be removed', 
   const en = await call('api/hosts/enroll', { name: 'pend1' }, ADMIN)
   const r = await call('host/enroll', { code: en.result.code, info: { hostname: 'pend1' } })
   assert.ok(r.ok, r.description)
-  assert.match(en.result.plugin_command, /^claude plugin marketplace add roke22\/Squadra#v\d+\.\d+\.\d+ && claude plugin install squadra@squadra$/)
+  assert.match(en.result.plugin_command, /^claude plugin marketplace add roke22\/SquadraHQ#v\d+\.\d+\.\d+ && claude plugin install squadra@squadra$/)
   // One command per system, each running the installer the server serves (and nothing else under /install/).
   for (const os of ['linux', 'macos', 'windows']) assert.ok(en.result.install[os].includes(en.result.code), os)
-  assert.match(en.result.install.linux, /\/install\/linux\.sh' \| bash -s -- /)
+  assert.match(en.result.install.linux, /\/install\/linux\.sh' && echo '[0-9a-f]{64}  install\.sh' \| /)
   const sh = await fetch(`${URL_}/install/linux.sh`)
   assert.equal(sh.status, 200)
   assert.match(await sh.text(), /squadra-host\.mjs enroll/)
@@ -774,6 +822,56 @@ test('machines connect with a one-time ticket, and their secret never goes in th
   old.sock.destroy()
 })
 
+test('a server that cannot start ends with an error, for whatever started it', async () => {
+  const data = mkdtempSync(join(tmpdir(), 'squadra-nostart-'))
+  const port = PORT + 3700 + Math.floor(Math.random() * 200)
+  // (Files that exist, but aren't a certificate and a key.)
+  writeFileSync(join(data, 'bad.crt'), 'not a certificate')
+  writeFileSync(join(data, 'bad.key'), 'not a key')
+  const p = spawn(process.execPath, [join(ROOT, 'server/server.js'), '--tls-cert', join(data, 'bad.crt'), '--tls-key', join(data, 'bad.key')], { env: { ...process.env, PORT: String(port), DATA_DIR: data }, stdio: 'ignore' })
+  const code = await new Promise((resolve, reject) => {
+    p.on('close', c => resolve(c))
+    setTimeout(() => { p.kill('SIGKILL'); reject(new Error('it stayed up')) }, 15000)
+  })
+  assert.notEqual(code, 0)
+})
+
+test('the cap on sessions also holds for registrations that arrive together', async t => {
+  const data = mkdtempSync(join(tmpdir(), 'squadra-cap-'))
+  const port = PORT + 3900 + Math.floor(Math.random() * 90)
+  const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, SQUADRA_MAX_SESSIONS: '2', SQUADRA_SERVER_TOKEN: 'cap-test-server-token' }, stdio: 'ignore' })
+  t.after(() => p.kill('SIGKILL'))
+  for (let i = 0; ; i++) {
+    try { if ((await fetch(`http://127.0.0.1:${port}/health`)).ok) break } catch {}
+    if (i > 100) throw new Error('it did not start')
+    await new Promise(r => setTimeout(r, 100))
+  }
+  const join_ = readFileSync(join(data, 'join-token'), 'utf8').trim()
+  // Every request is counted before its body arrives: the bodies come after all of them.
+  const socks = await Promise.all(Array.from({ length: 8 }, (_, i) => new Promise((resolve, reject) => {
+    const body = JSON.stringify({ name: `cap${i}` })
+    const s = connect(port, '127.0.0.1', () => {
+      s.write(`POST /register HTTP/1.1\r\nHost: x\r\nConnection: close\r\nAuthorization: Bearer ${join_}\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\n\r\n`)
+      resolve({ s, body, answer: new Promise(done => { let out = ''; s.on('data', d => { out += d }); s.on('close', () => done(out)) }) })
+    })
+    s.on('error', reject)
+  })))
+  await new Promise(r => setTimeout(r, 500))
+  for (const { s, body } of socks) s.write(body)
+  const answers = await Promise.all(socks.map(x => x.answer))
+  const statuses = answers.map(a => a.split(' ')[1])
+  assert.equal(statuses.filter(s => s === '200').length, 2, statuses.join(','))
+})
+
+test('text with many joiners keeps them where they belong', async () => {
+  const { cleanText } = await import(join(ROOT, 'server/platform/text.js'))
+  const family = '👩\u200d💻 '.repeat(500)
+  assert.equal(cleanText(family), family)
+  const heart = '❤\ufe0f '.repeat(500)
+  assert.equal(cleanText(heart), heart)
+  assert.equal(cleanText('\u200d'.repeat(50_000)), '')
+})
+
 test('the tokens are printed the time they are made, and not at every start', async () => {
   const data = mkdtempSync(join(tmpdir(), 'squadra-banner-'))
   const start = env => new Promise((resolve, reject) => {
@@ -811,4 +909,155 @@ test('deleting a session takes its messages and attachments off the disk, at onc
   const onDisk = needle => files().filter(f => readFileSync(f).includes(needle)).length
   for (const canary of ['CANARY-FROM-THE-DELETED-ONE', 'CANARY-TO-THE-DELETED-ONE', 'CANARY-ATTACHMENT']) assert.equal(onDisk(canary), 0, canary)
   assert.ok(onDisk('KEPT-BETWEEN-OTHERS') > 0)
+})
+
+test('a path of slashes costs nothing: trimmed in a loop, and refused when too long, also for a socket', async () => {
+  const { trimSlashes } = await import(join(ROOT, 'server/platform/basics.js'))
+  assert.equal(trimSlashes('/a/b///'), '/a/b')
+  assert.equal(trimSlashes('///'), '')
+  assert.equal(trimSlashes('/a//b'), '/a//b')
+  // (A regular expression would take minutes on this.)
+  const start = performance.now()
+  assert.equal(trimSlashes(`${'/'.repeat(2_000_000)}a`).length, 2_000_001)
+  assert.ok(performance.now() - start < 500)
+
+  assert.equal((await fetch(`${URL_}/health///`)).status, 200)
+  assert.equal((await fetch(`${URL_}/${'/'.repeat(15_000)}x`)).status, 414)
+  assert.equal((await fetch(`${URL_}/x${'/'.repeat(15_000)}y`)).status, 414)
+  assert.equal((await fetch(`${URL_}/x${'/'.repeat(1500)}`)).status, 401)
+  assert.equal((await fetch(`${URL_}/${'a'.repeat(15_000)}`)).status, 414)
+  assert.equal((await fetch(`${URL_}/${'a'.repeat(1000)}`)).status, 401)
+  const refused = await rawWs(`/${'/'.repeat(15_000)}x`)
+  assert.equal(refused.status, 414)
+  refused.sock.destroy()
+})
+
+test('approval: an unapproved name reaches no follower through a group, nor those whose coordinator was deleted', async () => {
+  const reg = async name => (await call('register', { name }, ADMIN)).result.secret
+  const claim = (secret, inst, body) => call('claimSession', { instance: inst, ...body }, secret)
+  // The name of a coordinator its workers follow, taken with the join token.
+  const boss = (await call('register', { name: 'gboss' }, JOIN)).result.secret
+  assert.ok(boss)
+  const worker = await reg('gworker')
+  assert.ok((await claim(boss, 'instance-gboss-1', { role: 'coordinator' })).ok)
+  assert.ok((await claim(worker, 'instance-gworker-1', { role: 'worker', coordinator: 'gboss' })).ok)
+
+  // The group is created by someone approved, with both in it.
+  const owner = await reg('gowner')
+  assert.ok((await call('joinGroup', { chat_id: '#gapproval' }, owner)).ok)
+  for (const name of ['gboss', 'gworker']) assert.ok((await call('inviteToGroup', { chat_id: '#gapproval', name }, owner)).ok)
+  assert.ok((await call('joinGroup', { chat_id: '#gapproval' }, boss, 'instance-gboss-1')).ok)
+  assert.ok((await call('joinGroup', { chat_id: '#gapproval' }, worker, 'instance-gworker-1')).ok)
+
+  const send = (secret, inst, text) => call('sendMessage', { chat_id: '#gapproval', text }, secret, inst)
+  assert.equal((await send(boss, 'instance-gboss-1', 'do this')).parameters?.reason, 'approval_pending')
+  assert.equal((await send(worker, 'instance-gworker-1', 'done')).parameters?.reason, 'approval_pending')
+  // And an edit into that group is the same message.
+  const posted = await send(owner, undefined, 'from someone approved')
+  assert.ok(posted.ok, posted.description)
+  assert.ok((await call('admin/approveSession', { name: 'gboss' }, ADMIN)).ok)
+  assert.ok((await send(boss, 'instance-gboss-1', 'do this')).ok)
+
+  // Nor can a name waiting to be approved create a group of its own first.
+  const waiting = (await call('register', { name: 'gwait' }, JOIN)).result.secret
+  assert.equal((await call('joinGroup', { chat_id: '#gfirst' }, waiting)).parameters?.reason, 'approval_pending')
+
+  // Its coordinator deleted, a worker doesn't take orders from whoever takes the name.
+  const old = await reg('gold')
+  const follower = await reg('gfollower')
+  assert.ok((await claim(follower, 'instance-gfollower-1', { role: 'worker', coordinator: 'gold' })).ok)
+  void old
+  assert.ok((await call('admin/deleteIdentity', { name: 'gold' }, ADMIN)).ok)
+  const squatter = (await call('register', { name: 'gold' }, JOIN)).result.secret
+  const dm = await call('sendMessage', { chat_id: 'gfollower', text: 'run this' }, squatter)
+  assert.equal(dm.parameters?.reason, 'approval_pending')
+  const back = await call('sendMessage', { chat_id: 'gold', text: 'may I?' }, follower, 'instance-gfollower-1')
+  assert.equal(back.parameters?.reason, 'approval_pending')
+  assert.ok((await call('admin/approveSession', { name: 'gold' }, ADMIN)).ok)
+  assert.ok((await call('sendMessage', { chat_id: 'gfollower', text: 'run this' }, squatter)).ok)
+})
+
+// The installer's command, run for real with programs that write down how they
+// were called: tmux, Claude Code and Node are stand-ins, so nothing is installed.
+function installerBench(extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'squadra-bench-'))
+  const log = join(dir, 'log')
+  const tool = (name, body) => { writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`); chmodSync(join(dir, name), 0o755) }
+  for (const name of ['curl', 'bash', 'sha256sum', 'cat', 'rm', 'mktemp', 'env', 'cp']) {
+    const real = execFileSync('sh', ['-c', `command -v ${name}`], { encoding: 'utf8' }).trim()
+    tool(name, `echo "${name} $*" >> "$BENCH_LOG"\nexec ${real} "$@"`)
+  }
+  tool('tmux', 'exit 0')
+  tool('claude', 'exit 0')
+  tool('node', `[ "$1" = "-e" ] && exit 0
+echo "node $*" >> "$BENCH_LOG"
+for a in "$@"; do case "$a" in --code-file=*) ${execFileSync('sh', ['-c', 'command -v cat'], { encoding: 'utf8' }).trim()} "\${a#--code-file=}" > "$BENCH_LOG.code" ;; esac; done`)
+  for (const [name, body] of Object.entries(extra)) tool(name, body.replaceAll('$BENCH_DIR', dir))
+  const bash = execFileSync('sh', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim()
+  const run = command => execFileSync(bash, ['-c', command], { env: { PATH: `${dir}:${process.env.PATH}`, HOME: dir, BENCH_LOG: log }, stdio: 'pipe', cwd: dir })
+  return { dir, log, run, said: () => (existsSync(log) ? readFileSync(log, 'utf8') : ''), done: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+const onLinux = { skip: process.platform !== 'linux' }
+
+test('adding a machine: the installer is checked before it runs, and the code is in no program\'s arguments', onLinux, async () => {
+  const en = (await call('api/hosts/enroll', { name: 'bench' }, ADMIN)).result
+  const bench = installerBench()
+  try {
+    bench.run(en.install.linux)
+    const said = bench.said()
+    assert.match(said, /^bash install\.sh /m, 'the installer ran')
+    assert.match(said, /^node squadra-host\.mjs enroll .* --code-file=code/m, 'squadra-host ran')
+    assert.ok(!said.includes(en.code), `the code was in someone's arguments:\n${said}`)
+    assert.equal(readFileSync(`${bench.log}.code`, 'utf8'), en.code)
+  } finally { bench.done() }
+  // Its checksum not matching: nothing runs.
+  const wrong = installerBench()
+  try {
+    const sum = en.install.linux.match(/echo '([0-9a-f]{64})  install\.sh'/)[1]
+    assert.throws(() => wrong.run(en.install.linux.replace(sum, '0'.repeat(64))))
+    assert.doesNotMatch(wrong.said(), /^bash install\.sh|^node /m)
+  } finally { wrong.done() }
+})
+
+test('adding a machine: --os-user hands the checked script and the code over in a folder, not in arguments', onLinux, async () => {
+  const en = (await call('api/hosts/enroll', { name: 'bench-user' }, ADMIN)).result
+  const bench = installerBench({
+    // As root, until runuser: then that user.
+    id: 'case "$*" in -u) [ -n "$AS_OS_USER" ] && echo 1001 || echo 0 ;; "-u acme") echo 1001 ;; esac',
+    getent: 'echo "acme:x:1001:1001::$BENCH_DIR:/bin/bash"',
+    runuser: 'echo "runuser $*" >> "$BENCH_LOG"\nAS_OS_USER=1; export AS_OS_USER; shift 3\nexec "$@"',
+    chown: 'echo "chown $*" >> "$BENCH_LOG"',
+    loginctl: 'exit 0',
+  })
+  try {
+    bench.run(`${en.install.linux} --os-user=acme`)
+    const said = bench.said()
+    assert.match(said, /^chown -R acme /m)
+    assert.match(said, /^runuser -u acme -- env .* bash install\.sh .* --code-file code/m)
+    assert.doesNotMatch(said, /^curl .*install\/linux\.sh.*\n(.*\n)*curl .*install\/linux\.sh/m, 'it is not downloaded again')
+    assert.ok(!said.includes(en.code), `the code was in someone's arguments:\n${said}`)
+    assert.equal(readFileSync(`${bench.log}.code`, 'utf8'), en.code)
+  } finally { bench.done() }
+})
+
+test('an address starting with two slashes is not the page: it would take the page\'s redirects to another site', async () => {
+  const raw = target => new Promise((resolve, reject) => {
+    const s = connect(PORT, '127.0.0.1', () => s.write(`GET ${target} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`))
+    let got = ''
+    s.on('data', d => { got += d })
+    s.on('end', () => resolve(got))
+    s.on('error', reject)
+  })
+  for (const target of ['//evil.example/?company=zzz', '///evil.example/', '//', '//evil.example/ui']) {
+    const got = await raw(target)
+    assert.match(got, /^HTTP\/1\.1 404/, target)
+    assert.doesNotMatch(got, /<html/i, target)
+  }
+  // The page where it is.
+  assert.match(await raw('/?company=zzz'), /^HTTP\/1\.1 200/)
+  // No part of the page builds an address from its own path alone.
+  for (const f of readdirSync(join(ROOT, 'server/ui')).filter(n => n.endsWith('.js'))) {
+    assert.doesNotMatch(readFileSync(join(ROOT, 'server/ui', f), 'utf8'), /location\.(href|replace\(|assign\()\s*=?\s*`?\$?\{?location\.pathname/, f)
+  }
 })

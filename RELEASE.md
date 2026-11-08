@@ -2,7 +2,7 @@
 
 A release is three things: a `squadra-host` signed with the release key, a tag on `main`, and a GitHub Release.
 
-Users install and update from the latest tag, not from `main`. Machines refuse a `squadra-host` that isn't signed, and they install the plugin from the tag of their own version (`roke22/Squadra#v<version>`). So a release isn't usable until its tag is pushed, and a tag can't be taken back once someone has used it.
+Users install and update from the latest tag, not from `main`. Machines refuse a `squadra-host` that isn't signed, and they install the plugin from the tag of their own version (`roke22/SquadraHQ#v<version>`). So a release isn't usable until its tag is pushed, and a tag can't be taken back once someone has used it.
 
 ## Once, before the first release
 

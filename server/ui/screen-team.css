@@ -1,0 +1,80 @@
+/* One team: what it is for and what it reported, beside who is in it. */
+
+#team { flex: 1; min-height: 0; overflow-y: auto; }
+.tq { display: flex; flex-wrap: wrap; align-items: flex-start; min-height: 100%; }
+.tq-main { flex: 3 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.tq-aside { flex: 1 1 260px; min-width: 0; align-self: stretch; display: flex; flex-direction: column; gap: 18px; padding: 20px; border-left: 1px solid var(--line); }
+
+.tq-card { overflow: hidden; }
+.tq-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 46px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.tq-h h2 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.tq-sub { font-size: var(--fs-sm); color: var(--muted); }
+.tq-body { padding: 14px 16px; }
+.tq-goal { margin: 0; font-size: var(--fs-lg); line-height: 1.5; text-wrap: pretty; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tq-quiet { margin: 0; padding: 14px 16px; color: var(--muted); }
+.tq-body .tq-quiet { padding: 0; }
+
+.tq-reports { list-style: none; margin: 0; padding: 4px 0; }
+.tq-reports li + li { border-top: 1px solid var(--line); }
+.tq-report { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 9px; min-height: 44px; padding: 9px 16px; color: inherit; text-decoration: none; }
+.tq-report:hover { background: var(--raised); }
+.tq-report .tag.ok { color: var(--ok); border-color: currentColor; }
+.tq-report .tag.err { color: var(--err); border-color: currentColor; }
+.tq-report .tag.warn { color: var(--warn); border-color: currentColor; }
+.tq-name { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+.tq-text { flex: 1 1 200px; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tq-when { font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+
+.tq-label { margin: 0 0 8px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.tq-aside section + section { padding-top: 16px; border-top: 1px solid var(--line); }
+.tq-members { list-style: none; margin: 0; padding: 0; }
+.tq-member { display: flex; align-items: center; gap: 8px; min-height: 34px; margin: 0 -8px; padding: 4px 8px; border-radius: var(--r); color: inherit; text-decoration: none; }
+.tq-member:hover { background: var(--raised); }
+.tq-member.offline .tq-name { opacity: .62; }
+.tq-where { margin-left: auto; font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+.tq-small { margin: 0 0 8px; font-size: var(--fs-sm); color: var(--muted); }
+.tq-act.quiet { padding-left: 0; }
+
+#team .empty { min-height: 60vh; justify-content: center; }
+
+@media (max-width: 900px) {
+  .tq-main, .tq-aside { padding: 12px; }
+  .tq-aside { border-left: 0; border-top: 1px solid var(--line); }
+  .tq-member, .tq-report { min-height: 48px; }
+}
+
+/* The plan: how far it is, then each task. */
+.pl-sum { display: flex; flex-direction: column; gap: 10px; }
+.pl-meter { display: flex; gap: 2px; height: 6px; border-radius: var(--r-pill); overflow: hidden; background: var(--raised); }
+.pl-meter.big { height: 8px; }
+.pl-meter i, .pl-key { display: block; }
+.pl-done { background: var(--ok); } .pl-doing { background: var(--info); } .pl-blocked { background: var(--err); } .pl-waiting { background: var(--warn); }
+.pl-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-sm); color: var(--muted); }
+.pl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pl-key { width: 8px; height: 8px; border-radius: 2px; }
+.pl-table { width: 100%; min-width: 560px; border-collapse: collapse; border-top: 1px solid var(--line); }
+.pl-table th { padding: 8px 16px; border-bottom: 1px solid var(--line); text-align: left; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.pl-table td { padding: 9px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.pl-table tr:last-child td { border-bottom: 0; }
+.pl-t { display: block; }
+.pl-row-done .pl-t { color: var(--muted); }
+.pl-note { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--muted); }
+.pl-who { display: inline-flex; align-items: center; gap: 5px; color: var(--text); text-decoration: none; font-family: var(--mono); font-size: 12.5px; }
+.pl-who .role { width: 12px; height: 12px; }
+.tq-quiet0 { color: var(--muted); font-size: var(--fs-sm); }
+.pl-foot { padding: 10px 16px 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }
+
+/* A phone: each task on its own lines (what, then state, who and reference),
+   and the team's live view, made for a wide screen, isn't offered. */
+@media (max-width: 900px) {
+  .pl-table, .pl-table tbody { display: block; min-width: 0; }
+  .pl-table thead { display: none; }
+  .pl-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .pl-table tr:last-child { border-bottom: 0; }
+  .pl-table td { padding: 0; border: 0; }
+  .pl-table td:first-child { flex: 1 0 100%; }
+  .pl-table td:last-child { margin-left: auto; }
+  .pl-table td:last-child:empty { display: none; }
+  .pl-table .mc-state { font-size: var(--fs-sm); }
+  .wide-only { display: none; }
+}

@@ -70,13 +70,16 @@ const KEY_VALUE = /(?<![A-Za-z0-9])([A-Za-z0-9_.-]{0,40}?(?:password|passwd|pass
 const BEARER = /\b(Bearer|bearer|BEARER|Basic|Token)\s+[A-Za-z0-9._~+/=-]{8,1000}/g
 // Secrets in command lines: --password x, --token=x, mysql -pX, curl -u user:pass.
 const CLI_FLAGS = /(--(?:password|passwd|token|secret|api-?key|access-?key|auth)(?:=|\s+))(["']?)[^\s"']{3,500}\2/gi
-const CLI_SHORT = /(\bmysql(?:dump)?\b[^\n|;&]{0,200}?\s-p)([^\s]{3,200})|(\bcurl\b[^\n|;&]{0,200}?\s(?:-u|--user)\s+)([^\s:]{1,100}):([^\s]{1,200})/gi
+// (Case matters for mysql: -P is its port, and it can come before -p.)
+const CLI_SHORT = /(\b(?:mysql(?:dump)?|mariadb(?:-dump)?)\b[^\n|;&]{0,200}?\s-p)([^\s]{3,200})|(\b[Cc][Uu][Rr][Ll]\b[^\n|;&]{0,200}?\s(?:-u|--user)\s+)([^\s:]{1,100}):([^\s]{1,200})/g
 // netrc lines, sshpass -p X, openssl -pass pass:X / -k X, docker/az/mongosh
 // -p X, redis-cli -a X, htpasswd -b file user X, smbclient -U user%X,
 // wget --http-password X, mysqldump -p X, kubectl --from-literal=k=X.
 const OTHER_CLI = /(\bmachine\s+\S{1,200}\s+login\s+\S{1,200}\s+password\s+|\bsshpass\s+-p\s*|\s-pass(?:in|out)?\s+pass:|\bopenssl\b[^\n|;&]{0,200}?\s-k\s+|\b(?:docker|podman)\s+login\b[^\n|;&]{0,200}?\s(?:-p|--password)\s+|\baz\s+login\b[^\n|;&]{0,200}?\s-p\s+|\bmongo(?:sh)?\b[^\n|;&]{0,200}?\s-p\s+|\bredis-cli\b[^\n|;&]{0,200}?\s-a\s+|\bhtpasswd\s+-b\w*\s+\S{1,200}\s+\S{1,200}\s+|\bsmbclient\b[^\n|;&]{0,200}?\s-U\s+[^\s%]{1,100}%|--http-password[=\s]+|\bmysql(?:dump)?\b[^\n|;&]{0,200}?\s-p\s+|--from-literal=[^=\s]{1,100}=)([^\s'"]{1,500})/gi
 // Cookie headers.
 const COOKIE = /\b((?:Set-)?Cookie:\s{0,5})[^\n]{1,4000}/gi
+
+const cliShort = (m, a, c, user) => (a ? `${a}[REDACTED]` : `${c}${user}:[REDACTED]`)
 
 // The text is cut before matching: what is sent is clipped well below this.
 const REDACT_MAX = 25_000
@@ -90,7 +93,7 @@ export function redact(text) {
   out = out.replace(COOKIE, '$1[REDACTED]')
   out = out.replace(CLI_FLAGS, '$1[REDACTED]')
   out = out.replace(OTHER_CLI, '$1[REDACTED]')
-  out = out.replace(CLI_SHORT, (m, a, _p, c, user) => (a ? `${a}[REDACTED]` : `${c}${user}:[REDACTED]`))
+  out = out.replace(CLI_SHORT, (m, a, _p, c, user) => cliShort(m, a, c, user))
   out = out.replace(KEY_VALUE, (_, k, sep) => `${k}${sep}[REDACTED]`)
   return out
 }
@@ -100,6 +103,10 @@ export function redact(text) {
 // patterns can't see): every string as text, and a string or number under a
 // secret-looking key (a string) as a whole. `mask` is redact or maskOutgoing's text.
 const SECRET_KEY = /^(?:[A-Za-z0-9_.-]{0,40}?(?:password|passwd|passphrase|(?<![A-Za-z])(?:pw|pwd|pass|hmac)(?![a-z])|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|signing[_-]?key|account[_-]?key|credentials?|authorization|cookie|contrase(?:ñ|n)a|clave))[A-Za-z0-9_.-]{0,40}$/i
+// (Words of a camelCase name count as words: dbPass, hmacKey. Not a secret by
+// name alone: pass_through, and a pwd that is a folder.)
+const ACRONYM_PASS = /^(?:DB|PG|MYSQL|API|ADMIN|ROOT|USER|SQL|REDIS|SMTP)_?(?:PASS|PWD|PW)$/
+const secretName = (k, v) => (SECRET_KEY.test(k) || SECRET_KEY.test(k.replace(/([a-z0-9])([A-Z])/g, '$1_$2')) || SECRET_KEY.test(k.replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')) || ACRONYM_PASS.test(k)) && !/tokens$|^pass[_-]?through$/i.test(k) && !(/^pwd$/i.test(k) && /^(~|\/[^/]+)\//.test(v))
 export function maskDeep(value, mask, depth = 0) {
   let masked = 0
   const walk = (v, d) => {
@@ -110,7 +117,7 @@ export function maskDeep(value, mask, depth = 0) {
     for (const [k, x] of Object.entries(v)) {
       // (Counts of tokens — max_tokens, tokens — aren't secrets; a number
       // under a password, secret or PIN key is.)
-      const secretKey = SECRET_KEY.test(k) && !/tokens$/i.test(k)
+      const secretKey = secretName(k, x)
       const numberSecret = typeof x === 'number' && Number.isFinite(x) && /pass|secret|^pin$|[_-]pin$/i.test(k) && String(x).length >= 4
       if ((secretKey && typeof x === 'string' && x.length >= 4 && !/^\[REDACTED/.test(x)) || numberSecret) { masked++; out[k] = '[REDACTED]' } else out[k] = walk(x, d + 1)
     }
@@ -125,6 +132,8 @@ export function maskDeep(value, mask, depth = 0) {
 // (no spaces, brackets or code). Ordinary code such as
 // `const token = getToken(req)` stays as written. The whole text is checked.
 const OUT_KEY_VALUE = /(?<![A-Za-z0-9])([A-Za-z0-9_.-]{0,40}?(?:password|passwd|passphrase|(?<![A-Za-z])(?:pw|pwd|pass|hmac)(?![a-z])|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|account[_-]?key|credentials?)[A-Za-z0-9_.-]{0,40})(["']?\s{0,5}[:=]\s{0,5})(["']?)([A-Za-z0-9+/_~.@#$%^&*!-]{8,500})\3(?![A-Za-z0-9(])/gi
+// The same for camelCase names, where case tells the words apart: dbPass=…, hmacKey=…
+const OUT_CAMEL_KEY_VALUE = /(?<![A-Za-z0-9])([A-Za-z0-9_.-]{0,40}?(?:[A-Za-z0-9](?:Pw|Pwd|Pass|Hmac)(?![a-z])|[a-z0-9](?:PW|PWD|PASS|HMAC)(?![a-z])|(?<![A-Za-z0-9])(?:DB|PG|MYSQL|API|ADMIN|ROOT|USER|SQL|REDIS|SMTP)_?(?:PASS|PWD|PW)(?![A-Za-z])|(?<![A-Za-z])(?:pw|pwd|pass|hmac)(?=[A-Z]))[A-Za-z0-9_.-]{0,40})(["']?\s{0,5}[:=]\s{0,5})(["']?)([A-Za-z0-9+/_~.@#$%^&*!-]{8,500})\3(?![A-Za-z0-9(])/g
 const NOT_SECRET = /^(true|false|null|none|undefined|required|optional|string|number|boolean|redacted|\[redacted\]|example|changeme|xxx+|\*+)$/i
 export function maskOutgoing(text) {
   if (typeof text !== 'string' || !text) return { text, masked: 0 }
@@ -134,13 +143,15 @@ export function maskOutgoing(text) {
   for (const re of SECRET_PATTERNS) out = out.replace(re, count(() => '[REDACTED]'))
   out = out.replace(URL_CREDENTIALS, count((_, a, b) => `${a}${b}:[REDACTED]@`))
   out = out.replace(BEARER, count((_, k) => `${k} [REDACTED]`))
-  out = out.replace(OUT_KEY_VALUE, (m, k, sep, q, v) => {
+  out = out.replace(CLI_SHORT, (m, a, _p, c, user) => { const r = cliShort(m, a, c, user); if (r !== m) masked++; return r })
+  const keyValue = (m, k, sep, q, v) => {
     // A secret has letters and digits; names in code don't (process.env.API_KEY,
     // os.environ["X"], my-tls-secret, /auth/reset-password).
-    if (NOT_SECRET.test(v) || !/\d/.test(v) || !/[A-Za-z]/.test(v) || (!q && /^[/#]/.test(v))) return m
+    if (NOT_SECRET.test(v) || !/\d/.test(v) || !/[A-Za-z]/.test(v) || (!q && /^[/#]/.test(v)) || /^pass[_-]?through$/i.test(k)) return m
     masked++
     return `${k}${sep}${q}[REDACTED]${q}`
-  })
+  }
+  out = out.replace(OUT_KEY_VALUE, keyValue).replace(OUT_CAMEL_KEY_VALUE, keyValue)
   return { text: out, masked }
 }
 
@@ -157,19 +168,28 @@ function outputMaySecrets(tool, toolInput) {
   if (/^(BashOutput|TaskOutput)$/.test(tool)) return true
   const i = toolInput && typeof toolInput === 'object' ? toolInput : {}
   if (/^mcp__/.test(tool) && /shell|exec|terminal|bash|command|run/i.test(tool)) {
-    // (Every string in its input, whatever the field is called: args, argv…)
-    const strings = []
-    const walk = (v, d) => { if (strings.length > 200 || d > 10) return; if (typeof v === 'string') strings.push(v); else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x, d + 1) }
-    walk(i, 0)
+    const strings = stringsIn(i)
     return !strings.length || strings.length > 200 || strings.some(cmd => touchesSecrets('Bash', { command: cmd }))
   }
   return touchesSecrets(tool, toolInput)
+}
+// Every string in a tool's input, whatever the field is called: args, paths, uri…
+function stringsIn(input) {
+  const strings = []
+  const walk = (v, d) => { if (strings.length > 200 || d > 10) return; if (typeof v === 'string') strings.push(v); else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x, d + 1) }
+  walk(input, 0)
+  return strings
 }
 export function touchesSecrets(tool, toolInput) {
   const i = toolInput && typeof toolInput === 'object' ? toolInput : {}
   if (tool === 'Bash') {
     const cmd = String(i.command ?? '').slice(0, 10_000)
     return SECRET_FILE.test(cmd) || SECRET_DIR.test(cmd) || SECRET_COMMAND.test(cmd)
+  }
+  // An MCP tool can name a file in any field. (Too many to look at: taken as secret.)
+  if (/^mcp__/.test(tool)) {
+    const strings = stringsIn(i)
+    return strings.length > 200 || strings.some(v => { const t = v.slice(0, 4096); return SECRET_FILE.test(t) || SECRET_DIR.test(t) || SECRET_FILE.test(` ${t}`) })
   }
   const path = String(i.file_path ?? i.notebook_path ?? i.path ?? '').slice(0, 4096)
   // Grep and Glob also by their pattern (".env*", "**/*.pem").
@@ -295,9 +315,18 @@ const MAX_HOOK_BYTES = 64 * 1024 * 1024
 // onPrompt(prompt): each prompt about to be sent, whole (a worker's tasks start).
 // onChannelSeen(ids): message_ids of channel messages the transcript shows
 // reached Claude, also those put into a turn already going (no prompt for them).
-// stopCheck(active): when the turn is about to end, a reason to go on, or ''
+// stopCheck(background, lastText): when the turn is about to end (lastText: Claude's
+// last words in it, read here and never sent), a reason to go on, or ''
 // (asked for by the Stop hook through the same socket).
-export function createObserver({ level = 'full', send, log = () => {}, contextProvider = () => '', onToolInput = null, onPrompt = null, onChannelSeen = null, stopCheck = null }) {
+// onConversation(id, transcript): the conversation this session is in, when
+// first known and whenever it changes (/clear, /resume), at every level.
+// onPermissionAsk(tool, input): the agent shows a permission prompt in its
+// terminal (agents without channels: Codex CLI's PermissionRequest hook, Grok
+// CLI's permission_prompt notification), for the tool call it asks about;
+// tool null when that can't be told (Grok names none: the one call still
+// running, if there is exactly one). onToolEnd(tool, input): with it, a call of
+// the main agent that ran or failed (its prompt, if any, is gone).
+export function createObserver({ level = 'full', send, log = () => {}, contextProvider = () => '', onToolInput = null, onPrompt = null, onChannelSeen = null, stopCheck = null, onConversation = null, onPermissionAsk = null, onToolEnd = null }) {
   level = normalizeLevel(level) ?? 'full'
   const limits = LIMITS[level]
   let server = null
@@ -306,8 +335,12 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   let flushing = false
   let flushTimer = null
   let tail = null // { path, offset, rest, decoder, timer }
+  let conversation = null
   let cwd = process.cwd()
   let stopped = false
+  // Tool calls started and not finished yet (tool_use_id -> { tool, input, at }).
+  const running = new Map()
+  let askedAt = 0 // the last PermissionRequest hook
 
   const push = ev => {
     if (stopped || level === 'off') return
@@ -340,6 +373,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
     tail = { path, offset, rest: '', decoder: new StringDecoder('utf8'), timer: setInterval(readTail, 700) }
   }
 
+  let lastText = ''
   function readTail() {
     if (!tail) return
     let size
@@ -386,6 +420,8 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
         push({ ts, kind: 'usage', context_tokens: context, model: e.message.model, context_window: window, compact_at: point, context_pct: Math.min(100, Math.round(context / point * 100)) })
       }
     }
+    // (Kept here whatever the level: the stop check reads it, nothing is sent.)
+    for (const block of e.message.content ?? []) if (block?.type === 'text' && block.text?.trim()) lastText = block.text
     if (!limits.text) return
     for (const block of e.message.content ?? []) {
       if (block?.type === 'text' && block.text?.trim()) {
@@ -399,10 +435,15 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   function onHook({ ts, input }) {
     if (!input || typeof input !== 'object') return
     if (input.hook_event_name === 'PreToolUse' && onToolInput) { try { onToolInput(String(input.tool_name ?? ''), input.tool_input) } catch {} }
+    if (onPermissionAsk) permissionHooks(input)
     // Claude Code's working directory (it can change during a session).
     const cwdChanged = typeof input.cwd === 'string' && input.cwd !== cwd
     if (cwdChanged) cwd = input.cwd
     if (input.transcript_path && !input.agent_id) setTranscript(input.transcript_path)
+    if (typeof input.session_id === 'string' && !input.agent_id && input.session_id !== conversation) {
+      conversation = input.session_id
+      try { onConversation?.(conversation, input.transcript_path) } catch (err) { log(`observe: conversation callback failed: ${err.message}`) }
+    }
     const base = {
       ts: Number(ts) || Date.now(),
       ...(input.agent_type ? { agent: String(input.agent_type) } : {}),
@@ -426,7 +467,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
         // command's name, the tool), never its arguments or content.
         const secret = touchesSecrets(tool, input.tool_input)
         // (Not even the command's name: a quoted value before it could split into it.)
-        const summary = secret && tool === 'Bash'
+        const summary = secret && (tool === 'Bash' || tool.startsWith('mcp__'))
           ? 'command … (touches secrets: not shown)'
           : summarizeTool(tool, input.tool_input, cwd)
         return push({
@@ -499,6 +540,35 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
     }
   }
 
+  // What tells a prompt is waiting, for agents without channels (see onPermissionAsk).
+  function permissionHooks(input) {
+    const id = typeof input.tool_use_id === 'string' ? input.tool_use_id : null
+    const event = input.hook_event_name
+    if (event === 'PreToolUse' && id && !input.agent_id) {
+      running.set(id, { tool: String(input.tool_name ?? ''), input: input.tool_input, at: Date.now() })
+      // (Calls whose end never came: forgotten after ten minutes, at most 50 kept.)
+      for (const [k, v] of running) if (Date.now() - v.at > 10 * 60_000 || running.size > 50) running.delete(k)
+    } else if (event === 'PostToolUse' || event === 'PostToolUseFailure') {
+      if (id) running.delete(id)
+      if (!input.agent_id) try { onToolEnd?.(String(input.tool_name ?? ''), input.tool_input ?? null) } catch (err) { log(`observe: tool end callback failed: ${err.message}`) }
+    }
+    try {
+      if (event === 'PermissionRequest' && !input.agent_id) { askedAt = Date.now(); onPermissionAsk(String(input.tool_name ?? ''), input.tool_input ?? null) }
+      else if (event === 'Notification' && input.notification_type === 'permission_prompt') {
+        // (Grok runs the PreToolUse hook to its end before it asks, so the call
+        // asked about has just started: an older one still running, e.g. in
+        // the background, is not it, nor one whose hook didn't get here.)
+        const calls = [...running.values()].filter(c => Date.now() - c.at < 10_000)
+        // (An agent with both says it twice, in either order: the hook's, with the call, counts.)
+        const at = Date.now()
+        setTimeout(() => {
+          if (stopped || askedAt > at - 15_000) return
+          try { onPermissionAsk(calls.length === 1 ? calls[0].tool : null, calls.length === 1 ? calls[0].input ?? null : null) } catch (err) { log(`observe: permission callback failed: ${err.message}`) }
+        }, 2000).unref?.()
+      }
+    } catch (err) { log(`observe: permission callback failed: ${err.message}`) }
+  }
+
   return {
     level,
     // The socket also serves the post-compaction context, so it runs even with
@@ -522,7 +592,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
           if (msg?.want === 'stop') {
             // Up to date first: what reached Claude in this turn counts.
             readTail()
-            Promise.resolve().then(() => stopCheck?.(msg.active === true))
+            Promise.resolve().then(() => stopCheck?.(msg.background === true, typeof msg.last_text === 'string' && msg.last_text ? msg.last_text : lastText))
               .catch(err => { log(`observe: stop check failed: ${err.message}`); return '' })
               .then(block => conn.end(JSON.stringify({ block: typeof block === 'string' ? block : '' })))
             return

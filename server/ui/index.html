@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SquadraHQ</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2215%22%20fill%3D%22%23C15F3C%22/%3E%3Cg%20fill%3D%22%23fff%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2219%22%20r%3D%226.4%22/%3E%3Ccircle%20cx%3D%2223.5%22%20cy%3D%2228.5%22%20r%3D%224.4%22/%3E%3Ccircle%20cx%3D%2240.5%22%20cy%3D%2228.5%22%20r%3D%224.4%22/%3E%3Ccircle%20cx%3D%2216.5%22%20cy%3D%2237%22%20r%3D%223.5%22/%3E%3Ccircle%20cx%3D%2247.5%22%20cy%3D%2237%22%20r%3D%223.5%22/%3E%3Ccircle%20cx%3D%2210.5%22%20cy%3D%2245%22%20r%3D%222.7%22/%3E%3Ccircle%20cx%3D%2253.5%22%20cy%3D%2245%22%20r%3D%222.7%22/%3E%3C/g%3E%3C/svg%3E">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#f6f6f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1114" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="SquadraHQ">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preload" href="/vendor/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/ui/styles.css">
+<link rel="stylesheet" href="/ui/ds-base.css">
+<link rel="stylesheet" href="/ui/ds-components.css">
+<link rel="stylesheet" href="/ui/shell.css">
+<link rel="stylesheet" href="/ui/overlays.css">
+<link rel="stylesheet" href="/ui/screen-inbox.css">
+<link rel="stylesheet" href="/ui/screen-teams.css">
+<link rel="stylesheet" href="/ui/screen-team.css">
+<link rel="stylesheet" href="/ui/screen-session.css">
+<link rel="stylesheet" href="/ui/screen-machines.css">
+<link rel="stylesheet" href="/ui/screen-signin.css">
+<link rel="stylesheet" href="/ui/screen-newteam.css">
+<link rel="stylesheet" href="/ui/screen-mosaic.css">
+<script>
+  // Light or dark, first thing, so the page doesn't flash.
+  try { const t = localStorage.getItem('squadraTheme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t } catch {}
+</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="squadra-logo" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="15" fill="#C15F3C"/>
+    <g fill="#fff">
+      <circle cx="32" cy="19" r="6.4"/>
+      <circle cx="23.5" cy="28.5" r="4.4" fill-opacity=".95"/><circle cx="40.5" cy="28.5" r="4.4" fill-opacity=".95"/>
+      <circle cx="16.5" cy="37" r="3.5" fill-opacity=".85"/><circle cx="47.5" cy="37" r="3.5" fill-opacity=".85"/>
+      <circle cx="10.5" cy="45" r="2.7" fill-opacity=".72"/><circle cx="53.5" cy="45" r="2.7" fill-opacity=".72"/>
+    </g>
+  </symbol>
+</svg>
+
+<div id="splash" hidden></div>
+
+<div id="login" hidden>
+  <form class="login-card" id="loginForm">
+    <div class="brand"><svg class="logo" aria-hidden="true"><use href="#squadra-logo"/></svg>SquadraHQ</div>
+    <p id="loginIntro"></p>
+    <div id="loginFields"></div>
+    <button type="submit" id="loginBtn"></button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="foot"><span class="ver"></span><span class="prefs"><button type="button" class="theme-btn" data-theme-toggle></button><span class="lang" role="group" aria-label="Language"><button type="button" data-lang="en">EN</button><button type="button" data-lang="es">ES</button></span></span></div>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <aside id="rail" class="rail">
+    <div class="rail-top">
+      <div class="rail-brand"><svg class="logo" aria-hidden="true"><use href="#squadra-logo"/></svg><span>SquadraHQ</span></div>
+      <label class="rail-co" id="companyBox" hidden><span class="sr-only" id="companyLabel"></span><select id="companySelect"></select><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></label>
+      <div class="rail-co-name" id="companyName" hidden></div>
+      <button class="rail-search" id="searchBtn" type="button" aria-haspopup="dialog"></button>
+    </div>
+    <nav class="rail-scroll" id="nav"></nav>
+    <div class="rail-foot"><span class="rail-conn" role="status"><span class="dot" id="connDot"></span><span id="connText"></span></span><button class="rail-settings" id="settingsBtn" type="button" aria-haspopup="dialog"></button></div>
+  </aside>
+  <div class="rail-scrim" id="railScrim" hidden></div>
+  <main id="main">
+    <header class="head">
+      <button class="icon-btn head-menu" id="menuBtn" type="button" aria-controls="rail" aria-expanded="false"></button>
+      <h1 id="topTitle"></h1>
+      <div class="head-tabs" id="topTabs"></div>
+      <span class="head-sub" id="topSub"></span>
+      <div class="head-actions" id="topRight"></div>
+    </header>
+    <div id="alerts" hidden></div>
+    <div id="teams" hidden></div>
+    <div id="team" hidden></div>
+    <div id="newteam" hidden></div>
+    <div id="addmachine" hidden></div>
+    <div id="mosaic" hidden></div>
+    <div id="archived" hidden></div>
+    <div id="inbox" hidden></div>
+    <div id="org" hidden></div>
+    <div id="session" class="full" hidden></div>
+    <div id="hosts" hidden></div>
+    <div id="terminal" hidden></div>
+  </main>
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<div id="settings" hidden></div>
+<div id="palette" hidden></div>
+
+<script type="module" src="/ui/app.js"></script>
+</body>
+</html>

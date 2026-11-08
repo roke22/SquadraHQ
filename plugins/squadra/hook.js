@@ -106,7 +106,7 @@ async function main() {
   if (STOP_MODE) {
     let input = {}
     try { input = JSON.parse(raw) ?? {} } catch {}
-    const block = await askContext(sock, 'stop', { want: 'stop', field: 'block', extra: { active: input.stop_hook_active === true } })
+    const block = await askContext(sock, 'stop', { want: 'stop', field: 'block', extra: { background: Array.isArray(input.background_tasks) && input.background_tasks.length > 0, last_text: String(input.last_assistant_message ?? '').slice(-20_000) } })
     if (block) process.stdout.write(JSON.stringify({ decision: 'block', reason: block }))
     return
   }
