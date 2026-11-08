@@ -204,7 +204,7 @@ The **[examples](https://roke22.github.io/SquadraHQ/examples.html)** show whole 
 
 Update the dashboard to the latest release (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) and start it again, or rebuild the Docker image from there. Then run `squadra-host update` on each computer. The dashboard tells you which ones are out of date.
 
-**From 0.0.7:** what the dashboard held becomes its first company, and computers and sessions keep working as they are. The first time you open it, the server token creates the first owner; after that you sign in with email, password and code, and the token no longer opens the dashboard (`--allow-token-api` keeps it working on `/api` for your scripts). Run `squadra-host update` on each computer and open its sessions again to get the new features, such as the inbox and the team plan; computers not updated keep working without them.
+**From 0.0.7:** what the dashboard held becomes its first company, and computers and sessions keep working as they are. The first time you open it, the server token creates the first owner; after that you sign in with email, password and code, and the token no longer opens the dashboard (`--allow-token-api` keeps it working on `/api` for your scripts). Run `squadra-host update` on each computer and open its sessions again to get the new features, such as the inbox and the team plan; computers not updated keep working without them. The repository is now `roke22/SquadraHQ`: the old address still works, and each computer moves to the new one when it updates.
 
 ## FAQ
 

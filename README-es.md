@@ -204,7 +204,7 @@ Los **[ejemplos](https://roke22.github.io/SquadraHQ/es/ejemplos.html)** muestran
 
 Actualiza el panel a la última versión (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) y arráncalo de nuevo, o reconstruye la imagen de Docker desde ahí. Después ejecuta `squadra-host update` en cada ordenador. El panel te dice cuáles están desactualizados.
 
-**Desde 0.0.7:** lo que tenía el panel pasa a ser su primera empresa, y los ordenadores y las sesiones siguen funcionando como estaban. La primera vez que lo abres, el token del servidor crea el primer propietario; después entras con email, contraseña y código, y el token ya no abre el panel (`--allow-token-api` lo mantiene en `/api` para tus scripts). Ejecuta `squadra-host update` en cada ordenador y vuelve a abrir sus sesiones para tener lo nuevo, como la bandeja y el plan del equipo; los ordenadores sin actualizar siguen funcionando sin ello.
+**Desde 0.0.7:** lo que tenía el panel pasa a ser su primera empresa, y los ordenadores y las sesiones siguen funcionando como estaban. La primera vez que lo abres, el token del servidor crea el primer propietario; después entras con email, contraseña y código, y el token ya no abre el panel (`--allow-token-api` lo mantiene en `/api` para tus scripts). Ejecuta `squadra-host update` en cada ordenador y vuelve a abrir sus sesiones para tener lo nuevo, como la bandeja y el plan del equipo; los ordenadores sin actualizar siguen funcionando sin ello. El repositorio pasa a ser `roke22/SquadraHQ`: la dirección antigua sigue funcionando, y cada ordenador pasa a la nueva al actualizarse.
 
 ## Preguntas frecuentes
 
