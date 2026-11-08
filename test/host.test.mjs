@@ -1672,3 +1672,41 @@ test('Codex CLI and Grok CLI: a session names its agent, and what arrives is typ
     assert.ok(out.block.endsWith('</channel>'))
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('Codex CLI and Grok CLI: an answer to a permission prompt is typed only while that prompt is on screen', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sq-answers-'))
+  const codex = [
+    '› RUN: rm -f /tmp/a',
+    '• Ran rm -f /tmp/old',
+    '  Would you like to run the following command?',
+    '  Reason: test',
+    '  $ rm -f /tmp/a',
+    '› 1. Yes, proceed (y)',
+    '  3. No, and tell Codex what to do differently (esc)',
+    '  Press enter to confirm or esc to cancel',
+  ].join('\n')
+  const grok = [
+    '     ◆ Ran rm -f /tmp/old',
+    '  ┃  ›  test',
+    '  ┃  │ rm -f /tmp/very/long/path/that/',
+    '  ┃  │ wraps',
+    '  ┃  1 (○) Yes, and don\'t ask again for anything (always-approve mode)',
+    '  ┃  3 (●) Yes, proceed',
+    '  ┃  4 (○) No, reject (type to add feedback)',
+  ].join('\n')
+  const script = `
+    import { codexPermissionKeys, grokPermissionKeys } from ${JSON.stringify(join(ROOT, 'host/squadra-host.mjs'))}
+    const ans = (command, behavior = 'allow') => ({ behavior, input: { command } })
+    const codex = ${JSON.stringify(codex)}, grok = ${JSON.stringify(grok)}
+    process.stdout.write(JSON.stringify({
+      codex: [codexPermissionKeys(codex, ans('rm -f /tmp/a')), codexPermissionKeys(codex, ans('rm -f /tmp/a', 'deny')), codexPermissionKeys(codex, ans('rm -f /tmp/old')), codexPermissionKeys(codex.split('\\n').slice(0, 2).join('\\n'), ans('rm -f /tmp/old'))],
+      grok: [grokPermissionKeys(grok, ans('rm -f /tmp/very/long/path/that/wraps')), grokPermissionKeys(grok, ans('rm -f /tmp/very/long/path/that/wraps', 'deny')), grokPermissionKeys(grok, ans('rm -f /tmp/old')), grokPermissionKeys(grok, { behavior: 'allow', input: {} })],
+    }))`
+  const out = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, SQUADRA_HOST_DIR: join(dir, 'host') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }))
+  try {
+    // The prompt's own call: yes or no. Another call (one shown above the
+    // prompt), no prompt, or nothing to compare: nothing is typed.
+    assert.deepEqual(out.codex, [['y'], ['Escape'], null, null])
+    assert.deepEqual(out.grok, [['3'], ['4'], null, null])
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})

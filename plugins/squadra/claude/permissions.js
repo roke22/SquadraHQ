@@ -1,5 +1,6 @@
 // Relaying this session's permission prompts to whoever may answer them.
 
+import { randomInt } from 'node:crypto'
 import { maskOutgoing, maskDeep } from '../observe.js'
 import {
   RELAY_OFF, NAME_RE, log, S, active, loadAccess, readAllowPins, call, skeleton, LOOKALIKE,
@@ -216,18 +217,26 @@ export function withdrawIfAmbiguous(s, tool, input) {
   }
 }
 
+// Who is asked now: [] when nobody may answer (or the session logged out
+// while checking: nothing is sent).
+async function currentApprovers(s) {
+  if (s.role === 'worker' && !(await checkCoordinator(s, { fresh: true }))) return []
+  let approvers = permissionApprovers(s)
+  // A coordinator's approvers must still be the identities the user confirmed.
+  if (s.role === 'coordinator') approvers = await verifiedApprovers(s, approvers)
+  if (!approvers.length || !active(s)) return []
+  for (const [id, p] of pendingPermissions) if (p.expires < Date.now()) pendingPermissions.delete(id)
+  return approvers
+}
+
 export async function onPermissionRequest(params) {
   const requestAt = Date.now()
   const s = S
   if (!s?.secret) return
   const { request_id, tool_name, description, input_preview } = params
   if (!request_id || !/^[a-km-z]{5}$/i.test(String(request_id))) return
-  if (s.role === 'worker' && !(await checkCoordinator(s, { fresh: true }))) return
-  let approvers = permissionApprovers(s)
-  // A coordinator's approvers must still be the identities the user confirmed.
-  if (s.role === 'coordinator') approvers = await verifiedApprovers(s, approvers)
-  if (!approvers.length || !active(s)) return // (logged out while checking: nothing is sent)
-  for (const [id, p] of pendingPermissions) if (p.expires < Date.now()) pendingPermissions.delete(id)
+  const approvers = await currentApprovers(s)
+  if (!approvers.length) return
   const pending = { approvers: new Set(approvers), expires: Date.now() + PERMISSION_TTL_MS }
   pendingPermissions.set(String(request_id).toLowerCase(), pending)
   // The tool's input and description come from the session's work (a repo
@@ -263,6 +272,42 @@ export async function onPermissionRequest(params) {
   }
 }
 
+// The same for agents without channels (Codex CLI, Grok CLI): their hooks say
+// that a prompt waits in the terminal and for which call, with its exact
+// input. The answer is typed there by squadra-host, which first checks that
+// the prompt on screen still shows this call; meanwhile it can still be
+// answered in the terminal. When the call can't be told (tool null), the
+// approvers are only told that the session waits: there is nothing to answer.
+const REQUEST_LETTERS = 'abcdefghijkmnopqrstuvwxyz'
+export async function onTypedPermission(s, tool, input) {
+  if (!s?.secret) return
+  const approvers = await currentApprovers(s)
+  if (!approvers.length) return
+  const send = text => { for (const chat_id of approvers) void call('sendMessage', { chat_id, text }, { s }).then(m => { if (m?.message_id) s.relayIds.add(Number(m.message_id)) }).catch(e => log(`permission notice to ${chat_id} failed: ${e.message}`)) }
+  if (!tool || !input || typeof input !== 'object' || Array.isArray(input)) {
+    send(`🔐 Session ${s.name} waits for a permission in its terminal, and which call it asks about could not be read: the user answers it there.`)
+    return
+  }
+  let request_id
+  do request_id = Array.from({ length: 5 }, () => REQUEST_LETTERS[randomInt(REQUEST_LETTERS.length)]).join('')
+  while (pendingPermissions.has(request_id))
+  pendingPermissions.set(request_id, { approvers: new Set(approvers), expires: Date.now() + PERMISSION_TTL_MS, typed: { tool, input } })
+  // As for Claude Code: quoted as JSON, secrets masked, the fixed lines first,
+  // and a command's own "description" (which never runs) apart: Bash's, or
+  // the agent's own command tool (Grok's run_terminal_command).
+  const deep = maskDeep(input, t => maskOutgoing(t).text)
+  const v = deep.value
+  const prose = typeof v.command === 'string' && typeof v.description === 'string' ? v.description : null
+  const rest = prose != null ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'description')) : v
+  send(
+    `🔐 Permission: ${JSON.stringify(tool)}\n` +
+    `Session: ${s.name}\n` +
+    `Reply "yes ${request_id}" or "no ${request_id}"\n` +
+    `Input (from the session): ${shown(JSON.stringify(rest), 3000, deep.masked)}` +
+    (prose != null ? `\nIts "description" field (does not run): ${shown(prose, 1000, 0, { letters: false })}` : ''),
+  )
+}
+
 // A "yes/no <code>" counts only as a DM from someone asked about that very
 // request, while it is pending. Returns the verdict, or null to ignore it.
 // Returns the verdict, null to drop the message (a wrong answer to a real
@@ -287,5 +332,6 @@ export function takePermissionReply(msg, match) {
   // its key, an unsigned answer could have been written by it.
   if (S?.serverKey && !msg.squadra_sig) { log(`unsigned permission answer from "${sender}" ignored: the prompt stays open`); return null }
   pendingPermissions.delete(id)
-  return { request_id: id, behavior: match[1].toLowerCase().startsWith('y') ? 'allow' : 'deny' }
+  // (An agent without channels gets the call too: squadra-host checks its screen against it.)
+  return { request_id: id, behavior: match[1].toLowerCase().startsWith('y') ? 'allow' : 'deny', ...(p.typed ? { typed: p.typed } : {}) }
 }

@@ -67,6 +67,16 @@ export function createMachines(platform, { sessions, observation }) {
   const FRESH_WAIT_MS = Number(process.env.SQUADRA_FRESH_WAIT_MS ?? 20_000)
   const freshWaiters = new Map() // worker -> resolve(confirmed)
   bus.on('context-cleared', name => freshWaiters.get(name)?.(true))
+  // Codex CLI and Grok CLI are started again instead (the machine says so):
+  // a new plugin instance of the worker taking its name after it was asked
+  // confirms it.
+  const restarting = new Set()
+  const startedAt = new Map() // worker being cleared -> when it last started
+  bus.on('instance-started', name => {
+    if (!freshWaiters.has(name)) return
+    startedAt.set(name, Date.now())
+    if (restarting.has(name)) freshWaiters.get(name)(true)
+  })
   async function freshStart(name, p) {
     const worker = String(p.chat_id ?? '')
     const no = (reason, text) => ({ cleared: false, reason, text })
@@ -83,8 +93,13 @@ export function createMachines(platform, { sessions, observation }) {
     const confirmed = new Promise(resolve => freshWaiters.set(worker, resolve))
     const timer = setTimeout(() => freshWaiters.get(worker)?.(false), FRESH_WAIT_MS)
     try {
+      const asked = Date.now()
       try {
-        await askHost(row.host_id, { t: 'clear', term: worker, coordinator: name })
+        const reply = await askHost(row.host_id, { t: 'clear', term: worker, coordinator: name })
+        if (reply?.restarted === true) {
+          restarting.add(worker)
+          if ((startedAt.get(worker) ?? 0) >= asked) freshWaiters.get(worker)?.(true)
+        }
       } catch (err) {
         return no('machine_refused', `its machine did not clear it: ${err.message.replace(/^(Bad Request|Conflict): /, '')}`)
       }
@@ -96,6 +111,8 @@ export function createMachines(platform, { sessions, observation }) {
     } finally {
       clearTimeout(timer)
       freshWaiters.delete(worker)
+      restarting.delete(worker)
+      startedAt.delete(worker)
     }
   }
 

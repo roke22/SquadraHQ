@@ -2,7 +2,7 @@
 // session's pending-input folder, one file per message, and squadra-host types
 // it in the session's terminal when the agent waits for input: a <channel>
 // block like the ones Claude Code shows, so the same rules read the same way.
-// Permission prompts are answered in the session's own terminal (no relay).
+// Answers to permission prompts are left the same way, for squadra-host to type.
 
 import { mkdirSync, lstatSync } from 'node:fs'
 import { join } from 'node:path'
@@ -41,6 +41,23 @@ export function deliver(params) {
   }
 }
 
-// No relay: the prompt is answered in the terminal.
-export const givePermission = () => {}
-export const takePermissionReply = () => 'chat'
+// Where squadra-host looks for answers to permission prompts (the same name there).
+export const ANSWERS_DIR = 'permission-answers'
+
+// An approver's answer to a prompt in the terminal (see onTypedPermission),
+// with the call it was asked about: squadra-host types it only while the
+// prompt on screen shows that call.
+export function givePermission(verdict) {
+  const s = S
+  if (!s || !verdict?.typed || !/^[a-km-z]{5}$/.test(String(verdict.request_id))) return
+  try {
+    const dir = join(s.stateDir, ANSWERS_DIR)
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    const st = lstatSync(dir)
+    if (!st.isDirectory() || st.isSymbolicLink()) throw new Error(`${dir} is not a plain folder`)
+    const answer = { request_id: verdict.request_id, behavior: verdict.behavior === 'allow' ? 'allow' : 'deny', tool: String(verdict.typed.tool), input: verdict.typed.input, at: Date.now() }
+    writePrivateFile(join(dir, `${String(Date.now()).padStart(14, '0')}-${verdict.request_id}.json`), JSON.stringify(answer) + '\n')
+  } catch (err) {
+    log(`could not leave a permission answer for the terminal: ${err.message}`)
+  }
+}

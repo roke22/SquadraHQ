@@ -320,7 +320,12 @@ const MAX_HOOK_BYTES = 64 * 1024 * 1024
 // (asked for by the Stop hook through the same socket).
 // onConversation(id, transcript): the conversation this session is in, when
 // first known and whenever it changes (/clear, /resume), at every level.
-export function createObserver({ level = 'full', send, log = () => {}, contextProvider = () => '', onToolInput = null, onPrompt = null, onChannelSeen = null, stopCheck = null, onConversation = null }) {
+// onPermissionAsk(tool, input): the agent shows a permission prompt in its
+// terminal (agents without channels: Codex CLI's PermissionRequest hook, Grok
+// CLI's permission_prompt notification), for the tool call it asks about;
+// tool null when that can't be told (Grok names none: the one call still
+// running, if there is exactly one).
+export function createObserver({ level = 'full', send, log = () => {}, contextProvider = () => '', onToolInput = null, onPrompt = null, onChannelSeen = null, stopCheck = null, onConversation = null, onPermissionAsk = null }) {
   level = normalizeLevel(level) ?? 'full'
   const limits = LIMITS[level]
   let server = null
@@ -332,6 +337,9 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   let conversation = null
   let cwd = process.cwd()
   let stopped = false
+  // Tool calls started and not finished yet (tool_use_id -> { tool, input, at }).
+  const running = new Map()
+  let askedAt = 0 // the last PermissionRequest hook
 
   const push = ev => {
     if (stopped || level === 'off') return
@@ -426,6 +434,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   function onHook({ ts, input }) {
     if (!input || typeof input !== 'object') return
     if (input.hook_event_name === 'PreToolUse' && onToolInput) { try { onToolInput(String(input.tool_name ?? ''), input.tool_input) } catch {} }
+    if (onPermissionAsk) permissionHooks(input)
     // Claude Code's working directory (it can change during a session).
     const cwdChanged = typeof input.cwd === 'string' && input.cwd !== cwd
     if (cwdChanged) cwd = input.cwd
@@ -528,6 +537,29 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
       default:
         return undefined
     }
+  }
+
+  // What tells a prompt is waiting, for agents without channels (see onPermissionAsk).
+  function permissionHooks(input) {
+    const id = typeof input.tool_use_id === 'string' ? input.tool_use_id : null
+    const event = input.hook_event_name
+    if (event === 'PreToolUse' && id && !input.agent_id) {
+      running.set(id, { tool: String(input.tool_name ?? ''), input: input.tool_input, at: Date.now() })
+      // (Calls whose end never came: forgotten after ten minutes, at most 50 kept.)
+      for (const [k, v] of running) if (Date.now() - v.at > 10 * 60_000 || running.size > 50) running.delete(k)
+    } else if ((event === 'PostToolUse' || event === 'PostToolUseFailure') && id) running.delete(id)
+    try {
+      if (event === 'PermissionRequest' && !input.agent_id) { askedAt = Date.now(); onPermissionAsk(String(input.tool_name ?? ''), input.tool_input ?? null) }
+      else if (event === 'Notification' && input.notification_type === 'permission_prompt') {
+        const calls = [...running.values()]
+        // (An agent with both says it twice, in either order: the hook's, with the call, counts.)
+        const at = Date.now()
+        setTimeout(() => {
+          if (stopped || askedAt > at - 15_000) return
+          try { onPermissionAsk(calls.length === 1 ? calls[0].tool : null, calls.length === 1 ? calls[0].input ?? null : null) } catch (err) { log(`observe: permission callback failed: ${err.message}`) }
+        }, 2000).unref?.()
+      }
+    } catch (err) { log(`observe: permission callback failed: ${err.message}`) }
   }
 
   return {

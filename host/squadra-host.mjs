@@ -889,7 +889,7 @@ export function listPersonas(folder, home = claudeHome()) {
       const tools = Array.isArray(data.tools) ? data.tools : typeof data.tools === 'string' && data.tools.trim() ? data.tools.split(',') : null
       // An agent limited to some tools, none of them Squadra's, can't message its squad.
       const noSquadra = !!tools && !tools.map(t => String(t).trim()).some(t => t === '*' || t.startsWith(SQUADRA_TOOLS_PREFIX))
-      out.push({ id: `agent:${scope}:${name}`, kind: 'agent', scope, name, description: oneLine(data.description, 300), no_squadra_tools: noSquadra })
+      out.push({ id: `agent:${scope}:${name}`, kind: 'agent', scope, name, description: oneLine(data.description, 300), no_squadra_tools: noSquadra, file: f.real, base })
     }
   }
   return out.slice(0, PERSONAS_MAX)
@@ -899,10 +899,11 @@ export function listPersonas(folder, home = claudeHome()) {
 const personaView = p => ({ id: p.id, kind: p.kind, scope: p.scope, name: p.name, description: p.description, ...(p.no_squadra_tools ? { no_squadra_tools: true } : {}) })
 
 // The persona a session opens with, looked up again in its folder now.
-function findPersona(folder, id, role) {
+// (Agents other than Claude Code don't apply an agent's list of tools: toolsApply false.)
+function findPersona(folder, id, role, { toolsApply = true } = {}) {
   const p = listPersonas(folder).find(x => x.id === id)
   if (!p) throw new Error(`the persona "${plain(id)}" is not in ${folder}/.claude or in this user's ${claudeHome()} any more: pick another one`)
-  if (p.no_squadra_tools && role !== 'solo') {
+  if (p.no_squadra_tools && role !== 'solo' && toolsApply) {
     throw new Error(`the agent "${p.name}" only allows some tools, none of them Squadra's: as a ${role} it could not message its squad. Add ${SQUADRA_TOOLS_PREFIX}__reply (and the other Squadra tools) to its "tools", or open it as a standalone session`)
   }
   return p
@@ -918,6 +919,23 @@ function skillPrompt(p) {
     '',
     'The user opened this session to follow the skill below in all of its work, for as long as it runs: before and after any context compaction, and also when other skills are loaded later (they add to it, they never replace it). It never overrides what the user asks in this terminal, nor the Squadra rules (trust, access, permissions).',
     `The skill's own files (references, scripts, templates) are in: ${dirname(f.real)}`,
+    '',
+    frontmatter(f.text).body.trim(),
+    '',
+  ].join('\n')
+}
+
+// Any persona's text, for agents that only take instructions (Codex CLI, Grok
+// CLI): a skill as above, an agent's file as its own instructions (its tools
+// and model are Claude Code's, not applied there).
+function personaPrompt(p) {
+  if (p.kind === 'skill') return skillPrompt(p)
+  const f = readPersonaFile(p.file, p.base)
+  if (!f) throw new Error(`the agent "${p.name}" could not be read`)
+  return [
+    `# Persona of this session: the "${p.name}" agent`,
+    '',
+    'The user opened this session to act as the agent below in all of its work, for as long as it runs, also after any context compaction. It never overrides what the user asks in this terminal, nor the Squadra rules (trust, access, permissions).',
     '',
     frontmatter(f.text).body.trim(),
     '',
@@ -1139,7 +1157,9 @@ function sessionEnv(s) {
 // The conversation a session was last in, as its plugin noted it, if it can be
 // continued: in the same folder and still saved. Never --continue: that takes
 // the folder's last conversation, which can be another session's.
-function ownConversation(dir, folder) {
+// matches(id, transcript): whether the transcript is that conversation's, by
+// where its agent keeps them (Claude Code's, unless said).
+function ownConversation(dir, folder, matches = (id, transcript) => transcript.endsWith(`${sep}${id}.jsonl`)) {
   try {
     // (A session can write here: a pipe or a device would stop this program.)
     const file = join(dir, 'conversation.json')
@@ -1147,7 +1167,7 @@ function ownConversation(dir, folder) {
     if (!st.isFile() || st.size > 8192) return null
     const c = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof c.id !== 'string' || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(c.id)) return null
-    if (!c.transcript.endsWith(`${sep}${c.id}.jsonl`) || !statSync(c.transcript).isFile()) return null
+    if (typeof c.transcript !== 'string' || !matches(c.id, c.transcript) || !statSync(c.transcript).isFile()) return null
     return realpathSync(c.folder) === folder ? c.id : null
   } catch { return null }
 }
@@ -1225,6 +1245,10 @@ const claudeCode = {
   typeAnswer,
   // The skills and agents a session opened in this folder could follow, as the dashboard sees them.
   personas: folder => listPersonas(folder).map(personaView),
+  // For the other agents: a persona found again, and its text; the conversation a session can continue.
+  findPersona,
+  personaPrompt,
+  conversation: ownConversation,
   // The Squadra plugin in its config: installed, and how it is set up.
   plugin: {
     status: pluginStatus,
@@ -1344,41 +1368,81 @@ async function ensureGrokPlugin({ update = false } = {}) {
 async function prepareTyped(a, s) {
   const program = typedProgram(a.command(loadSettings()))
   if (!program) throw new Error(`${a.name} ("${a.command(loadSettings())}") was not found on this machine`)
-  if (s.persona) throw new Error(`personas are only for Claude Code sessions for now: open this ${a.name} session without one`)
+  // The persona, looked up again in the folder now; its text goes in as
+  // instructions (see personaArg).
+  s.personaInfo = s.persona ? claudeCode.findPersona(s.folder, s.persona, s.role, { toolsApply: false }) : null
   let st = await a.plugin.status(program)
   if (!st?.installed || !st.enabled || (st.version && olderVersion(st.version, VERSION))) {
     log(`installing the Squadra plugin in ${a.name}`)
     st = await a.plugin.ensure()
   }
-  if (s.resume) log(`"${plain(s.name)}" starts a new conversation: continuing one is only for Claude Code sessions for now`)
   return { program, root: st.root }
 }
 
 // TOML strings for Codex's -c (JSON's escapes are TOML's).
 const toml = v => JSON.stringify(String(v))
 
+// A persona is longer than the commands tmux takes: its text is left in a
+// private file of the session (what the agent gets is what was checked now)
+// and a fixed shell line adds it as one argument when the agent starts (an
+// argument holds up to 128 KB). argv without a persona as it is.
+const PERSONA_ARG_MAX = 100 * 1024
+function personaArg(s, dir, argv, flag, text) {
+  const file = join(dir, 'persona.arg')
+  if (!s.personaInfo) { rmSync(file, { force: true }); return argv }
+  const value = text(claudeCode.personaPrompt(s.personaInfo))
+  if (Buffer.byteLength(value) > PERSONA_ARG_MAX) throw new Error(`the persona "${plain(s.personaInfo.name)}" is too long for this agent (over ${PERSONA_ARG_MAX / 1024} KB)`)
+  ensurePrivateDir(dir)
+  const tmp = join(dir, `.persona.arg.${process.pid}.${Date.now()}`)
+  writeFileSync(tmp, value, { mode: 0o600, flag: 'wx' })
+  renameSync(tmp, file)
+  return ['/bin/sh', '-c', `f=$1; shift; exec "$@" ${flag} "$(cat "$f")"`, 'sh', file, ...argv]
+}
+
+// The conversation a session can continue (its own, as Claude Code's), if it asked to.
+function typedConversation(s, dir, matches) {
+  if (!s.resume) return null
+  const id = claudeCode.conversation(dir, s.folder, matches)
+  if (!id) log(`"${plain(s.name)}" has no conversation of its own to continue: it starts a new one`)
+  return id
+}
+
 // The command a session runs, after the "env" that starts it. env: the
 // session's variables (the plugin needs them: Codex gives an MCP server only
-// what it is told).
-function codexCommand(s, prep, env) {
+// what it is told). dir: the plugin's folder for this session.
+function codexCommand(s, prep, env, dir) {
   const server = join(String(prep.root ?? ''), 'server.js')
   if (!prep.root || !existsSync(server)) throw new Error(`the Squadra plugin in Codex is not where expected (${server}): run "${cli()} plugin"`)
   const mcpEnv = Object.entries(env).filter(([k]) => /^(SQUADRA_[A-Z_]+|CLAUDE_CONFIG_DIR)$/.test(k))
+  // (Codex keeps each conversation in <home>/sessions/…/rollout-<date>-<id>.jsonl.)
+  const conversation = typedConversation(s, dir, (id, t) => t.endsWith(`-${id}.jsonl`) && within(t, join(codexHome(), 'sessions')))
   // Codex doesn't expand ${CLAUDE_PLUGIN_ROOT} in the plugin's own server, so
   // the server is given here, under the same name (it replaces that one), and
   // its tools need no approval (they only message the squad).
-  return [prep.program,
+  const argv = [prep.program, ...(conversation ? ['resume'] : []),
     '-c', `mcp_servers.squadra.command=${toml(process.execPath)}`,
     '-c', `mcp_servers.squadra.args=[${toml(server)}]`,
     '-c', `mcp_servers.squadra.env={${mcpEnv.map(([k, v]) => `${k}=${toml(v)}`).join(',')}}`,
     '-c', 'mcp_servers.squadra.default_tools_approval_mode="approve"',
     '-c', 'mcp_servers.squadra.startup_timeout_sec=30',
+    ...(conversation ? [conversation] : []),
   ]
+  // (The persona as developer instructions: they last the whole session.)
+  return personaArg(s, dir, argv, '-c', text => `developer_instructions=${toml(text)}`)
 }
+
+// Grok's config folder.
+const grokHome = () => join(HOME, '.grok')
 
 // Grok runs the plugin's server itself (it sets CLAUDE_PLUGIN_ROOT); its
 // tools are allowed without asking (they only message the squad).
-const grokCommand = (s, prep) => [prep.program, '--allow', 'MCPTool(squadra__*)']
+function grokCommand(s, prep, env, dir) {
+  // (Grok keeps each conversation in <home>/sessions/<folder>/<id>/updates.jsonl.)
+  const conversation = typedConversation(s, dir, (id, t) => t.endsWith(`${sep}${id}${sep}updates.jsonl`) && within(t, join(grokHome(), 'sessions')))
+  const argv = [prep.program, '--allow', 'MCPTool(squadra__*)', ...(conversation ? ['--resume', conversation] : [])]
+  // (The persona as rules added to its system prompt.)
+  return personaArg(s, dir, argv, '--rules', text => text)
+}
 
 // The screen of a session (its last lines).
 const screenOf = async target => (await tmux(['capture-pane', '-p', '-J', '-t', target])).stdout.split('\n').filter(l => l.trim()).slice(-24).join('\n')
@@ -1406,11 +1470,12 @@ async function typeWaiting(t, a) {
   if (typingNow.has(t.id)) return
   typingNow.add(t.id)
   try {
+    const target = `=${PREFIX}${t.id}:`
+    await typePermissionAnswers(t, a, target)
     const dir = join(claudeCode.plugin.stateDir(t.id), 'pending-input')
     let files
     try { files = readdirSync(dir).filter(f => PENDING_RE.test(f)).sort().slice(0, 10) } catch { return }
     if (!files.length) return
-    const target = `=${PREFIX}${t.id}:`
     if (!a.waiting(await screenOf(target))) return
     const parts = []
     for (const f of files) {
@@ -1424,6 +1489,58 @@ async function typeWaiting(t, a) {
   } catch (err) {
     log(`could not type the messages of "${plain(t.id)}": ${err.message}`)
   } finally { typingNow.delete(t.id) }
+}
+
+// Answers to permission prompts (see plugins/squadra/typed): typed while the
+// prompt on screen still shows the call they answer, never otherwise. Dropped
+// after two minutes (it was answered in the terminal, or another came).
+const ANSWER_RE = /^\d{14}-[a-km-z]{5}\.json$/
+const ANSWER_KEEP_MS = 2 * 60_000
+async function typePermissionAnswers(t, a, target) {
+  const dir = join(claudeCode.plugin.stateDir(t.id), 'permission-answers')
+  let files
+  try { files = readdirSync(dir).filter(f => ANSWER_RE.test(f)).sort().slice(0, 5) } catch { return }
+  for (const f of files) {
+    const file = join(dir, f)
+    let ans = null
+    // (A session can write there: only small plain files are read.)
+    try { const st = lstatSync(file); if (st.isFile() && st.size <= 64 * 1024) ans = JSON.parse(readFileSync(file, 'utf8')) } catch {}
+    const age = Date.now() - Number(f.slice(0, 14))
+    if (!ans || typeof ans !== 'object' || age > ANSWER_KEEP_MS || age < -60_000) {
+      rmSync(file, { force: true })
+      if (ans) log(`the answer to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" was not typed: that prompt is no longer on its screen`)
+      continue
+    }
+    const keys = a.permissionKeys(await screenOf(target), ans)
+    if (!keys) continue
+    for (const k of keys) await tmux(['send-keys', '-t', target, k])
+    rmSync(file, { force: true })
+    log(`typed "${ans.behavior === 'allow' ? 'yes' : 'no'}" to the permission prompt ${f.slice(15, 20)} of "${plain(t.id)}" (${a.name})`)
+  }
+}
+
+// Whether a prompt's text shows the call an answer is for: a command (its
+// first 60 characters) or the file it changes, spaces and box lines aside.
+function promptShows(text, ans) {
+  const i = ans.input && typeof ans.input === 'object' ? ans.input : {}
+  const what = typeof i.command === 'string' ? i.command : [i.file_path, i.path, i.notebook_path].find(v => typeof v === 'string')
+  const needle = typeof what === 'string' ? what.replace(/\s+/g, '').slice(0, 60) : ''
+  return needle.length >= 2 && text.replace(/[\s│┃]+/g, '').includes(needle)
+}
+
+// The keys that answer the prompt on screen, if it is the one asked about.
+// Codex: "Would you like to run …?" (y: yes; Esc: no). Grok: numbered options
+// in a box (the number picks and confirms).
+export function codexPermissionKeys(screen, ans) {
+  const at = screen.lastIndexOf('Would you like to')
+  if (at < 0 || !/Press enter to confirm/i.test(screen.slice(at)) || !promptShows(screen.slice(at), ans)) return null
+  return ans.behavior === 'allow' ? ['y'] : ['Escape']
+}
+export function grokPermissionKeys(screen, ans) {
+  const box = screen.split('\n').filter(l => /^\s*┃/.test(l)).join('\n')
+  const yes = /(\d) \([○●]\) Yes, proceed/.exec(box), no = /(\d) \([○●]\) No, reject/.exec(box)
+  if (!yes || !no || !promptShows(box, ans)) return null
+  return [ans.behavior === 'allow' ? yes[1] : no[1]]
 }
 
 // When each one waits for input: its input box shows, it isn't working, and
@@ -1448,11 +1565,6 @@ function typedAnswer(a) {
   }
 }
 
-// Not cleared from outside: their /new and /clear start a new session with a
-// new plugin process while the old one stays (holding the session's name), and
-// the new one would ask the user to confirm joining.
-const noClear = a => Promise.reject(new Error(`clearing the context of a ${a.name} session from here is not supported yet: give it the new task as it is`))
-
 const codexCli = {
   id: 'codex',
   name: 'Codex CLI',
@@ -1462,8 +1574,9 @@ const codexCli = {
   prepare: s => prepareTyped(codexCli, s),
   sessionCommand: codexCommand,
   waiting: codexWaiting,
+  waitingNow: async target => codexWaiting(await screenOf(target)),
+  permissionKeys: codexPermissionKeys,
   typeWaiting: t => typeWaiting(t, codexCli),
-  clearContext: () => noClear(codexCli),
   typeAnswer: null,
   plugin: { status: codexPluginStatus, ensure: ensureCodexPlugin, commands: `codex plugin marketplace add ${TYPED_REPO} --ref v${VERSION} && codex plugin add squadra@squadra` },
 }
@@ -1478,8 +1591,9 @@ const grokCli = {
   prepare: s => prepareTyped(grokCli, s),
   sessionCommand: grokCommand,
   waiting: grokWaiting,
+  waitingNow: async target => grokWaiting(await screenOf(target)),
+  permissionKeys: grokPermissionKeys,
   typeWaiting: t => typeWaiting(t, grokCli),
-  clearContext: () => noClear(grokCli),
   typeAnswer: null,
   plugin: { status: grokPluginStatus, ensure: ensureGrokPlugin, commands: `grok plugin install ${TYPED_REPO}@v${VERSION}#plugins/squadra --trust` },
 }
@@ -1556,14 +1670,7 @@ async function openTerminalNow(spec) {
   // coordinator, read instead of environment variables) and, when the server
   // reserved the name for this machine, its identity.
   const dir = claudeCode.plugin.stateDir(s.name)
-  // (A session in the home folder reaches everything of this user: its
-  // permission prompts are answered only in its own terminal.)
-  // (Codex and Grok answer theirs in their terminal for now.)
-  const relay = settings.permission_relay && !s.home && s.role !== 'solo' && !typed
-  // (The plugin tells the session's squad which persona it follows.)
-  const persona = s.personaInfo ? { kind: s.personaInfo.kind, name: s.personaInfo.name, description: s.personaInfo.description } : null
-  s.launchStart = randomBytes(16).toString('hex')
-  writePrivate(dir, 'launch.json', { name: s.name, role: s.role, coordinator: s.coordinator, start: s.launchStart, ...(relay ? {} : { permission_relay: false }), ...(persona ? { persona } : {}), ...(typed ? { agent: s.agent } : {}) })
+  writeLaunch(s, settings, dir, typed)
   // (Its links, kept while it runs: the dashboard can change them, see "links".)
   if (s.role === 'coordinator') writePrivate(dir, 'links.json', { name: s.name, coordinators: s.links })
   else rmSync(join(dir, 'links.json'), { force: true })
@@ -1574,31 +1681,83 @@ async function openTerminalNow(spec) {
   }
 }
 
-async function startSession(s, settings, claude, dir, typed) {
-  if (s.identity) writePrivate(dir, 'identity.json', { name: s.name, secret: s.identity, server: claudeCode.plugin.serverUrl() })
-  const tname = PREFIX + s.name
+// The ticket the plugin reads at this start (launch.json): role, coordinator,
+// persona, agent, valid only for the start it names.
+function writeLaunch(s, settings, dir, typed) {
+  // (A session in the home folder reaches everything of this user: its
+  // permission prompts are answered only in its own terminal.)
+  const relay = settings.permission_relay && !s.home && s.role !== 'solo'
+  // (The plugin tells the session's squad which persona it follows.)
+  const persona = s.personaInfo ? { kind: s.personaInfo.kind, name: s.personaInfo.name, description: s.personaInfo.description } : null
+  s.launchStart = randomBytes(16).toString('hex')
+  writePrivate(dir, 'launch.json', { name: s.name, role: s.role, coordinator: s.coordinator, start: s.launchStart, ...(relay ? {} : { permission_relay: false }), ...(persona ? { persona } : {}), ...(typed ? { agent: s.agent } : {}) })
+}
+
+// What a session's process starts with: its variables and its command.
+function launchCommand(s, settings, claude, dir, typed) {
   const env = { SQUADRA_NAME: s.name, SQUADRA_LAUNCH_START: s.launchStart, ...claudeCode.sessionEnv(s) }
-  if (!settings.permission_relay || s.home || s.role === 'solo' || typed) env.SQUADRA_PERMISSION_RELAY = 'off'
+  // (Always said: a session started again in its terminal keeps the variables
+  // it was first opened with, unless they are given again.)
+  env.SQUADRA_PERMISSION_RELAY = !settings.permission_relay || s.home || s.role === 'solo' ? 'off' : 'on'
   if (typed) env.SQUADRA_AGENT = s.agent
   // Fixed command. Two or more arguments make tmux exec it directly, no shell.
   // "env -u TMUX" hides the tmux server from the session: its tools can't
   // simply run "tmux send-keys" into another session. (They run as the same
   // user, so this is a speed bump, not a wall: see the README.)
-  const argv = ['/usr/bin/env', '-u', 'TMUX', '-u', 'TMUX_PANE', ...(typed ? typed.sessionCommand(s, claude, env) : claudeCode.sessionCommand(s, claude, dir, env))]
+  const argv = ['/usr/bin/env', '-u', 'TMUX', '-u', 'TMUX_PANE', ...(typed ? typed.sessionCommand(s, claude, env, dir) : claudeCode.sessionCommand(s, claude, dir, env))]
+  return { env, argv, envArgs: Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]) }
+}
+
+async function startSession(s, settings, claude, dir, typed) {
+  if (s.identity) writePrivate(dir, 'identity.json', { name: s.name, secret: s.identity, server: claudeCode.plugin.serverUrl() })
+  const tname = PREFIX + s.name
+  const { argv, envArgs } = launchCommand(s, settings, claude, dir, typed)
   const meta = JSON.stringify({ owner: OWNER_TAG, role: s.role, coordinator: s.coordinator, folder: s.folder, compact_window: s.compact_window, persona: s.personaInfo ? { id: s.personaInfo.id, kind: s.personaInfo.kind, name: s.personaInfo.name } : null, ...(typed ? { agent: s.agent } : {}) })
   await tmux([
     'start-server', ';',
     'set-option', '-g', 'history-limit', '10000', ';',
     'set-option', '-g', 'exit-empty', 'off', ';',
     'new-session', '-d', '-s', tname, '-x', '120', '-y', '36', '-c', s.folder,
-    ...Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]),
+    ...envArgs,
     ...argv, ';',
     'set-option', '-t', `=${tname}:`, 'status', 'off', ';',
     'set-option', '-t', `=${tname}:`, '@squadra', meta,
   ])
-  // The folder could have been swapped (e.g. for a symlink) between the check
-  // and the start: make sure the session really is where it was allowed.
-  // If that can't be checked, the session is closed too.
+  await checkStartedWhere(tname, s, dir)
+  log(`opened "${plain(s.name)}" (${s.role}${typed ? `, ${typed.name}` : ''}${s.personaInfo ? `, ${s.personaInfo.kind} "${plain(s.personaInfo.name)}"` : ''}) in ${s.folder}`)
+  return { id: s.name, name: s.name }
+}
+
+// A Codex CLI or Grok CLI session started again in its own terminal, with a
+// new conversation: that is how they are cleared. (Their /new and /clear start
+// a second plugin process while the first keeps the session's name.) The old
+// plugin exits with the agent and frees the name; the new one joins with a new
+// ticket, as at the first start.
+async function restartTyped(t, typed) {
+  const settings = loadSettings()
+  const tname = PREFIX + t.id
+  if (!(await typed.waitingNow(`=${tname}:`))) throw new Error('it is busy or waiting for an answer on its screen')
+  // Everything checked again, as when it was opened (the folder may have changed).
+  const folder = checkFolder(t.folder, settings)
+  const st = statSync(folder)
+  const s = { name: t.id, role: t.role, coordinator: t.coordinator, folder, folderId: `${st.dev}:${st.ino}`, compact_window: t.compact_window, home: isHome(folder), agent: t.agent, resume: false, persona: t.persona?.id ?? null }
+  const prep = await typed.prepare(s)
+  const dir = claudeCode.plugin.stateDir(s.name)
+  writeLaunch(s, settings, dir, typed)
+  try {
+    const { argv, envArgs } = launchCommand(s, settings, prep, dir, typed)
+    await tmux(['respawn-pane', '-k', '-t', `=${tname}:`, '-c', s.folder, ...envArgs, ...argv])
+    await checkStartedWhere(tname, s, dir)
+  } catch (err) {
+    rmSync(join(dir, 'launch.json'), { force: true })
+    throw err
+  }
+}
+
+// The folder could have been swapped (e.g. for a symlink) between the check
+// and the start: make sure the session really is where it was allowed.
+// If that can't be checked, the session is closed too.
+async function checkStartedWhere(tname, s, dir) {
   // (Right after the start, until the command has really begun, tmux
   // reports its own folder: asked again for a few seconds.)
   let where = null, whereId = null
@@ -1614,8 +1773,6 @@ async function startSession(s, settings, claude, dir, typed) {
     rmSync(join(dir, 'launch.json'), { force: true }) // no ticket left for a later start
     throw new Error(where ? `the session started in ${where} instead of ${s.folder}; closed it` : 'could not check where the session started; closed it')
   }
-  log(`opened "${plain(s.name)}" (${s.role}${typed ? `, ${typed.name}` : ''}${s.personaInfo ? `, ${s.personaInfo.kind} "${plain(s.personaInfo.name)}"` : ''}) in ${s.folder}`)
-  return { id: s.name, name: s.name }
 }
 
 // The links of a coordinator running on this machine, changed from the
@@ -1669,7 +1826,14 @@ async function clearSession(id, coordinator) {
   const t = (await listTerminals()).find(x => x.id === id)
   if (!t) throw new Error('no such session on this machine')
   if (t.role !== 'worker' || t.coordinator !== coordinator) throw new Error(`"${id}" is not a worker of "${coordinator}" on this machine`)
-  await (TYPED[t.agent] ?? claudeCode).clearContext(`=${PREFIX}${id}:`)
+  // (Codex CLI and Grok CLI: started again, see restartTyped. The server then
+  // takes its new start as the confirmation.)
+  if (TYPED[t.agent]) {
+    await restartTyped(t, TYPED[t.agent])
+    log(`started "${plain(id)}" again with a new conversation for its coordinator "${plain(coordinator)}"`)
+    return { cleared: true, restarted: true }
+  }
+  await claudeCode.clearContext(`=${PREFIX}${id}:`)
   log(`cleared the context of "${plain(id)}" for its coordinator "${plain(coordinator)}"`)
   return { cleared: true }
 }

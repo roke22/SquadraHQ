@@ -31,10 +31,11 @@ process.on('uncaughtException', err => log(`uncaught exception: ${err}`))
 
 // The agent this session runs: what squadra-host wrote for this start, else
 // SQUADRA_AGENT, else Claude Code. Codex CLI and Grok CLI run this same MCP
-// server, but have no channels: what arrives is typed in their terminal.
+// server, but have no channels: what arrives, and answers to their permission
+// prompts, are typed in their terminal.
 const launched = readLaunch(process.env.SQUADRA_NAME)?.agent ?? process.env.SQUADRA_AGENT
 if (typed.TYPED_AGENTS.includes(launched)) {
-  useAgent({ kind: launched, deliver: typed.deliver, givePermission: typed.givePermission, takePermissionReply: typed.takePermissionReply })
+  useAgent({ kind: launched, deliver: typed.deliver, givePermission: typed.givePermission, takePermissionReply })
 } else {
   useAgent({ kind: 'claude', deliver, givePermission, takePermissionReply })
 }

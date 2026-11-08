@@ -322,6 +322,7 @@ export function createSessions(platform) {
     const lease = { instance, since: now(), downNotified: false }
     leases.set(name, lease)
     db.prepare('INSERT OR REPLACE INTO leases (name, instance, since) VALUES (?, ?, ?)').run(name, instance, lease.since)
+    bus.emit('instance-started', name)
     return lease
   }
 

@@ -9,7 +9,7 @@ import {
   COORDINATOR_WORDS, defaultObserve, SERVER_URL, transportProblem, CONFIG_DIR_IGNORED, DEFAULT_COORDINATOR, NAME_RE,
   log, OBSERVE_ORDER, RUN_DIR, VERSION, SERVER_TOKEN, ROOT_ENV_FILE, S, setSession, readApproved,
   listedApprovers, prepareAccess, writeApproved, personaLabel, linkedCoordinators, loadAccess, call,
-  claimPidFile, releasePidFile, nameOrQ, readPeerKey, checkCoordinator, connect, startLoops, writePrivateFile,
+  claimPidFile, releasePidFile, nameOrQ, readPeerKey, checkCoordinator, connect, startLoops, writePrivateFile, agent,
 } from '../core/index.js'
 import { WINDOWS_HINT, channelLaunchStatus, LAUNCH_HINT } from './launch.js'
 import { roleRules } from './instructions.js'
@@ -18,7 +18,7 @@ import {
 } from './context.js'
 import { tasksStarting, channelIds, stopCheck } from './tasks.js'
 import { ping } from './tools.js'
-import { pinApprovers, TOOL_INPUT_KEEP_MS, withdrawIfAmbiguous, pendingPermissions } from './permissions.js'
+import { pinApprovers, TOOL_INPUT_KEEP_MS, withdrawIfAmbiguous, pendingPermissions, onTypedPermission } from './permissions.js'
 import { confirmWithUser } from './mcp.js'
 
 function parseRole(role) {
@@ -130,6 +130,8 @@ export async function login({ name, role, coordinator, staticAccess = false, see
       }
       withdrawIfAmbiguous(s, tool, input)
     },
+    // Agents without channels: a prompt in their terminal is relayed from their hooks.
+    ...(agent.kind && agent.kind !== 'claude' ? { onPermissionAsk: (tool, input) => { if (S === s) void onTypedPermission(s, tool, input) } } : {}),
   })
   const sockDir = prepareSocketDir(RUN_DIR)
   if (sockDir) s.observer.start(join(sockDir, `${process.ppid}.sock`))

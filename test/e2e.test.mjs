@@ -1166,6 +1166,37 @@ test('observation: a transcript read shorter than the size reported adds nothing
   assert.deepEqual(sent.filter(e => e.kind === 'text').map(e => e.text), [TEXT])
 })
 
+test('observation: a permission prompt of Codex CLI or Grok CLI is told once, with the call it asks about', async () => {
+  const { createObserver } = await import(join(ROOT, 'plugins/squadra/observe.js'))
+  const asked = []
+  const o = createObserver({ level: 'off', send: async () => {}, onPermissionAsk: (tool, input) => asked.push([tool, input]) })
+  const hook = input => o._onHook({ ts: Date.now(), input })
+  const wait = () => new Promise(r => setTimeout(r, 2200))
+  // Codex: its PermissionRequest hook names the call; its notification after it adds nothing.
+  hook({ hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'rm -f a' } })
+  hook({ hook_event_name: 'Notification', notification_type: 'permission_prompt' })
+  await wait()
+  assert.deepEqual(asked, [['Bash', { command: 'rm -f a' }]])
+  // Grok: only the notification, for the one call still running.
+  asked.length = 0
+  const o2 = createObserver({ level: 'off', send: async () => {}, onPermissionAsk: (tool, input) => asked.push([tool, input]) })
+  const hook2 = input => o2._onHook({ ts: Date.now(), input })
+  hook2({ hook_event_name: 'PreToolUse', tool_name: 'run_terminal_command', tool_input: { command: 'ls' }, tool_use_id: 't1' })
+  hook2({ hook_event_name: 'PostToolUse', tool_name: 'run_terminal_command', tool_input: { command: 'ls' }, tool_use_id: 't1' })
+  hook2({ hook_event_name: 'PreToolUse', tool_name: 'run_terminal_command', tool_input: { command: 'rm -f b' }, tool_use_id: 't2' })
+  hook2({ hook_event_name: 'Notification', notification_type: 'permission_prompt' })
+  await wait()
+  assert.deepEqual(asked, [['run_terminal_command', { command: 'rm -f b' }]])
+  // Two calls running: which one it asks about can't be told.
+  asked.length = 0
+  hook2({ hook_event_name: 'PreToolUse', tool_name: 'run_terminal_command', tool_input: { command: 'rm -f c' }, tool_use_id: 't3' })
+  hook2({ hook_event_name: 'Notification', notification_type: 'permission_prompt' })
+  await wait()
+  assert.deepEqual(asked, [[null, null]])
+  await o.stop()
+  await o2.stop()
+})
+
 // --- context & compaction ------------------------------------------------------------
 
 test('context window per model', async () => {
