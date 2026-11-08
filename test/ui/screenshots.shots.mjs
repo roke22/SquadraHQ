@@ -73,16 +73,18 @@ async function company(lang) {
   const d = DATA[lang]
   const server = await startServer()
   const machine = await startMachine(server, 'mac-mini', { id: 'api', role: 'worker', coordinator: 'coord-dev' }, { screens: screens(d) })
-  // (One team runs Claude Code, Codex and Grok, to show each agent's mark.)
+  // (Codex and Grok sessions too, to show each agent's mark: Codex in a pane
+  // that shows its conversation, Grok only in the lists, since the terminals
+  // drawn here are Claude Code's.)
   const open = async (name, role, coordinator, agent) => {
     await server.call('api/terminals/open', { host: machine.id, spec: { name, role, ...(coordinator ? { coordinator } : {}) } })
     return startSession(server, name, role, coordinator, machine.identities.get(name), { agent })
   }
   const dev = await open('coord-dev', 'coordinator')
-  const web = await open('web', 'worker', 'coord-dev', 'grok')
+  const web = await open('web', 'worker', 'coord-dev')
   const api = await startSession(server, 'api', 'worker', 'coord-dev', undefined, { agent: 'codex' })
   const qa = await open('coord-qa', 'coordinator')
-  await open('pruebas', 'worker', 'coord-qa')
+  await open('pruebas', 'worker', 'coord-qa', 'grok')
   await open('editor', 'coordinator')
   await startMachine(server, 'server-2', { id: 'docs', role: 'worker', coordinator: 'editor' })
   for (const [c, title, goal] of d.teams) await server.call('api/org/squad', { coordinator: c, title, goal })

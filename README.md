@@ -21,6 +21,8 @@ SquadraHQ gives [Claude Code](https://claude.com/product/claude-code) a **coordi
 
 A web dashboard keeps what needs you in one inbox, shows each team with its plan, and opens a whole team live, like a wall of terminals: what each agent is doing, what Claude is saying, and who is waiting for you. From there you also add your computers and open new sessions on them.
 
+Coordinators and workers can also be **Codex CLI** or **Grok CLI** sessions, mixed with Claude Code ones in the same team (experimental): see [Codex CLI and Grok CLI](#codex-cli-and-grok-cli-experimental).
+
 SquadraHQ is **multi-agent orchestration for Claude Code**: parallel Claude Code sessions on one machine or many, coordinated by another Claude Code session, with a self-hosted web dashboard and web terminal to run and watch them from any browser. It is open source (MIT), a single Node.js server with no dependencies, and installs as a Claude Code plugin.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/inbox-dark-en.jpg"><img src="docs/screenshots/inbox-light-en.jpg" alt="The SquadraHQ inbox: a permission waiting and two decisions from the Development coordinator, one open with its options and the recommended one marked" width="1440"></picture>
@@ -68,6 +70,7 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Follow each team's plan:** the coordinator keeps the list of tasks it is working through, who has each one and its state, on the team's page.
 - **See what each agent did without reading it all:** beside its terminal and its conversation, what it is doing now and a timeline of what mattered (its orders, the files it edited, tests and commits, permissions and reports), read from what it already reports, so it costs no tokens.
 - **Use all your computers and accounts:** each agent runs on any machine you add, with that machine's Claude Code login.
+- **Mix agents (experimental):** give a worker or a coordinator Codex CLI or Grok CLI instead of Claude Code; the dashboard marks each session with its agent (A, O, X) and the team works the same way.
 - **Build teams with your own skills:** give each agent a skill or agent from its project (design, marketing, HR, code review…) as its persona, and save the whole team as a template to open it again in one click.
 - **Link teams:** link the coordinators of two teams (design and marketing, say) so they share work, each handing what it takes on to its own workers.
 - **See and shape your whole organisation:** the org chart shows every team, its agents and how teams are linked, with what each one is for on hover; add, describe, link, move and close them from there.
@@ -108,12 +111,23 @@ Claude Code already has [subagents](https://code.claude.com/docs/en/sub-agents) 
 
 SquadraHQ adds to Claude Code rather than replacing it: subagents and Agent Teams still work inside each session.
 
+## Codex CLI and Grok CLI (experimental)
+
+Any coordinator or worker can run [Codex CLI](https://github.com/openai/codex) or [Grok CLI](https://x.ai/cli) instead of Claude Code: choose it for each session in **New team** or **New session** (the machine needs it: tick it in **Add machine**, or install it yourself). It runs the same SquadraHQ plugin and follows the same rules, with a few differences, since neither has Claude Code's Channels:
+
+- **Messages are typed into its terminal between its turns.** A message that arrives while it works waits for the end of its turn, so a coordinator gives out its tasks and ends its turn, and its workers' reports come in as new turns.
+- **Permission prompts** go to its coordinator as with Claude Code. The answer is typed into its terminal only when the prompt shows that very command on one line; a long command, one over several lines or a file edit is only announced, and answered in the terminal.
+- **Clearing its context** for a new task starts the agent again in its terminal, with a new conversation. **Personas** go in as its instructions, without the agent's own list of tools. **Continue the last conversation** works as with Claude Code.
+- **First start:** sign in on each machine (`codex login` and `grok login`; add `--device-auth` on a machine without a browser) and trust the folder. Codex also asks once to trust the SquadraHQ hooks, and again after an update that changes them. **Trusting a folder also trusts its own Codex or Grok settings, which can run code:** only do it for repositories you trust. A Grok session isn't opened where the project defines its own MCP server named `squadra`.
+
+It is experimental: it works with the agents' current versions, but has had far less use than Claude Code. More in the [reference](docs/reference.md#codex-cli-and-grok-cli-experimental).
+
 ## What you need
 
 - **A Claude Code account** with a claude.ai plan (Pro, Max, Team or Enterprise) or an Anthropic Console API key. On Team and Enterprise, an Owner enables *Channels* in the organization settings.
 - **A computer for the dashboard,** with [Node.js 22](https://nodejs.org) or Docker. It can be the same computer where your agents run.
 
-The computers where the agents run get everything else installed for them when you add them (see step 2).
+The computers where the agents run get everything else installed for them when you add them (see step 2). For Codex CLI or Grok CLI sessions, an account for that agent too.
 
 ## 1. Install the dashboard
 
@@ -143,12 +157,12 @@ It gets and renews its HTTPS certificate by itself, and the dashboard is at `htt
 
 ## 2. Add your computers
 
-In the dashboard, open **Machines → Add machine** (or the **+** next to *Machines* in the sidebar). The page walks you through it: choose the computer's system (Linux, macOS or Windows) and run the single command it shows on that computer. It installs everything it needs and connects it to your dashboard; the page says when it has connected and lets you choose its folders right there.
+In the dashboard, open **Machines → Add machine** (or the **+** next to *Machines* in the sidebar). The page walks you through it: choose the computer's system (Linux, macOS or Windows) and the agents to install there (Claude Code, and Codex CLI or Grok CLI if you want them), and run the single command it shows on that computer. It installs everything it needs and connects it to your dashboard; the page says when it has connected and lets you choose its folders right there.
 
 Then, still in the dashboard:
 
 1. **Add folder**, on that page once it has connected or under the machine on the *Machines* page: choose the folders where agents may work (your projects).
-2. **Open your first team** ([step 3](#3-build-your-teams)), or a single session with **Machines → New session**. Each one opens in a live terminal in your browser. The first time, accept Claude Code's prompts (for the development channel, choose *"I am using this for local development"*).
+2. **Open your first team** ([step 3](#3-build-your-teams)), or a single session with **Machines → New session**. Each one opens in a live terminal in your browser. The first time, accept Claude Code's prompts (for the development channel, choose *"I am using this for local development"*). Codex CLI and Grok CLI ask you to sign in once on each machine (`codex login`, `grok login`) and to trust the folder.
 3. **Talk to the coordinator** in its terminal (**Give an order** on its team's page takes you there) and tell it what you want done.
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/live-dark-en.jpg"><img src="docs/screenshots/live-light-en.jpg" alt="A team all at once: the coordinator's terminal and its workers' conversations side by side" width="1440"></picture>
@@ -158,7 +172,7 @@ Then, still in the dashboard:
 A team is a coordinator and its workers, like a department. **New team** (the **+** next to *Your teams* in the sidebar, or the button on **Teams**) opens a page with four steps:
 
 1. **What it is for:** the team's **name** and its **goal**. The coordinator is told both, and puts its effort there.
-2. **Who:** a coordinator and workers, just a coordinator, or a template you saved. Each session gets a name (one worker per area or repository: `copy`, `design`, `ads`) and, if the folder has skills or agents, a **persona**.
+2. **Who:** a coordinator and workers, just a coordinator, or a template you saved. Each session gets a name (one worker per area or repository: `copy`, `design`, `ads`), its agent if the machine has more than one (Claude Code, Codex CLI or Grok CLI) and, if the folder has skills or agents, a **persona**.
 3. **Where:** the machine and the folder.
 4. **Open it:** the coordinator opens first, then each worker, and you land on the team's page.
 
@@ -182,7 +196,7 @@ The **[examples](https://roke22.github.io/Squadra/examples.html)** show whole or
 - **Name workers after what they do** (`api`, `web`, `docs`): the coordinator uses the names to decide who gets each task.
 - **Give each worker a persona:** in **New team** or **New session**, pick one of the skills (`.claude/skills/<name>/SKILL.md`) or agents (`.claude/agents/<name>.md`) the machine finds in that folder or in `~/.claude`. It goes into the agent's system prompt, so it holds through compactions, and its coordinator is told which persona each worker follows.
 - **One worker per repository or area,** so they don't edit the same files. For parallel work in one repository, give each worker its own [git worktree](https://git-scm.com/docs/git-worktree).
-- **Open your own projects,** or repositories you trust, in the agents' folders.
+- **Open your own projects,** or repositories you trust, in the agents' folders. Claude Code, Codex CLI and Grok CLI all apply a trusted folder's own settings.
 - **Leave room in the context:** with 1M-context models, the dashboard's default of auto-compacting at 600K tokens keeps agents sharp.
 - **Press Ctrl+K** (⌘K on a Mac) to go to any session, team, inbox entry or screen, or to open an action, by typing a few letters.
 
@@ -201,13 +215,16 @@ It approves what has no side effects: reading files, searching, running tests an
 Yes, with any claude.ai plan that includes Claude Code (Pro, Max, Team, Enterprise) or with an Anthropic Console API key. Each agent is a normal Claude Code session on its machine, with that machine's login, so it counts against that account like any other session.
 
 **What does the "add machine" command install?**
-What is missing among tmux, Node.js 22 and Claude Code, then `squadra-host`: a small Node program that connects the machine to your server, installs the `squadra` plugin and stays running as a user service. The script is [install/linux.sh](install/linux.sh) (and [macos.sh](install/macos.sh), [windows.bat](install/windows.bat)); the command checks it against your server's copy before running it.
+What is missing among tmux, Node.js 22 and Claude Code (and Codex CLI, with npm, or Grok CLI, with its own installer, if you ticked them), then `squadra-host`: a small Node program that connects the machine to your server, installs the `squadra` plugin and stays running as a user service. The script is [install/linux.sh](install/linux.sh) (and [macos.sh](install/macos.sh), [windows.bat](install/windows.bat)); the command checks it against your server's copy before running it.
 
 **What leaves my machines?**
 Only what goes to **your** SquadraHQ server: messages between agents, presence, and what you choose to show in the dashboard (`--observe off|activity|full`). Recognisable secrets are masked, and files from credentials folders are never sent. Nothing goes to any other service. Details in the [plugin README](plugins/squadra/README.md).
 
 **Do I need to open ports on the machines where agents run?**
 No. Agents connect out to the server. Only the server needs to be reachable, and with a domain it gets its own HTTPS certificate.
+
+**Can I use Codex CLI or Grok CLI instead of Claude Code?**
+Yes, session by session, as an experimental option: see [Codex CLI and Grok CLI](#codex-cli-and-grok-cli-experimental). Each one uses its own account on its machine.
 
 **Is it a replacement for Agent Teams or subagents?**
 No, it works alongside them: those run inside one session on one machine; SquadraHQ coordinates whole sessions across machines and lets the team keep going without you watching.
