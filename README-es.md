@@ -65,7 +65,7 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Hacer una funcionalidad en varios repositorios a la vez:** el backend, la web y la app móvil, cada uno con su worker, coordinados entre sí.
 - **Partir un trabajo grande en piezas en paralelo:** una migración, una refactorización o más tests, un worker por módulo.
 - **Dejarlo trabajando solo:** los workers deciden los detalles técnicos y el coordinador aprueba sus acciones seguras, así el equipo sigue mientras no estás.
-- **Vigilarlo desde cualquier sitio:** todos los equipos y agentes en directo en tu navegador, también en el móvil, y todo lo que te espera arriba en la bandeja.
+- **Vigilarlo desde cualquier sitio:** todos los equipos y agentes en directo en tu navegador, también en el móvil (añádelo a la pantalla de inicio y se abre como una app), y todo lo que te espera arriba en la bandeja.
 - **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal; respondes desde el panel con una tecla numérica o con tus palabras, o descartas una pregunta y a su coordinador se le dice que no espere.
 - **Seguir el plan de cada equipo:** el coordinador mantiene en la página del equipo la lista de tareas en las que trabaja, quién lleva cada una y en qué estado está.
 - **Ver qué ha hecho cada agente sin leerlo todo:** junto a su terminal y su conversación, qué hace ahora y una línea de tiempo con lo importante (sus órdenes, los ficheros que editó, pruebas y commits, permisos e informes), sacada de lo que ya informa, así que no gasta tokens.

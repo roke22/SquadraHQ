@@ -187,8 +187,21 @@ test('the dashboard page carries a strict CSP and cannot be framed; xterm is ser
   assert.match(csp, /script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/)
   assert.match(csp, /frame-ancestors 'none'/)
   assert.equal(r.headers.get('x-frame-options'), 'DENY')
-  assert.ok(!(await r.text()).includes('cdn.jsdelivr.net'), 'no third-party scripts')
+  const page = await r.text()
+  assert.ok(!page.includes('cdn.jsdelivr.net'), 'no third-party scripts')
   for (const f of ['xterm.js', 'addon-fit.js', 'xterm.css']) assert.equal((await fetch(`${URL_}/vendor/${f}`)).status, 200, f)
+  // Installable on a phone: its manifest (allowed by the CSP, from here only) and its icons.
+  assert.match(csp, /manifest-src 'self'/)
+  assert.match(page, /<link rel="manifest" href="\/manifest\.webmanifest">/)
+  const manifest = await fetch(`${URL_}/manifest.webmanifest`)
+  assert.equal(manifest.headers.get('content-type'), 'application/manifest+json')
+  const m = await manifest.json()
+  assert.equal(m.display, 'standalone')
+  for (const icon of [...m.icons.map(i => i.src), '/icons/apple-touch-icon.png']) {
+    const res = await fetch(`${URL_}${icon}`)
+    assert.deepEqual([res.status, res.headers.get('content-type')], [200, 'image/png'], icon)
+  }
+  assert.notEqual((await fetch(`${URL_}/icons/nothing.png`)).status, 200)
 })
 
 test('the dashboard is made of scripts and styles from its own folder, and nothing else is served from there', async () => {

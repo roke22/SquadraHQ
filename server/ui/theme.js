@@ -18,3 +18,15 @@ export function setTheme(choice) {
 export const toggleTheme = () => setTheme(themeNow() === 'dark' ? 'light' : 'dark')
 export const onTheme = f => { listeners.add(f); return () => listeners.delete(f) }
 darkQuery.addEventListener('change', () => { for (const f of listeners) f() })
+
+// The colour of the phone's bar, installed as an app: the theme on screen,
+// also when it was chosen here rather than by the system.
+function themeBar() {
+  const now = themeNow()
+  for (const m of document.querySelectorAll('meta[name="theme-color"]')) {
+    if (document.documentElement.dataset.theme) m.setAttribute('media', /dark/.test(m.dataset.was ??= m.getAttribute('media') ?? '') === (now === 'dark') ? 'all' : 'not all')
+    else if (m.dataset.was != null) m.setAttribute('media', m.dataset.was)
+  }
+}
+onTheme(themeBar)
+themeBar()

@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { statSync, createReadStream } from 'node:fs'
 import {
-  guardRequest, sendJson, clientIp, readParams, bearer, own, sendError, VERSION, UI_FILE, VENDOR_FILES,
+  guardRequest, sendJson, clientIp, readParams, bearer, own, sendError, VERSION, UI_FILE, VENDOR_FILES, APP_FILES,
   MAX_JSON_BODY, cachedFile, pageHeaders, ApiError, allowServerWide, ipKey, sha256, refuseSocket, logError,
   ALLOW_TOKEN_API, atLeast, pathTooLong, cleanText, trimSlashes,
 } from './platform/index.js'
@@ -181,9 +181,11 @@ export function createRoutes(server, companies, accounts) {
         res.writeHead(200, { 'Content-Type': uiFile[2] === 'js' ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Content-Length': f.body.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
         return res.end(f.body)
       }
-      // The web terminal (xterm.js), served from here rather than a CDN.
-      if (req.method === 'GET' && Object.hasOwn(VENDOR_FILES, path)) {
-        const [file, type] = VENDOR_FILES[path]
+      // The web terminal (xterm.js), served from here rather than a CDN, and
+      // what a phone needs to install the dashboard (its manifest and icons).
+      const fixed = req.method === 'GET' ? (Object.hasOwn(VENDOR_FILES, path) ? VENDOR_FILES[path] : Object.hasOwn(APP_FILES, path) ? APP_FILES[path] : null) : null
+      if (fixed) {
+        const [file, type] = fixed
         const f = cachedFile(new URL(file, import.meta.url))
         if (!f) throw new ApiError(404, 'Not Found')
         res.writeHead(200, { 'Content-Type': type, 'Content-Length': f.body.length, 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' })

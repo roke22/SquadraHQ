@@ -131,6 +131,16 @@ export const VENDOR_FILES = {
   '/vendor/InterVariable.woff2': ['./vendor/InterVariable.woff2', 'font/woff2'],
 }
 
+// What a phone needs to install the dashboard as an app (no service worker:
+// it is a live page, with nothing to keep offline).
+export const APP_FILES = {
+  '/manifest.webmanifest': ['./ui/manifest.webmanifest', 'application/manifest+json'],
+  '/icons/icon-192.png': ['./ui/icons/icon-192.png', 'image/png'],
+  '/icons/icon-512.png': ['./ui/icons/icon-512.png', 'image/png'],
+  '/icons/maskable-512.png': ['./ui/icons/maskable-512.png', 'image/png'],
+  '/icons/apple-touch-icon.png': ['./ui/icons/apple-touch-icon.png', 'image/png'],
+}
+
 // Single source of truth: server/package.json.
 export const VERSION = (() => {
   try { return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version } catch { return '0.0.0' }

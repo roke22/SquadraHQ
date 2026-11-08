@@ -65,7 +65,7 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Build a feature across several repositories at once:** the backend, the web app and the mobile app, each with its own worker, kept in step by the coordinator.
 - **Split a big job into parallel pieces:** a migration, a refactor or more tests, one worker per module.
 - **Leave it working unattended:** workers decide the technical details and the coordinator approves their safe actions, so the team keeps going while you are away.
-- **Keep watch from anywhere:** every team and agent live in your browser, on a phone too, and everything that waits on you at the top of the inbox.
+- **Keep watch from anywhere:** every team and agent live in your browser, on a phone too (add it to the home screen and it opens as an app), and everything that waits on you at the top of the inbox.
 - **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong; you answer from the dashboard with a number key or in your own words, or dismiss a question and its coordinator is told not to wait.
 - **Follow each team's plan:** the coordinator keeps the list of tasks it is working through, who has each one and its state, on the team's page.
 - **See what each agent did without reading it all:** beside its terminal and its conversation, what it is doing now and a timeline of what mattered (its orders, the files it edited, tests and commits, permissions and reports), read from what it already reports, so it costs no tokens.

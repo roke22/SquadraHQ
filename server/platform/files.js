@@ -34,6 +34,7 @@ export function pageHeaders(html) {
       "img-src 'self' data:",
       "font-src 'self'",
       "connect-src 'self'",
+      "manifest-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'none'",
       "form-action 'none'",
