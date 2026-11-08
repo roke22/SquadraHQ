@@ -1,7 +1,7 @@
 # Build from the repository root (it also ships squadra-host, which the server
 # hands out to the machines you add):
 #   docker build -f server/Dockerfile -t squadra-server .
-FROM node:22-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
+FROM node:22-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
 WORKDIR /app
 COPY server ./
 COPY host/squadra-host.mjs* ./
