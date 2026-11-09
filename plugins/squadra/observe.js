@@ -405,7 +405,12 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   }
 
   function onTranscriptEntry(e, line) {
-    if (e.type !== 'assistant' && !e.isSidechain && onChannelSeen && line.includes('<channel')) {
+    // Only what Claude was given: a prompt (user) or what was put into a turn
+    // already going (attachment). A "queue-operation" line is a message
+    // waiting in Claude Code's queue, with its whole text: Claude hasn't seen
+    // it yet, and asking for its report now (Stop hook) got "I only see that
+    // #N exists, not its text".
+    if ((e.type === 'user' || e.type === 'attachment') && !e.isSidechain && onChannelSeen && line.includes('<channel')) {
       // (The tag as Claude Code writes it, inside a JSON string: quotes escaped.)
       const ids = [...line.matchAll(/<channel\b([^>]*)>/g)].map(m => Number(/\bmessage_id=\\"(\d+)\\"/.exec(m[1])?.[1])).filter(Boolean)
       if (ids.length) try { onChannelSeen(ids) } catch (err) { log(`observe: channel callback failed: ${err.message}`) }
@@ -476,6 +481,10 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
           id: input.tool_use_id,
           tool,
           summary: clip(redact(summary), limits.summary),
+          // What it is for, in Claude's words (a command's description): what
+          // the dashboard says it is doing now. Not for one that touches secrets.
+          ...(!secret && typeof input.tool_input?.description === 'string' && input.tool_input.description.trim() && ['Bash', 'PowerShell'].includes(tool)
+            ? { what: clip(redact(input.tool_input.description.trim().split('\n')[0]), 200) } : {}),
           ...(limits.detail && !secret ? { detail: clip(redact(JSON.stringify(maskDeep(input.tool_input ?? {}, redact).value, null, 2)), limits.detail) } : {}),
         })
       }

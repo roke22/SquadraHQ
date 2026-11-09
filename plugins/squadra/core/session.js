@@ -44,6 +44,8 @@ export function newSession({ name, role, coordinator, staticAccess, seedAllow })
     planSent: false, // a coordinator that has sent its plan (update_plan) isn't reminded to
     planAt: 0, // when it last did
     lastReportAt: 0, // when the last final report from one of its workers reached it
+    planHintFor: 0, // the report it was last reminded about (once each)
+    openAsks: new Set(), // coordinator: its questions in the user's inbox not answered yet (ask_user)
     joinedGroups: new Set(),
     relayIds: new Set(), // message ids of the permission requests this session sent
     toolInputs: [], // the last tool calls' exact inputs (from the hooks), for the relay

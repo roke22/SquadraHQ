@@ -31,7 +31,7 @@ export function createObservation(platform) {
     observe_start: { level: STR(20) },
     session_start: { source: STR(40), model: STR(100) },
     prompt: { text: STR(20_000), channel: BOOL },
-    tool_start: { id: STR(100), tool: STR(200), summary: STR(2000), detail: STR(20_000) },
+    tool_start: { id: STR(100), tool: STR(200), summary: STR(2000), what: STR(300), detail: STR(20_000) },
     tool_end: { id: STR(100), tool: STR(200), ok: BOOL, interrupted: BOOL, summary: STR(2000), duration_ms: INT, detail: STR(20_000) },
     text: { text: STR(20_000) },
     usage: { context_tokens: INT, model: STR(100), context_window: INT, compact_at: INT, context_pct: PCT },
@@ -84,7 +84,7 @@ export function createObservation(platform) {
       case 'prompt': set('working'); break
       case 'tool_start':
         if (ev.agent) break // tools run by subagents: the main session is inside its Task/Agent tool
-        a.tool = { id: ev.ref, name: ev.tool, summary: ev.summary, since: ev.ts }
+        a.tool = { id: ev.ref, name: ev.tool, summary: ev.summary, ...(ev.what ? { what: ev.what } : {}), since: ev.ts }
         set('tool')
         break
       case 'tool_end':

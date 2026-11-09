@@ -376,7 +376,7 @@ export class ChatView {
     bar.classList.toggle('waiting', !!st.waiting)
     bar.querySelector('.dot').className = `dot ${st.dot}`
     bar.querySelector('.txt').textContent = st.text
-    bar.querySelector('.txt').title = st.text
+    bar.querySelector('.txt').title = st.title ? `${st.text}\n${st.title}` : st.text
   }
 
   tick() {

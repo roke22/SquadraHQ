@@ -33,6 +33,8 @@
 .settings-side { flex: 1 1 248px; display: flex; justify-content: flex-end; padding: 56px 12px 24px; background: var(--panel); border-right: 1px solid var(--line); }
 .settings-nav { width: 224px; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 56px; align-self: flex-start; }
 .settings-group { display: flex; flex-direction: column; gap: 1px; }
+.settings-co { margin: 0 8px; }
+.settings-co select { width: 100%; }
 .settings-group-h { padding: 0 8px 4px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-nav [data-tab], .settings-out {
   display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 4px 8px;
@@ -81,6 +83,7 @@
 .settings-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); }
 .settings-row:first-of-type { border-radius: var(--r-md) var(--r-md) 0 0; }
 .settings-row + .settings-row { border-top: 0; }
+.settings-row .note { margin: 2px 0 0; max-width: 46ch; }
 .settings-row:last-of-type { border-radius: 0 0 var(--r-md) var(--r-md); }
 .settings-row:only-of-type { border-radius: var(--r-md); }
 .settings-row b { font-weight: 500; }
@@ -119,3 +122,5 @@
 .roles-help dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 10px 0 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); }
 .roles-help dt { color: var(--text); font-weight: 600; }
 .roles-help dd { margin: 0; }
+/* A dialog opened from the settings goes over them. */
+body:has(#settings:not([hidden])) .modal-bg { z-index: 77; }

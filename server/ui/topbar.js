@@ -10,6 +10,7 @@ import { runAction, openMenu } from './dialogs.js'
 import { terminalOf, hostLine, hostAction } from './machines.js'
 import { reopenable, reopen, addWorkerTo, saveTemplateDialog } from './squads.js'
 import { orgSquads, orgZoom, linksDialog } from './org.js'
+import { renderBack } from './back.js'
 
 // The terminal a session view shows (null: its chat).
 // (An observer has no terminals: its chat instead.)
@@ -44,9 +45,15 @@ const teamsSeg = view => `<nav class="seg" aria-label="${esc(T.teams)}">${[['tea
   .map(([v, href, label]) => `<a href="${href}"${v === view ? ' class="on" aria-current="page"' : ''}>${esc(label)}</a>`).join('')}</nav>`
 
 export function renderTop() {
+  renderHead()
+  renderBack()
+}
+
+function renderHead() {
   const r = currentRoute()
-  // (Only the teams views have a selector; a squad's own view is one team.)
-  if (!['org', 'teams'].includes(r.view) && !(r.view === 'mosaic' && !r.squad)) setHtml($('topTabs'), '')
+  // (Only the teams views and the inbox have a selector; a squad's own view is
+  // one team. The inbox's, with its counts, is its own: see renderInbox.)
+  if (!['org', 'teams', 'inbox'].includes(r.view) && !(r.view === 'mosaic' && !r.squad)) setHtml($('topTabs'), '')
   if (r.view === 'inbox') {
     // (Its subtitle, how many wait on you, is the inbox's own: see renderInbox.)
     setHtml($('topTitle'), esc(T.inbox))
@@ -62,13 +69,13 @@ export function renderTop() {
   if (r.view === 'addmachine') {
     setHtml($('topTitle'), esc(T.addTitle))
     $('topSub').textContent = ''
-    setHtml($('topRight'), `<a class="btn plain" href="#/hosts" data-amcancel>${esc(T.cancel)}</a>`)
+    setHtml($('topRight'), `<a class="btn plain" href="#/hosts" data-amcancel data-back>${esc(T.cancel)}</a>`)
     return
   }
   if (r.view === 'newteam') {
     setHtml($('topTitle'), esc(T.newTeam))
     $('topSub').textContent = ''
-    setHtml($('topRight'), `<a class="btn plain" href="#/teams">${esc(T.cancel)}</a>`)
+    setHtml($('topRight'), `<a class="btn plain" href="#/teams" data-back>${esc(T.cancel)}</a>`)
     return
   }
   if (r.view === 'team') {
@@ -104,7 +111,7 @@ export function renderTop() {
       setHtml($('topTitle'), esc(T.tqLiveTitle(state.squadMeta.get(r.squad)?.title || r.squad)))
       const linked = linksOf(r.squad)
       $('topSub').textContent = [T.squadCount(ws.filter(w => w.online).length, ws.length), linked.length ? T.linkedWith(linked.join(', ')) : ''].filter(Boolean).join(' · ')
-      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}">${esc(T.addWorker)}</button>` : ''}<a class="btn" href="#/q/${encodeURIComponent(r.squad)}">${esc(T.tqBackToTeam)}</a>`)
+      setHtml($('topRight'), `${colsSeg}${can('operator') ? `<button class="btn" data-addworker="${esc(r.squad)}">${esc(T.addWorker)}</button>` : ''}`)
       return
     }
     setHtml($('topTitle'), esc(T.teams)); setHtml($('topTabs'), teamsSeg('mosaic'))
@@ -126,12 +133,11 @@ export function renderTop() {
     if (s) acts.push(`<button class="btn" data-go="#/s/${encodeURIComponent(r.term)}/chat">${T.chat}</button>`)
     acts.push(`<button class="btn" data-tact="redraw">${T.redraw}</button>`)
     if (t && h?.online) acts.push(`<button class="btn danger" data-tact="kill">${T.closeSession}</button>`)
-    acts.push(`<button class="btn" data-go="#/h/${encodeURIComponent(r.host)}">${T.back}</button>`)
     setHtml($('topRight'), acts.join(''))
   } else if (r.view === 'archived') {
     setHtml($('topTitle'), T.archivedTitle)
     $('topSub').textContent = T.archivedSub
-    setHtml($('topRight'), `<button class="btn" data-go="#/teams">${T.backAll}</button>`)
+    setHtml($('topRight'), '')
   } else {
     const s = sessions.get(r.name)
     const st = status(s)

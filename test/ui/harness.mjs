@@ -2,12 +2,12 @@
 // polling it as a plugin does, and a machine that answers like squadra-host.
 
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { totpCode, totpStep } from '../../server/accounts/totp.js'
+import { tempDir } from '../tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
@@ -25,7 +25,7 @@ export const OWNER = { email: 'owner@example.com', name: 'The Owner', password: 
 export async function startServer({ tokenApi = true } = {}) {
   const port = await freePort()
   const url = `http://127.0.0.1:${port}`
-  const dataDir = mkdtempSync(join(tmpdir(), 'squadra-ui-'))
+  const dataDir = tempDir('squadra-ui-')
   let log = ''
   const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
     // (The token keeps working on /api: what these tests set up isn't the page.)
@@ -121,11 +121,12 @@ export async function startMachine(server, name, terminal, { screens = {}, code:
   const typed = []
   const answers = [] // what the inbox had it type, as { term, text }
   const identities = new Map() // the sessions it opened -> their secret
+  const opened = [] // what it was asked to open, as the server sent it
   const ws = new WebSocket(`${server.url.replace('http', 'ws')}/host/connect`, ['squadra', `auth.${secret}`])
   const send = m => ws.send(JSON.stringify(m))
   const b64 = text => Buffer.from(text).toString('base64')
   const info = {
-    hostname: name, platform: 'linux', arch: 'x64', version: '0.0.7', folders: ['/srv/squad'], allow_input: true, answers: true, max_sessions: 8,
+    hostname: name, platform: 'linux', arch: 'x64', version: '0.0.7', folders: ['/srv/squad'], allow_input: true, answers: true, max_sessions: 8, permission_profiles: 'allow',
     terminals: [{ id: terminal.id, role: terminal.role, coordinator: terminal.coordinator, folder: '/srv/squad', created_at: Date.now() }],
   }
   await new Promise((resolve, reject) => {
@@ -139,6 +140,7 @@ export async function startMachine(server, name, terminal, { screens = {}, code:
       if (m.t === 'answer') { answers.push({ term: m.term, text: m.text }); send({ t: 'reply', req: m.req, ok: true, result: { typed: true } }) }
       if (m.t === 'open') {
         identities.set(m.spec.name, m.spec.identity)
+        opened.push(m.spec)
         info.terminals.push({ id: m.spec.name, role: m.spec.role, coordinator: m.spec.coordinator, folder: '/srv/squad', created_at: Date.now() })
         send({ t: 'info', info })
         send({ t: 'reply', req: m.req, ok: true, result: { id: m.spec.name } })
@@ -148,5 +150,5 @@ export async function startMachine(server, name, terminal, { screens = {}, code:
     }
   })
   server.onClose(() => ws.close())
-  return { id, typed, answers, identities }
+  return { id, typed, answers, identities, opened }
 }

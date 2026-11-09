@@ -7,10 +7,11 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, spawnSync, execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, chmodSync, existsSync, realpathSync, rmSync, symlinkSync, lstatSync, readdirSync, statSync } from 'node:fs'
+import { writeFileSync, readFileSync, mkdirSync, chmodSync, existsSync, realpathSync, rmSync, symlinkSync, lstatSync, readdirSync, statSync } from 'node:fs'
 import { tmpdir, homedir, userInfo } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { tempDir } from './tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SERVER_TOKEN = 'test-server-token-host-0123456789'
@@ -43,12 +44,12 @@ async function dash(path, body) {
 
 let serverProc, hostProc
 let hostExit = null
-const work = mkdtempSync(join(tmpdir(), 'squadra-host-test-'))
+const work = tempDir('squadra-host-test-')
 const dataDir = join(work, 'data')
 const hostDir = join(work, 'host')
 // Claude Code's config outside /tmp: the plugin (and so the host) ignores a
 // CLAUDE_CONFIG_DIR in the same top-level folder as the sessions' folders.
-const claudeDir = mkdtempSync(join(homedir(), '.squadra-host-test-claude-'))
+const claudeDir = tempDir('.squadra-host-test-claude-', homedir())
 const allowed = join(work, 'projects')
 const outside = join(work, 'elsewhere')
 const fakeClaude = join(work, 'fake-claude.sh')
@@ -150,7 +151,7 @@ test('a machine enrolls with a one-time code and connects', { skip: !hasTmux && 
   const jsText = await js.text()
   assert.match(jsText, /squadra-host/)
   const verify = en.result.command.match(/ && (echo .*?\)) && printf /)[1]
-  const dl = mkdtempSync(join(tmpdir(), 'squadra-dl-'))
+  const dl = tempDir('squadra-dl-')
   writeFileSync(join(dl, 'squadra-host.mjs'), jsText)
   execFileSync('sh', ['-c', verify], { cwd: dl, stdio: 'ignore' })
   writeFileSync(join(dl, 'squadra-host.mjs'), jsText + '\n// tampered')
@@ -672,6 +673,78 @@ test('personas: the machine lists a folder\'s skills and agents, and opens a ses
   }
 })
 
+test('permission profiles: a session opens with its team\'s rules, as far as its machine takes them', { skip: !hasTmux && 'tmux not installed' }, async () => {
+  const argsOf = name => waitFor(() => {
+    const s = execFileSync('tmux', ['-L', SOCKET, 'capture-pane', '-p', '-J', '-t', `=sq-${name}:`], { encoding: 'utf8' })
+    return s.includes('ARGS:') ? s.match(/ARGS:.*/)[0] : null
+  }, { what: `${name} started` })
+  const stateDir = name => join(claudeDir, 'channels', 'squadra', name)
+  const settingsFile = join(hostDir, 'settings.json')
+  const before = readFileSync(settingsFile, 'utf8')
+  try {
+    // A profile of the team's: what the page sends never counts, the profile does.
+    const saved = await dash('permissions/save', { name: 'Backend', notes: 'Commit, never push: the release is mine.', caps: { commit: 'allow', push: 'deny' }, extra: { allow: ['Bash(make check *)'], deny: ['WebFetch(domain:prod.example.com)'] } })
+    assert.ok(saved.ok, saved.description)
+    assert.ok((await dash('permissions/assign', { coordinator: 'pboss', profile: saved.result.id })).ok)
+    const r = await dash('terminals/open', { host: hostId, spec: { name: 'pw1', role: 'worker', coordinator: 'pboss', folder: allowed, permissions: { profile: 'evil', allow: ['Bash(*)'] } } })
+    assert.ok(r.ok, r.description)
+    const args = await argsOf('pw1')
+    const file = join(stateDir('pw1'), 'permissions.json')
+    assert.ok(args.includes(`--settings ${file}`), args)
+    const rules = JSON.parse(readFileSync(file, 'utf8')).permissions
+    assert.ok(rules.allow.includes('Bash(git commit *)') && rules.allow.includes('Bash(make check *)'))
+    assert.ok(!rules.allow.includes('Bash(*)'))
+    assert.deepEqual(rules.deny, ['Bash(git push *)', 'WebFetch(domain:prod.example.com)'])
+    assert.equal(lstatSync(file).mode & 0o777, 0o600)
+    // What the user wrote goes in its system prompt, quoted, as the reason.
+    assert.ok(args.includes(`--append-system-prompt-file ${join(stateDir('pw1'), 'persona.md')}`))
+    assert.match(readFileSync(join(stateDir('pw1'), 'persona.md'), 'utf8'), /permission profile "Backend".*\n"Commit, never push: the release is mine\."/)
+    await waitFor(async () => (await dash('hosts')).result.find(h => h.id === hostId)?.info?.terminals?.some(t => t.id === 'pw1' && t.profile === 'Backend'), { what: 'listed with its profile' })
+    assert.ok((await dash('terminals/kill', { host: hostId, term: 'pw1' })).ok)
+
+    // A session of its own: none, whatever its team's (and nothing left from before).
+    assert.ok((await dash('permissions/assign', { session: 'pw1', profile: 'none' })).ok)
+    assert.ok((await dash('terminals/open', { host: hostId, spec: { name: 'pw1', role: 'worker', coordinator: 'pboss', folder: allowed } })).ok)
+    assert.doesNotMatch(await argsOf('pw1'), /--settings|--append-system-prompt-file/)
+    assert.ok(!existsSync(join(stateDir('pw1'), 'permissions.json')))
+    assert.ok((await dash('terminals/kill', { host: hostId, term: 'pw1' })).ok)
+
+    // A machine that takes only what asks or forbids: what it allows is left out.
+    writeFileSync(settingsFile, JSON.stringify({ ...JSON.parse(before), permissions_from_dashboard: 'restrict' }))
+    assert.ok((await dash('terminals/open', { host: hostId, spec: { name: 'pw2', role: 'worker', coordinator: 'pboss', folder: allowed } })).ok)
+    await argsOf('pw2')
+    const restricted = JSON.parse(readFileSync(join(stateDir('pw2'), 'permissions.json'), 'utf8')).permissions
+    assert.deepEqual(restricted.allow, [])
+    assert.deepEqual(restricted.deny, ['Bash(git push *)', 'WebFetch(domain:prod.example.com)'])
+    assert.ok((await dash('terminals/kill', { host: hostId, term: 'pw2' })).ok)
+    // One that takes none doesn't open a session that follows one.
+    writeFileSync(settingsFile, JSON.stringify({ ...JSON.parse(before), permissions_from_dashboard: 'off' }))
+    const off = await dash('terminals/open', { host: hostId, spec: { name: 'pw3', role: 'worker', coordinator: 'pboss', folder: allowed } })
+    assert.equal(off.ok, false)
+    assert.match(off.description, /permissions_from_dashboard/)
+    writeFileSync(settingsFile, before)
+
+    // Never from the dashboard, whatever the machine says: sudo, any command, an interpreter with anything, files outside.
+    for (const rule of ['Bash(sudo *)', 'Bash(*)', 'Bash', 'Bash(python3 *)', 'Edit(//etc/**)', 'Edit(~/.ssh/**)', 'Read(../other/**)']) {
+      const bad = await dash('permissions/save', { name: `Bad ${rule.length}${rule.charCodeAt(5)}`, extra: { allow: [rule] } })
+      assert.ok(bad.ok, bad.description) // (the server keeps it: the machine is the one that refuses)
+      assert.ok((await dash('permissions/assign', { coordinator: 'pboss', profile: bad.result.id })).ok)
+      const x = await dash('terminals/open', { host: hostId, spec: { name: 'pw4', role: 'worker', coordinator: 'pboss', folder: allowed } })
+      assert.equal(x.ok, false, rule)
+      assert.match(x.description, /never takes that from the dashboard/, rule)
+    }
+    // A path Claude Code would read from where its settings file is: refused, with how to write it.
+    const anchored = await dash('permissions/save', { name: 'Anchored', extra: { deny: ['Edit(/src/**)'] } })
+    assert.ok((await dash('permissions/assign', { coordinator: 'pboss', profile: anchored.result.id })).ok)
+    const y = await dash('terminals/open', { host: hostId, spec: { name: 'pw5', role: 'worker', coordinator: 'pboss', folder: allowed } })
+    assert.equal(y.ok, false)
+    assert.match(y.description, /write \.\/path for its folder or \/\/path for an absolute one/)
+  } finally {
+    writeFileSync(settingsFile, before)
+    await dash('permissions/assign', { coordinator: 'pboss', profile: '' })
+  }
+})
+
 test('links between squads: a coordinator opens with the ones the dashboard set, and they change while it runs', { skip: !hasTmux && 'tmux not installed' }, async () => {
   const linksOf = name => JSON.parse(readFileSync(join(claudeDir, 'channels', 'squadra', name, 'links.json'), 'utf8'))
   // What the page sends is ignored: the server's links are the ones that count.
@@ -962,7 +1035,7 @@ test('fourth audit: a settings.json that cannot be read means the strictest sett
 })
 
 test('a settings.json from 0.0.2 gets the new defaults once (continuing a conversation allowed)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-host-mig-'))
+  const dir = tempDir('squadra-host-mig-')
   const env = { ...process.env, SQUADRA_HOST_DIR: dir }
   const run = () => execFileSync(process.execPath, [join(ROOT, 'host/squadra-host.mjs'), 'folders'], { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   // What 0.0.2 wrote at enrollment: its defaults, allow_resume false among them.
@@ -990,7 +1063,7 @@ test('a settings.json from 0.0.2 gets the new defaults once (continuing a conver
 // --- squadra-host update ---------------------------------------------------------------
 
 test('squadra-host runs when it is reached through a link', () => {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'squadra-link-')))
+  const dir = realpathSync(tempDir('squadra-link-'))
   mkdirSync(join(dir, 'real'))
   writeFileSync(join(dir, 'real', 'program.mjs'), readFileSync(join(ROOT, 'host/squadra-host.mjs')))
   symlinkSync(join(dir, 'real'), join(dir, 'link'))
@@ -1005,7 +1078,7 @@ test('update: only a signed release, and not an older one', async t => {
   const { promisify } = await import('node:util')
   const { execFile } = await import('node:child_process')
   const { privateKey } = generateKeyPairSync('ed25519')
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-update-'))
+  const dir = tempDir('squadra-update-')
   // A copy of the program with a key to check with (and no launcher in the real home).
   const publicB64 = createPublicKey(privateKey).export({ format: 'der', type: 'spki' }).toString('base64url')
   const real = readFileSync(join(ROOT, 'host/squadra-host.mjs'), 'utf8')
@@ -1131,7 +1204,7 @@ test('settings: a file locked by hand stays locked, and a link stays a link', { 
 })
 
 test('the service of another configuration folder is left alone', { skip: (process.platform !== 'linux' || process.getuid() === 0) && 'a user service on Linux' }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-service-'))
+  const dir = tempDir('squadra-service-')
   const unit = join(dir, 'xdg', 'systemd', 'user', 'squadra-host.service')
   mkdirSync(dirname(unit), { recursive: true })
   writeFileSync(unit, 'ExecStart=/usr/bin/node /elsewhere/squadra-host.mjs\n')
@@ -1148,7 +1221,7 @@ test('the service of another configuration folder is left alone', { skip: (proce
 test('preparing a release: the version everywhere, signed, or nothing changes', async () => {
   const { createPublicKey, verify } = await import('node:crypto')
   const { cpSync } = await import('node:fs')
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-release-'))
+  const dir = tempDir('squadra-release-')
   const files = ['scripts', 'package.json', 'package-lock.json', 'server/package.json', 'plugins/squadra/package.json', 'plugins/squadra/.claude-plugin/plugin.json', '.claude-plugin/marketplace.json', 'host/squadra-host.mjs', '.github/ISSUE_TEMPLATE/bug_report.yml', 'README.md', 'README-es.md']
   for (const f of files) cpSync(join(ROOT, f), join(dir, f), { recursive: true })
   mkdirSync(join(dir, 'docs'))
@@ -1256,7 +1329,7 @@ test('squadra-host keeps its secret out of the WebSocket headers, and stops only
   srv.on('upgrade', (req, socket) => { seen.protocols.push(String(req.headers['sec-websocket-protocol'])); socket.destroy() })
   await new Promise(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => { srv.closeAllConnections(); srv.close() })
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-ticket-'))
+  const dir = tempDir('squadra-ticket-')
   const secret = 'sh_the_real_secret_of_this_machine'
   writeFileSync(join(dir, 'credentials.json'), JSON.stringify({ server: `http://127.0.0.1:${srv.address().port}`, id: 'h', secret }), { mode: 0o600 })
   const run = () => spawn(process.execPath, [join(ROOT, 'host/squadra-host.mjs')], { env: { ...process.env, SQUADRA_HOST_DIR: dir, SQUADRA_TMUX_SOCKET: `${SOCKET}-ticket`, PATH: dirname(process.execPath) + ':/usr/bin:/bin' }, stdio: 'ignore' })
@@ -1290,7 +1363,7 @@ test('squadra-host keeps its secret out of the WebSocket headers, and stops only
 
 test('the server keeps its key: made once, the same after a restart, and never replaced by itself', async () => {
   const { randomBytes } = await import('node:crypto')
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-server-key-'))
+  const dir = tempDir('squadra-server-key-')
   const port = 21500 + Math.floor(Math.random() * 500)
   const start = () => spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: SERVER_TOKEN }, stdio: ['ignore', 'ignore', 'pipe'] })
   const up = async () => {
@@ -1488,7 +1561,7 @@ test('the server hands out the release signature next to the program', async () 
 })
 
 test('one machine, two companies, the same session name: two separate copies of everything', { skip: !hasTmux && 'tmux not installed' }, async () => {
-  const xdg = mkdtempSync(join(homedir(), '.squadra-host-test-xdg-'))
+  const xdg = tempDir('.squadra-host-test-xdg-', homedir())
   const project = name => { const d = join(allowed, name); mkdirSync(d, { recursive: true }); return d }
   const company = async name => (await (await fetch(`${URL_}/admin/createCompany`, { method: 'POST', headers: { Authorization: `Bearer ${SERVER_TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })).json()).result
   const [a, b] = [await company('Shared A'), await company('Shared B')]
@@ -1650,7 +1723,7 @@ test('on a Mac, what is allowed goes by which folder it is, not by how it is spe
 })
 
 test('Codex CLI and Grok CLI: a session names its agent, and what arrives is typed as a channel block', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'sq-agents-'))
+  const dir = tempDir('sq-agents-')
   const work = join(dir, 'work')
   mkdirSync(work)
   const script = `
@@ -1675,7 +1748,7 @@ test('Codex CLI and Grok CLI: a session names its agent, and what arrives is typ
 })
 
 test('Grok CLI: a project file that defines an MCP server named squadra is found, up to the git root', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'sq-grokmcp-'))
+  const dir = tempDir('sq-grokmcp-')
   const repo = join(dir, 'repo'), sub = join(repo, 'a', 'b')
   mkdirSync(join(repo, '.git'), { recursive: true }); mkdirSync(sub, { recursive: true })
   // Above the git root: not where Grok looks.
@@ -1700,7 +1773,7 @@ test('Grok CLI: a project file that defines an MCP server named squadra is found
 })
 
 test('Codex CLI and Grok CLI: an answer to a permission prompt is typed only for the exact call on the prompt line', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'sq-answers-'))
+  const dir = tempDir('sq-answers-')
   const codex = (call, reason = 'test') => [
     '› RUN: something',
     '• Ran rm -f /tmp/old',

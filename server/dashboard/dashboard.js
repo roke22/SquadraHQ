@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { unix, now, guarded, bad, ApiError, VERSION, ROLES, AGENTS } from '../platform/index.js'
 
-export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, plans, organization }) {
+export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, plans, organization, permissions }) {
   const { rotateJoinToken, db, bus, broadcast, sseClients, truncateLog, dataDir, log, every } = platform
   const {
     register, approveSession, presenceOf, personaView, identityCreatedAt, identityExists, isOnline, linksOf,
@@ -154,6 +154,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
         inbox: inbox.list(),
         plans: plans.list(),
         squads: listSquads(),
+        permissions: permissions.permissionsState(),
       }
     },
     events(q) {
@@ -170,6 +171,9 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     },
     inbox() {
       return inbox.list()
+    },
+    'inbox/done'(q) {
+      return inbox.done({ before: q.get('before'), limit: q.get('limit'), team: q.get('team'), q: q.get('q') })
     },
     messages(q) {
       const limit = Math.max(1, Math.min(Number(q.get('limit') ?? 200) || 200, 1000))
@@ -335,10 +339,14 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     'org/squad': p => describeSquad(p),
     'org/positions': p => placeSquads(p),
     'org/describe': p => describeSession(p),
+    'permissions/save': p => permissions.saveProfile(p),
+    'permissions/delete': p => permissions.deleteProfile(p),
+    'permissions/assign': p => permissions.assignProfile(p),
     'terminals/open': (p, req) => openTerminalOn(p, req.actor),
     'terminals/kill': p => killTerminalOn(p),
     'terminal/ticket': (p, req) => newTerminalTicket(req.actor ?? null),
     'inbox/resolve': p => inbox.resolve(Number(p.id)),
+    'inbox/read-all': p => inbox.resolveTells(Array.isArray(p.ids) ? p.ids.map(Number) : p.ids),
     'inbox/answer': (p, req) => answerFromInbox(p, req.actor),
     'inbox/dismiss': (p, req) => dismissFromInbox(p, req.actor),
   }
@@ -346,14 +354,15 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   // Who may do each thing, at least. Whatever isn't here nobody may do, and the
   // server refuses to start (see the end): every new action says who it is for.
   const dashboardRoles = {
-    reads: { inbox: 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer' },
+    reads: { inbox: 'observer', 'inbox/done': 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer' },
     actions: {
-      'inbox/resolve': 'operator', 'inbox/answer': 'operator', 'inbox/dismiss': 'operator', kick: 'operator', clear: 'operator', archive: 'operator', unarchive: 'operator',
+      'inbox/resolve': 'operator', 'inbox/read-all': 'operator', 'inbox/answer': 'operator', 'inbox/dismiss': 'operator', kick: 'operator', clear: 'operator', archive: 'operator', unarchive: 'operator',
       'terminals/open': 'operator', 'terminals/kill': 'operator', 'terminal/ticket': 'operator', 'hosts/personas': 'operator',
       approve: 'manager', delete: 'manager',
       'hosts/enroll': 'manager', 'hosts/rename': 'manager', 'hosts/remove': 'manager', 'hosts/folders': 'manager',
       'templates/save': 'manager', 'templates/delete': 'manager', 'links/add': 'manager', 'links/delete': 'manager',
       'org/squad': 'manager', 'org/positions': 'manager', 'org/describe': 'manager',
+      'permissions/save': 'manager', 'permissions/delete': 'manager', 'permissions/assign': 'manager',
     },
   }
   for (const [table, roles] of [[dashboardActions, dashboardRoles.actions], [{ ...dashboardReads, stream: true }, dashboardRoles.reads]]) {

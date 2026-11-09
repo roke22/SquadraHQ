@@ -18,9 +18,10 @@ const SERVER_MODULES = {
   sessions: ['platform'],
   messaging: ['platform', 'sessions'],
   observation: ['platform'],
-  machines: ['platform', 'sessions', 'observation'],
+  permissions: ['platform', 'sessions'],
+  machines: ['platform', 'sessions', 'observation', 'permissions'],
   organization: ['platform', 'sessions', 'messaging', 'observation', 'machines'],
-  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization'],
+  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions'],
   ui: [],
 }
 const SERVER_OTHER_FOLDERS = ['vendor']
@@ -152,6 +153,8 @@ test('modules: the checks the plugin and the host each keep are the same', () =>
     assert.ok(definition(HOST, name), name)
     assert.equal(definition(file, name), definition(HOST, name), name)
   }
+  // (And one the server keeps too: what a permission rule looks like.)
+  assert.equal(definition('server/permissions/permissions.js', 'RULE_RE'), definition(HOST, 'RULE_RE'))
   assert.deepEqual(body(HOST, 'privateChain'), body(PATHS, 'safeChain'))
   assert.deepEqual(body(HOST, 'realNearest'), body(PATHS, 'realNearest'))
   assert.deepEqual(body(HOST, 'serverSigned'), body('plugins/squadra/signing.js', 'signedBy'))

@@ -2,12 +2,13 @@ import { inCompany } from './api.js'
 import { $ } from './dom.js'
 import { T } from './i18n.js'
 import {
-  state, sessions, templateListeners, linkListeners, hosts, views, hostListeners, unread,
+  state, sessions, templateListeners, profileListeners, linkListeners, hosts, views, hostListeners, unread,
 } from './state.js'
 import { esc } from './format.js'
 import { sortedSessions, status } from './content.js'
-import { toolName } from './chat.js'
+import { nowPhrase } from './doing.js'
 import { soon, setHtml, renderNav } from './nav.js'
+import { inboxArrived } from './attention.js'
 import { route, currentRoute, mosaicPanes, refreshLeads, dec } from './router.js'
 import { renderTop, sessionTerm } from './topbar.js'
 import { paneHead, buildMosaic, paneClass, refreshSquadRows, renderArchived } from './mosaic.js'
@@ -33,9 +34,11 @@ function onStream(type, data) {
     for (const fn of templateListeners) fn()
     state.links = data.links ?? []
     state.inbox = data.inbox ?? []
+    inboxArrived()
     state.plans = new Map((data.plans ?? []).map(p => [p.coordinator, p]))
     for (const fn of linkListeners) fn()
     state.squadMeta = new Map((data.squads ?? []).map(q => [q.coordinator, q]))
+    state.permissions = data.permissions ?? { profiles: [], teams: {}, sessions: {} }
     hosts.clear()
     for (const h of data.hosts ?? []) hosts.set(h.id, h)
     // After a reconnect, what happened in between isn't in the open chats:
@@ -81,6 +84,12 @@ function onStream(type, data) {
     if ((r.view === 'session' && r.name === data.name) || r.view === 'terminal' || r.squad) soon(renderTop)
     return
   }
+  if (type === 'profiles') {
+    state.permissions = data && typeof data === 'object' ? data : { profiles: [], teams: {}, sessions: {} }
+    for (const fn of profileListeners) fn()
+    soon(refreshTeam); soon(refreshSessionAside)
+    return
+  }
   if (type === 'templates') {
     state.templates = Array.isArray(data) ? data : []
     for (const fn of templateListeners) fn()
@@ -92,6 +101,7 @@ function onStream(type, data) {
   }
   if (type === 'inbox') {
     state.inbox = Array.isArray(data) ? data : []
+    inboxArrived()
     if (currentRoute().view === 'inbox') soon(renderInbox)
     soon(refreshTimelines)
     soon(renderNav); soon(refreshInbox); soon(refreshTeams); soon(refreshTeam); soon(refreshSessionAside)
@@ -145,7 +155,12 @@ function onStream(type, data) {
   }
 }
 
-function setConn(cls, text) { $('connDot').className = `dot ${cls}`; $('connText').textContent = text }
+// (On a phone, with no sidebar, the header says so, but only while it is not live.)
+function setConn(cls, text) {
+  $('connDot').className = `dot ${cls}`; $('connText').textContent = text
+  $('headConn').hidden = cls === 'ok'
+  $('headConn').innerHTML = `<span class="dot ${esc(cls)}" aria-hidden="true"></span><span>${esc(text)}</span>`
+}
 export async function connect() {
   const gen = ++state.streamGen
   let backoff = 1000
@@ -209,7 +224,7 @@ function renderAlerts() {
     const st = status(s)
     if (st.waiting) {
       const a = s.activity ?? {}
-      const what = a.tool ? `${toolName(a.tool.name)}${a.tool.summary ? ` · ${a.tool.summary}` : ''}` : a.waiting
+      const what = a.tool ? nowPhrase(a.tool) : a.waiting
       items.push({ cls: '', name: s.name, html: T.alertPerm(esc(s.name), esc(what ?? '')) })
     }
   }

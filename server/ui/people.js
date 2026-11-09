@@ -1,11 +1,12 @@
 import { $, store } from './dom.js'
 import { T, LOCALE, LANG } from './i18n.js'
-import { state, can } from './state.js'
+import { state, can, profileListeners, switchCompany } from './state.js'
 import { call, inCompany } from './api.js'
 import { esc } from './format.js'
 import { alertBox } from './mosaic.js'
 import { icon } from './icons.js'
 import { themeChoice, setTheme, onTheme } from './theme.js'
+import { notifyChoice, setNotify, notifySupported, notifyBlocked } from './attention.js'
 
 const ROLES = ['observer', 'operator', 'manager', 'owner']
 // Only owners give or take the role of owner.
@@ -22,6 +23,7 @@ const linkBox = l => `<div class="cmdrow"><pre class="cmd">${esc(l.link)}</pre><
 // whom they affect: you, this company, the whole server. Only what this
 // user's role allows is there. Esc, or the button at the top, closes them.
 let closeOpen = null
+let redrawPermissions = null
 export function openSettings(start) {
   closeOpen?.()
   const admin = state.me?.user.is_platform_admin
@@ -32,7 +34,7 @@ export function openSettings(start) {
   const groups = [
     [T.setMine, [['account', T.setProfile], ['appearance', T.setAppearance]]],
     ...(everywhere ? [[T.setAllCompanies, [['everyone', T.people]]]] : []),
-    ...(manager && here ? [[here.name, [['members', T.people], ['company', T.tabCompany]]]] : []),
+    ...(manager && here ? [[here.name, [['members', T.people], ['permissions', T.tabPermissions], ['company', T.tabCompany]]]] : []),
     ...(admin ? [[T.setServer, [['companies', T.tabCompanies], ['users', T.tabUsers], ['machines', T.tabMachines]]]] : []),
   ]
   const tabs = groups.flatMap(g => g[1])
@@ -40,6 +42,7 @@ export function openSettings(start) {
   const opener = document.activeElement
   root.innerHTML = `<div class="settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <aside class="settings-side"><nav class="settings-nav" aria-label="${esc(T.settingsSections)}">
+        ${(state.me?.companies.length ?? 0) > 1 ? `<label class="field settings-co"><span>${esc(T.company)}</span><select data-company>${state.me.companies.map(c => `<option value="${esc(c.id)}"${c.id === state.company ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>` : ''}
         ${groups.map(([title, items]) => `<div class="settings-group"><div class="settings-group-h">${esc(title)}</div>${items.map(([k, label]) => `<button type="button" data-tab="${k}">${esc(label)}</button>`).join('')}</div>`).join('')}
         <div class="settings-sep"></div>
         <button type="button" class="settings-out" data-logout>${icon('logout')}${esc(T.logout)}</button>
@@ -77,6 +80,8 @@ export function openSettings(start) {
   }
   document.addEventListener('keydown', keys, true)
   root.querySelector('[data-close]').onclick = close
+  const co = root.querySelector('[data-company]')
+  if (co) co.onchange = () => switchCompany(co.value)
   root.querySelector('[data-logout]').onclick = async () => { close(); (await import('./app.js')).logOut() }
   const body = d.el.querySelector('[data-body]')
   const fail = err => { d.el.querySelector('.err').textContent = err.status === 429 ? T.tooManyTries : err.message.replace(/^(Unauthorized|Bad Request|Not Found|Conflict|Forbidden): /, '') }
@@ -95,7 +100,21 @@ export function openSettings(start) {
       if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current')
     }
     root.querySelector('#settingsTitle').textContent = tab === 'everyone' ? T.evSeeAll : tabs.find(t => t[0] === tab)?.[1] ?? ''
-    try { await ({ everyone, members, company, companies, users, machines, account, appearance })[tab]() } catch (err) { fail(err) }
+    try { await ({ everyone, members, permissions, company, companies, users, machines, account, appearance })[tab]() } catch (err) { fail(err) }
+  }
+
+  // The permission profiles of this company: drawn again when they change
+  // (their dialogs are apart, so nothing being typed is lost).
+  async function permissions() {
+    drawing++
+    const { permissionsTab } = await import('./permissions.js')
+    profileListeners.delete(redrawPermissions)
+    redrawPermissions = () => {
+      if (root.hidden || current !== 'permissions') { profileListeners.delete(redrawPermissions); return }
+      permissionsTab(body, fail)
+    }
+    profileListeners.add(redrawPermissions)
+    permissionsTab(body, fail)
   }
 
   // How the dashboard looks to you, in this browser.
@@ -105,8 +124,10 @@ export function openSettings(start) {
     const seg = (name, value, label, on) => `<button type="button" data-${name}="${value}" aria-pressed="${on}"${on ? ' class="on"' : ''}>${esc(label)}</button>`
     body.innerHTML = `<div class="settings-row"><b id="themeLbl">${esc(T.theme)}</b><div class="seg" role="group" aria-labelledby="themeLbl">${[['system', T.themeSystem], ['light', T.themeLight], ['dark', T.themeDark]].map(([v, l]) => seg('theme', v, l, v === choice)).join('')}</div></div>
       <div class="settings-row"><b id="langLbl">${esc(T.language)}</b><div class="seg" role="group" aria-labelledby="langLbl">${[['en', 'English'], ['es', 'Español']].map(([v, l]) => seg('lang', v, l, v === LANG)).join('')}</div></div>
+      <div class="settings-row"><div><b id="notifyLbl">${esc(T.notifyTitle)}</b><p class="note">${esc(!notifySupported() ? T.notifyUnsupported : notifyBlocked() ? T.notifyBlocked : T.notifyHint)}</p></div>${notifySupported() ? `<div class="seg" role="group" aria-labelledby="notifyLbl">${[['off', T.notifyOff], ['on', T.notifyOn], ['sound', T.notifySound]].map(([v, l]) => seg('notify', v, l, v === notifyChoice())).join('')}</div>` : ''}</div>
       <p class="note settings-ver">${esc(document.querySelector('.ver')?.textContent ?? '')}</p>`
     for (const b of body.querySelectorAll('[data-theme]')) b.onclick = () => setTheme(b.dataset.theme)
+    for (const b of body.querySelectorAll('[data-notify]')) b.onclick = async () => { await setNotify(b.dataset.notify); appearance() }
     for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('squadraLang', b.dataset.lang); location.reload() } }
   }
 
@@ -207,6 +228,7 @@ export function openSettings(start) {
       ${can('owner') ? `<h4>${esc(T.retentionTitle)}</h4>
       <div class="set-card"><form data-retention class="people-form"><label class="field"><span>${esc(T.retentionDays)}</span><input type="text" inputmode="numeric" name="retention_days" value="${esc(kept.retention_days)}"></label>
         <label class="field"><span>${esc(T.eventHours)}</span><input type="text" inputmode="numeric" name="event_hours" value="${esc(kept.event_hours)}"></label>
+        <label class="field"><span>${esc(T.retentionInbox)}</span><input type="text" inputmode="numeric" name="inbox_days" value="${esc(kept.inbox_days ?? 90)}"></label>
         <button class="btn primary">${esc(T.save)}</button></form><p class="note" data-saved></p></div>
       <h4>${esc(T.exportTitle)}</h4><div class="set-card set-row"><p class="note">${esc(T.exportHint)}</p>
       <a class="btn" href="${esc(inCompany('/api/company/export'))}" download>${esc(T.exportBtn)}</a></div>
@@ -220,7 +242,7 @@ export function openSettings(start) {
         ok()
         const v = Object.fromEntries(new FormData(e.target))
         try {
-          await call(inCompany('/api/company/retention/set'), { retention_days: Number(v.retention_days), event_hours: Number(v.event_hours) })
+          await call(inCompany('/api/company/retention/set'), { retention_days: Number(v.retention_days), event_hours: Number(v.event_hours), inbox_days: Number(v.inbox_days) })
           body.querySelector('[data-saved]').textContent = T.saved
         } catch (err) { fail(err) }
       }

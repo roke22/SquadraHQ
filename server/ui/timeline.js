@@ -5,6 +5,7 @@ import { esc, hhmm } from './format.js'
 import { api } from './api.js'
 import { status } from './content.js'
 import { planMeter } from './team.js'
+import { TEST_RE, COMMIT_RE, PUSH_RE } from './doing.js'
 
 // Beside a session's terminal: what it is doing now, and what mattered so far.
 // Nothing is asked of the model: it is read from what the session already
@@ -13,11 +14,7 @@ import { planMeter } from './team.js'
 
 export const timelines = new Set()
 
-// Commands that say what they did: tests, a commit, a push (a guess from the
-// command line: anything else is left out).
-const TEST_RE = /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test(?::\S+)?\b|\bnpx\s+(?:vitest|jest|playwright\s+test|mocha)\b|\b(?:pytest|vitest|jest|phpunit|rspec)\b|\bgo\s+test\b|\bcargo\s+test\b|\bnode\s+--test\b|\bmake\s+(?:test|check)\b|\bdotnet\s+test\b|\bmvn\s+test\b|\bgradle\w*\s+test\b/
-const COMMIT_RE = /\bgit\s+(?:-C\s+\S+\s+)?commit\b/
-const PUSH_RE = /\bgit\s+(?:-C\s+\S+\s+)?push\b/
+// Commands that say what they did: tests, a commit, a push (doing.js).
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 const firstLine = (s, n = 140) => { const l = String(s ?? '').trim().split('\n')[0]; return l.length > n ? `${l.slice(0, n - 1)}…` : l }
 const commitMsg = cmd => /-m\s+(["'])(.+?)\1/.exec(cmd)?.[2] ?? /-m\s+(\S+)/.exec(cmd)?.[1] ?? ''
@@ -130,7 +127,7 @@ export class Timeline {
     const h = hosts.get(s.host_id)
     const pct = a.context_pct
     const now = `<section class="tl-now"><h2 class="tq-label">${esc(T.tlNow)}</h2>
-      <p class="tl-state"><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span>${esc(st.text)}</span></p>
+      <p class="tl-state"><span class="dot ${st.dot || 'off'}" aria-hidden="true"></span><span${st.title ? ` title="${esc(st.title)}"` : ''}>${esc(st.text)}</span></p>
       ${pct != null ? `<div class="tl-ctx" title="${esc(T.contextPct(pct))}"><span>${esc(T.svContext)}</span><span class="tl-bar"><i style="width:${pct}%"${pct >= 80 ? ' class="hot"' : ''}></i></span><span>${pct} %</span></div>` : ''}
       ${s.role === 'coordinator' && plan?.tasks.length ? `<div class="tl-plan">${planMeter(plan)}<span>${esc(T.planDone(plan.tasks.filter(t => t.state === 'done').length, plan.tasks.length))}</span></div>` : ''}
       ${task ? `<p class="tl-task"><span class="tq-label">${esc(T.tlTask)}</span>${esc(task.title)}</p>` : ''}

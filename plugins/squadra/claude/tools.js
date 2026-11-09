@@ -44,7 +44,11 @@ const ALWAYS_LOAD = { 'anthropic/alwaysLoad': true }
 function planHint() {
   if (S.role !== 'coordinator') return ''
   if (!S.planSent) return '\nThe user follows the work on the team\'s page: once you have split it, send the whole list of tasks with update_plan (each with who has it and its state), and update it as tasks finish.'
-  if (S.lastReportAt > S.planAt) return '\nYour plan is older than the last report you got: bring it up to date with update_plan (the whole list).'
+  // (Once per report: said on every reply, it had plans sent again unchanged.)
+  if (S.lastReportAt > S.planAt && S.planHintFor !== S.lastReportAt) {
+    S.planHintFor = S.lastReportAt
+    return '\nA worker reported after your last update_plan: if that changes a task\'s state, send the whole list again with update_plan. If the plan already shows it, ignore this.'
+  }
   return ''
 }
 
@@ -475,6 +479,8 @@ export async function callTool(name, args) {
         ref: clean(args.ref),
         ...(name === 'ask_user' ? { recommended: clean(args.recommended), options: Array.isArray(args.options) ? args.options.map(clean) : undefined } : {}),
       })
+      // (An open question: the Stop hook doesn't take a mention of it for one asked in the chat.)
+      if (name === 'ask_user') { S.openAsks.add(Number(id)); while (S.openAsks.size > 50) S.openAsks.delete(S.openAsks.values().next().value) }
       return name === 'ask_user'
         ? `It is in the user's inbox (#${id}). They answer when they can: go on with whatever doesn't depend on it. Until they answer, nobody does that part, not even written and left unapplied. If you learn something that changes it, edit_inbox. In your plan (update_plan), that task waits on the user.`
         : `It is in the user's inbox (#${id}).${planHint()}`
@@ -498,6 +504,7 @@ export async function callTool(name, args) {
         ref: clean(args.ref),
         close: clean(args.close),
       })
+      if (r?.closed) S.openAsks.delete(Number(id))
       return r?.closed ? `#${id} is closed.` : `#${id} is updated: the user sees it changed.`
     }
     case 'ping':

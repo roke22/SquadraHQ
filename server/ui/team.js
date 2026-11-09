@@ -6,6 +6,7 @@ import { esc, now } from './format.js'
 import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
+import { permissionsSection } from './permissions.js'
 
 // One team: what it is for, what its workers last reported, who is in it and
 // where each runs, the teams it is linked with, and saving it as a template.
@@ -99,6 +100,7 @@ export function renderTeam() {
       <aside class="tq-aside" aria-label="${esc(T.tqTeam)}">
         <section><h3 class="tq-label">${esc(T.tqWho)}</h3><ul class="tq-members">${who(coord)}${workers.map(w => who(w)).join('')}</ul>${workers.length ? '' : `<p class="tq-quiet">${esc(T.noWorkers)}</p>`}</section>
         <section><h3 class="tq-label">${esc(T.tqLinks)}</h3><p class="tq-small">${linked.length ? esc(T.tqLinkedTo(linked.map(titleOf).join(', '))) : esc(T.tqNoLinks)}</p>${can('manager') ? `<button type="button" class="btn quiet tq-act" data-links="${esc(coord.name)}">${esc(T.tqManageLinks)}</button>` : ''}</section>
+        ${permissionsSection({ coordinator: coord.name })}
         ${can('manager') ? `<section><h3 class="tq-label">${esc(T.tqTemplate)}</h3><p class="tq-small">${esc(T.tqTemplateHint)}</p><button type="button" class="btn tq-act" data-savetpl="${esc(coord.name)}">${esc(T.tqSaveTemplate)}</button></section>` : ''}
       </aside>
     </div>`)

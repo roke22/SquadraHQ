@@ -83,28 +83,35 @@
 .head h1 { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.01em; }
 .head-sub { min-width: 0; flex-shrink: 10; color: var(--muted); font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .head-actions { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-sm); }
-.head-menu { display: none; margin-left: -6px; }
-.head-menu .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+/* Back, where the user came from: named on a wide screen, an arrow on a phone. */
+.head-back { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 220px; height: 32px; margin-left: -8px; padding: 0 10px 0 4px; border: 0; border-radius: var(--r-md); background: none; color: var(--muted); font: inherit; font-size: var(--fs-md); cursor: pointer; transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
+.head-back[hidden] { display: none; }
+.head-back:hover { background: var(--panel-2); color: var(--text); }
+.head-back .ic { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.head-back-to { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.head-conn { display: none; }
 
-/* --- narrow screens: the sidebar slides in over the view ------------------- */
-.rail-scrim { position: fixed; inset: 0; z-index: 49; background: var(--scrim); animation: ds-fade var(--t) var(--ease); }
+/* --- narrow screens: no sidebar, the bar at the bottom instead ------------- */
+@media (min-width: 901px) {
+  .head-back.narrow-only { display: none; }
+}
 @media (max-width: 900px) {
   #app { grid-template-columns: minmax(0, 1fr); }
-  .rail { position: fixed; inset: 0 auto 0 0; z-index: 50; width: min(var(--rail-w), 86vw); transform: translateX(-100%); visibility: hidden; transition: transform var(--t-slow) var(--ease), visibility 0s linear var(--t-slow); box-shadow: var(--shadow-pop); }
-  .rail.open { transform: none; visibility: visible; transition: transform var(--t-slow) var(--ease); }
+  .rail { display: none; }
   .head { padding: 8px 12px; }
-  .head-menu { display: inline-grid; width: 36px; height: 36px; }
-  .rail-item, .rail-search, .rail-co select, .rail-settings { min-height: 40px; }
-  .rail-fold { height: 36px; width: 28px; }
+  .head-back { width: 40px; height: 40px; margin: 0 -8px 0 -10px; padding: 0; justify-content: center; color: var(--text); }
+  .head-back .ic { width: 22px; height: 22px; }
+  .head-back-to { display: none; }
+  .head-conn:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-sm); }
 }
 .head-tabs:empty { display: none; }
 .rail-search .ic { width: 14px; height: 14px; stroke-width: 2; }
 
-/* A phone: the places at the bottom (the sidebar still slides in for the teams). */
+/* A phone: the places at the bottom. */
 .tabbar { display: none; }
 @media (max-width: 900px) {
   #main { padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
-  .tabbar { position: fixed; inset: auto 0 0 0; z-index: 40; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); }
+  .tabbar { position: fixed; inset: auto 0 0 0; z-index: 40; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); }
   .tabbar > * { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 58px; padding: 6px 4px; border: 0; border-radius: 0; background: none; color: var(--muted); font-size: var(--fs-xs); text-decoration: none; }
   .tabbar > .on { color: var(--text); font-weight: 600; background: none; }
   .tabbar .ic { width: 20px; height: 20px; }
