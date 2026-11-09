@@ -19,6 +19,25 @@ const MAX_ANSWER = 2000
 // Lines that start "1) …", "2. …": a list. Without options, a question like
 // that is several decisions in one, or one whose choices aren't in options.
 const NUMBERED_RE = /^\s*\d{1,2}\s*[.)]\s+\S/gm
+// Where each item of a list starts: "1." or "1)" at the start of a line, or
+// "1)" after a space when it is written on one line ("… 1) ¿x? 2) ¿y?").
+// (Not "1." mid-line: "at 19:30. Is that ok?" is no list.)
+const ITEM_START_RE = /(?:^[ \t]*\d{1,2}[ \t]*[.)]|(?<=\s)\d{1,2}\))[ \t]+(?=\S)/gm
+// How many items of a list ask something of their own: two or more are two
+// or more decisions, whatever options they come with.
+function askingItems(text) {
+  const starts = [...text.matchAll(ITEM_START_RE)]
+  if (starts.length < 2) return 0
+  return starts.filter((m, i) => text.slice(m.index, starts[i + 1]?.index ?? text.length).includes('?')).length
+}
+// The option a recommendation names: its number, or its words (followed, if
+// it wants, by why: "Keep the column: nothing is lost"). -1: none of them.
+export function recommendedIndex(options, recommended) {
+  const r = String(recommended ?? '').trim().toLowerCase()
+  if (!r || !options.length) return -1
+  if (/^\d{1,2}$/.test(r)) return Number(r) >= 1 && Number(r) <= options.length ? Number(r) - 1 : -1
+  return options.findIndex(o => { const t = o.trim().toLowerCase(); return r === t || (r.startsWith(t) && /^[\s:.,;—–-]/.test(r.slice(t.length))) })
+}
 
 export function createInbox(platform, { sessions }) {
   const { db, broadcast, allow, rateLimit, spendStorage, ensureRoom, quota, inTx } = platform
@@ -101,7 +120,17 @@ export function createInbox(platform, { sessions }) {
     if (kind === 'ask' && !options.length && numbered >= 2) {
       throw bad(`NOT SAVED: this reads like ${numbered} decisions in one (a numbered list). Ask once per decision, each with its own options and recommended, so the user can answer each on its own; put two together only when the answer to one changes the other. If they are the choices of a single decision, put them in options.`)
     }
-    const recommended = kind === 'ask' ? short(p.recommended, MAX_OPTION, 'recommended') || null : null
+    const asking = askingItems(text)
+    if (kind === 'ask' && asking >= 2) {
+      throw bad(`NOT SAVED: this asks ${asking} things in one (a numbered list of questions). Call ask_user once per decision, each with its own options and recommended, so the user can answer each on its own; put two together only when the answer to one changes the other.`)
+    }
+    let recommended = kind === 'ask' ? short(p.recommended, MAX_OPTION, 'recommended') || null : null
+    if (recommended && options.length) {
+      const n = recommendedIndex(options, recommended)
+      if (n < 0) throw bad('NOT SAVED: recommended must name one of the options: its exact words (or its number), followed, if you want, by ": why". Put any other advice in the text.')
+      // (Its number, written as the option itself: what the user reads.)
+      if (/^\d{1,2}$/.test(recommended.trim())) recommended = options[n]
+    }
     const ref = short(p.ref, MAX_REF, 'ref') || null
     return { text, options, recommended, ref }
   }
@@ -183,14 +212,15 @@ export function createInbox(platform, { sessions }) {
     return { id, session: row.session, text: row.text }
   }
 
-  // The user answers a question from the dashboard, as they read it: if its
+  // The user answers a question from the dashboard, or replies to something
+  // they were told ("update the branches with main"), as they read it: if its
   // coordinator changed it since, they read it again first. Taken before it is
   // typed in the coordinator's terminal (nothing changes it meanwhile), and
   // given back if that fails.
   function takeAnswer(p, by) {
     const id = Number(p.id)
     const row = Number.isSafeInteger(id) ? db.prepare('SELECT * FROM inbox WHERE id = ?').get(id) : null
-    if (!row || row.kind !== 'ask') throw bad('no question with that id')
+    if (!row) throw bad('nothing in the inbox with that id')
     if (row.resolved_at) throw new ApiError(409, 'Conflict: it is no longer open', { parameters: { reason: 'closed' } })
     if (!ownedNow(row)) { closeOrphans(row.session); throw new ApiError(409, `Conflict: ${GONE}: it was closed`, { parameters: { reason: 'closed' } }) }
     if (Number(p.version) !== row.version) throw new ApiError(409, 'Conflict: its coordinator changed it after you read it: read it again before answering', { parameters: { reason: 'changed', version: row.version } })
@@ -200,7 +230,7 @@ export function createInbox(platform, { sessions }) {
       throw new ApiError(409, 'Conflict: it changed while answering: read it again', { parameters: { reason: 'changed' } })
     }
     broadcast('inbox', list())
-    return { id, session: row.session, text: row.text, answer }
+    return { id, kind: row.kind, session: row.session, text: row.text, answer }
   }
   function giveBack(id) {
     db.prepare('UPDATE inbox SET resolved_at = NULL, answer = NULL, answered_by = NULL WHERE id = ?').run(id)

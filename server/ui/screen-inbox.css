@@ -87,6 +87,8 @@ details.ibx-group > summary:hover { color: var(--text); }
 .ibx-opt:hover { background: var(--raised); border-color: var(--muted); }
 .ibx-opt:active { transform: scale(.995); }
 .ibx-opt.rec { border-color: var(--ok); }
+.ibx-opt[aria-pressed="true"] { border-color: var(--info); background: color-mix(in srgb, var(--info) 12%, var(--panel)); box-shadow: inset 0 0 0 1px var(--info); }
+.ibx-opt[aria-pressed="true"] kbd { border-color: var(--info); color: var(--info); }
 .ibx-opt span:not(.tag) { flex: 1; }
 .ibx-opt .tag { color: var(--ok); border-color: currentColor; }
 .ibx-optlist { margin: 0 0 16px; padding-left: 20px; }

@@ -60,7 +60,7 @@ export function saveTemplateDialog(coord) {
     try {
       await postJson('/api/templates/save', { name: input.value.trim(), host: sessions.get(coord)?.host_id ?? null, coordinator, workers: workers.filter(w => w.folder) })
       d.close()
-      alertBox(T.templateSaved(input.value.trim()))
+      alertBox(T.templateSaved(input.value.trim()), T.templateSavedTitle)
     } catch (e) { err.textContent = e.message }
   })
 }

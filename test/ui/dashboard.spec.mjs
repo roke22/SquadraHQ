@@ -259,10 +259,33 @@ test('a new team: one page, and it opens its coordinator and workers on the mach
   await form.locator('[data-name="1"]').fill('pay-api')
   await form.locator('[data-remove="1"]').click()
   await expect(form.locator('.nt-member')).toHaveCount(2)
+  // A subfolder lists its own personas once it is typed, with nothing else changed.
+  await expect(form.locator('[data-persona="0"] option')).toHaveCount(1)
+  await form.locator('[name=sub]').fill('payments')
+  await form.locator('[name=sub]').blur()
+  await form.locator('[data-persona="0"]').selectOption('skill:project:payments-lead')
   await form.locator('[data-launch]').click()
   await expect(page).toHaveURL(/#\/q\/coord-payments$/)
   expect([...machine.identities.keys()]).toEqual(expect.arrayContaining(['coord-payments', 'pay-api']))
+  expect(machine.opened.find(s => s.name === 'coord-payments')).toMatchObject({ folder: '/srv/squad/payments', persona: 'skill:project:payments-lead' })
   await expect(page.locator('#topTitle')).toHaveText('Payments')
+  // Before they first log in, they are shown as what they were opened as, in their team.
+  await expect(page.locator('#team .tq-members li').first().locator('.role')).toHaveClass(/coord/)
+  await expect(page.locator('#team .tq-members')).toContainText('pay-api')
+  await expect(page.locator('#nav .rail-sess.coord', { hasText: 'coord-payments' })).toBeVisible()
+})
+
+test('a team saved as a template: it says so, not that something failed', async ({ page }) => {
+  await signIn(page, '#/q/coord-payments')
+  await page.locator('[data-savetpl="coord-payments"]').click()
+  await page.locator('.modal [name=tname]').fill('payments-team')
+  await page.locator('.modal [data-ok]').click()
+  await expect(page.locator('.modal h3')).toHaveText('Template saved')
+  await expect(page.locator('.modal p')).toContainText('payments-team')
+  // Only to read: one button, that closes it.
+  await expect(page.locator('.modal .actions .btn')).toHaveCount(1)
+  await page.locator('.modal [data-ok]').click()
+  await expect(page.locator('.modal')).toHaveCount(0)
 })
 
 test('the sessions: they are listed with their squad', async ({ page }) => {
@@ -272,16 +295,19 @@ test('the sessions: they are listed with their squad', async ({ page }) => {
   await page.goto(`${server.url}/?company=default#/teams`)
   const team = page.locator('#teams .tm-card').filter({ hasText: 'coord' }).first()
   await expect(team.locator('.tm-person').first()).toContainText('coord')
-  await expect(team.locator('.tm-person.sub')).toContainText('worker1')
+  await expect(team.locator('.tm-person.sub', { hasText: 'worker1' })).toHaveCount(1)
   await expect(page.locator('#topTabs a[aria-current=page]')).toHaveText('List')
   // The plan its coordinator keeps: how far it is on its card, each task on its page.
-  await coord.call('setPlan', { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'done', who: 'worker1' }, { title: 'Drop the old column', state: 'waiting', ref: 'GH-6' }] })
+  await coord.call('setPlan', { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'done', who: 'worker1' }, { title: 'Drop the old column', state: 'waiting', ref: 'GH-6', who: 'coord' }] })
   await expect(team.locator('.tm-foot')).toContainText('Ship the cart')
   await expect(team.locator('.tm-foot')).toContainText('1 of 2')
   await page.goto(`${server.url}/?company=default#/q/coord`)
   const plan = page.locator('#team .pl-table')
   await expect(plan.locator('tr').nth(1)).toContainText('Round the total')
   await expect(plan.locator('tr').nth(2)).toContainText('Waits on you')
+  // Who has each task, with the icon of what they are.
+  await expect(plan.locator('tr').nth(1).locator('.pl-who .role')).toHaveClass(/worker/)
+  await expect(plan.locator('tr').nth(2).locator('.pl-who .role')).toHaveClass(/coord/)
   await expect(page.locator('#team .pl-meter')).toHaveAttribute('aria-label', '1 of 2 done, 0 in progress, 0 blocked, 1 waiting on you')
   await coord.call('setPlan', { tasks: [] })
   await page.goto(`${server.url}/#/c`)
@@ -344,16 +370,24 @@ test('the inbox: what a coordinator left is there, with what it wrote kept as te
 test('the inbox: a question opened from the dashboard is answered there, and one changed meanwhile is read again first', async ({ page }) => {
   await server.call('api/terminals/open', { host: machine.id, spec: { name: 'inboxm', role: 'coordinator' } })
   const c = await startSession(server, 'inboxm', 'coordinator', undefined, machine.identities.get('inboxm'))
-  const { id } = await c.call('askUser', { text: 'Stack the discounts?', options: ['Stack', 'Biggest'], recommended: 'Stack' })
+  const { id } = await c.call('askUser', { text: 'Stack the discounts?', options: ['Stack', 'Biggest'], recommended: 'Stack: customers expect it' })
   const { id: id2 } = await c.call('askUser', { text: 'Drop the column?', options: ['Drop', 'Keep'] })
   const { id: id3 } = await c.call('askUser', { text: 'Which name for the release?', options: ['1.3.0', '2.0.0'] })
   await signIn(page, `#/inbox/i${id}`)
   const detail = page.locator('.ibx-detail')
   await expect(page.locator('#topSub')).toContainText('3 waiting on you')
-  // The recommended option is marked; an option goes with the detail typed below.
+  // The recommended option is marked. Picking one only marks it: nothing is sent
+  // until Send, with the detail typed before or after it.
   await expect(detail.locator('[data-option="0"]')).toHaveClass(/rec/)
-  await detail.locator('textarea[name=answer]').fill('cap it at 25 %')
+  await expect(detail.locator('.ibx-rec')).toHaveText(/Customers expect it/)
+  await detail.locator('[data-option="1"]').click()
+  await expect(detail.locator('[data-option="1"]')).toHaveAttribute('aria-pressed', 'true')
   await detail.locator('[data-option="0"]').click()
+  await expect(detail.locator('[data-option="0"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(detail.locator('[data-option="1"]')).toHaveAttribute('aria-pressed', 'false')
+  await detail.locator('textarea[name=answer]').fill('cap it at 25 %')
+  expect(machine.answers.some(a => a.text.includes(`#${id} `))).toBe(false)
+  await detail.locator('button.primary').click()
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id} ("Stack the discounts?"), the user answers from their inbox: Stack. cap it at 25 %`)
   // Then the next that waits; what was answered is in Done.
   await expect(page).toHaveURL(new RegExp(`#/inbox/i(${id2}|${id3})$`))
@@ -362,10 +396,13 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await expect(page).toHaveURL(new RegExp(`#/inbox/done/i${id}$`))
   await expect(detail).toContainText('answered: Stack. cap it at 25 %')
   await page.locator('#topTabs [data-ibxtab=pending]').click()
-  // A key picks an option: 2 is the second.
+  // A key picks an option (2 is the second), and Ctrl+Enter sends it.
   await page.locator(`[data-key="i${id3}"]`).click()
   await expect(detail).toContainText('Which name for the release?')
   await page.keyboard.press('2')
+  await expect(detail.locator('[data-option="1"]')).toHaveAttribute('aria-pressed', 'true')
+  await detail.locator('[data-option="1"]').focus()
+  await page.keyboard.press('Control+Enter')
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id3} ("Which name for the release?"), the user answers from their inbox: 2.0.0`)
   // Changed by its coordinator while open here: refused once, and it says so.
   page.expectedErrors = [/status of 409/]
@@ -384,6 +421,20 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await detail.locator('button.primary').click()
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id2} ("Drop the column? It holds data in all 1240 rows"), the user answers from their inbox: Keep it`)
   await expect(page.locator('#inbox')).toContainText('Nothing is waiting for you')
+  // Something it was told is replied to as well, with what it said; Done still closes it without a reply.
+  const { id: t1 } = await c.call('tellUser', { text: 'The branches are behind main by 12 commits' })
+  const { id: t2 } = await c.call('tellUser', { text: 'The release notes are ready' })
+  await page.locator(`[data-key="i${t1}"]`).click()
+  await detail.locator('textarea[name=answer]').fill('Update them with main')
+  await detail.locator('button.primary').click()
+  await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${t1} ("The branches are behind main by 12 commits"), you told the user this, and they reply from their inbox: Update them with main`)
+  await expect(page).toHaveURL(new RegExp(`#/inbox/i${t2}$`))
+  await detail.locator(`[data-resolve="${t2}"]`).click()
+  expect(machine.answers.some(a => a.text.includes(`#${t2} `))).toBe(false)
+  await expect(page.locator('#inbox')).toContainText('Nothing is waiting for you')
+  await page.locator('#topTabs [data-ibxtab=done]').click()
+  await page.locator(`[data-key="i${t1}"]`).click()
+  await expect(detail).toContainText('answered: Update them with main')
 })
 
 test('the inbox: pending and done apart; done a page at a time, by words or team; what arrives shows by itself', async ({ page }) => {

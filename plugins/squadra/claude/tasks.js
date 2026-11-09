@@ -53,17 +53,36 @@ const BACKGROUND_NOTICE_MS = Number(process.env.SQUADRA_BACKGROUND_NOTICE_MS) ||
 // A coordinator ending its turn asking the user for something in this chat,
 // which they don't read: once per turn, a reminder to use the inbox. (A guess
 // from its last words; only ever a reminder.)
-const ASKS_USER_RE = /necesito que (?:decidas|confirmes|me digas|hagas)|queda(?:n)? pendientes? (?:para ti|de ti|de una persona)|pendientes? para ti|decide[sn]? t[uú]|tu (?:ok|confirmaci[oó]n|decisi[oó]n|aprobaci[oó]n)|dime (?:qu[eé]|si)|¿(?:quieres|prefieres|apruebas|hago|subo|lo hago|seguimos|procedo)|need you to (?:decide|confirm)|your (?:call|decision|approval|ok)|do you want me to|should i (?:go ahead|proceed|deploy|apply)|let me know (?:if|whether|which)/i
+const ASKS_USER_RE = /necesito que (?:me )?(?:decidas|confirmes|digas|hagas|apruebes)|confirm(?:es|a) o decid|decid(?:e|es|as|an)\s+t[uú]|queda(?:n)? pendientes? (?:para ti|de ti|de una persona)|pendientes? para ti|decide[sn]? t[uú]|tu (?:ok|confirmaci[oó]n|decisi[oó]n|aprobaci[oó]n)|dime (?:qu[eé]|si)|¿(?:quieres|prefieres|apruebas|hago|subo|lo hago|seguimos|procedo)|need you to (?:decide|confirm)|your (?:call|decision|approval|ok)|do you want me to|should i (?:go ahead|proceed|deploy|apply)|let me know (?:if|whether|which)/i
 // Words that point at the inbox: what it says is already there, not asked here.
 const MENTIONS_INBOX_RE = /\binbox\b|\bbandeja\b|\bbuz[oó]n\b/i
 function chatAskHint(s, lastText) {
   if (S !== s || s.role !== 'coordinator' || s.inboxThisTurn || s.chatAskHinted) return ''
   // (With a question of its own still open in the inbox, "your decision" is most likely that one.)
-  if (s.openAsks?.size || MENTIONS_INBOX_RE.test(String(lastText ?? ''))) return ''
+  if (s.openAsks?.size) return ''
+  // Its plan says a task waits on the user, and nothing is asked in their inbox.
+  if (s.planWaiting) {
+    s.chatAskHinted = true
+    return `[Squadra] Before you finish: your plan has ${s.planWaiting === 1 ? 'a task' : `${s.planWaiting} tasks`} waiting on the user, but no open question in their inbox, and they read their inbox, not this conversation. Ask each decision with its own ask_user (with its options and the one you recommend), then end your turn. If they already answered, update the plan instead (help("inbox")).`
+  }
+  // (Before any order, "tell me what you want" is it being ready, not a decision:
+  // nothing to put in the user's inbox.)
+  if (!s.ordered) return ''
+  if (MENTIONS_INBOX_RE.test(String(lastText ?? ''))) return ''
   const hit = ASKS_USER_RE.exec(String(lastText ?? ''))
   if (!hit) return ''
   s.chatAskHinted = true
   return `[Squadra] Before you finish: you are asking the user for something here ("${hit[0]}"), but they read their inbox, not this conversation. Put each decision that is theirs in its own ask_user (with its options and what you recommend), and what they should know or do in tell_user, then end your turn (help("inbox")).`
+}
+
+// A coordinator's first order: something typed in its terminal (by the user,
+// or their answer from the inbox) or a request from a linked coordinator. Its
+// workers' messages and the server's notices are not one.
+const CHANNEL_BLOCK_RE = /<channel\b[^>]*>[\s\S]*?<\/channel>/g
+export function orderSeen(s, prompt) {
+  if (s.role !== 'coordinator' || s.ordered) return
+  const text = String(prompt ?? '')
+  if (text.replace(CHANNEL_BLOCK_RE, '').trim() || /<channel\b[^>]*\blinked="true"/.test(text)) s.ordered = true
 }
 
 // The user's answer from the inbox is typed in as a prompt ("Inbox #12 (…), the

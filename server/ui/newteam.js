@@ -190,6 +190,8 @@ $('newteam').addEventListener('change', e => {
   const t = e.target
   if (t.name === 'host') { draft.host = t.value; draft.folder = hosts.get(t.value)?.info?.folders?.[0] ?? '' }
   else if (t.name === 'folder') draft.folder = t.value
+  // (Typing only keeps it; leaving the field lists the personas of the folder it names.)
+  else if (t.name === 'sub') draft.sub = t.value
   else if (t.name === 'profile') { draft.profile = t.value; $('newteam').querySelector('[data-profile-say]').textContent = profileSummary(profileById(t.value)); return }
   else if (t.dataset.persona != null) { const i = Number(t.dataset.persona); if (i === 0) draft.coord.persona = t.value; else draft.workers[i - 1].persona = t.value; return }
   else if (t.dataset.agent != null) { const i = Number(t.dataset.agent); (i === 0 ? draft.coord : draft.workers[i - 1]).agent = t.value; return }

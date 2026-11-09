@@ -64,6 +64,7 @@ const TOPICS = {
       'THE USER\'S INBOX (coordinator).',
       'The user is usually away and doesn\'t read this conversation: they read their inbox, on the dashboard or a phone.',
       'ask_user: a decision that is theirs (see help("decisions")). tell_user: something they will want to know when they are back and that needs no answer: a piece of work finished, its outcome, a problem they should see. Not routine progress.',
+      'The user may reply to what you told them ("update the branches with main"): it reaches you typed as "Inbox #<id> (...), you told the user this, and they reply from their inbox: ...". That reply is the user\'s order: act on it like one given here.',
       'edit_inbox: change an open entry as soon as it changes (they see it was updated, and an answer to the old version is refused until they read it again), or close it with why it no longer applies.',
       'Never poll or loop waiting for an answer: it reaches you on its own.',
     ].join('\n'),

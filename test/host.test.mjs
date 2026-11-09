@@ -900,6 +900,20 @@ test('an answer from the inbox is typed in its coordinator\'s terminal, as the u
   assert.deepEqual([!!item.resolved_at, item.answer, item.answered_by], [true, 'Stack, with a 25 % cap\nand tell support', 'server token'])
   // Answered already: not again.
   assert.equal((await dash('inbox/answer', { id, version: 1, answer: 'Biggest' })).parameters?.reason, 'closed')
+  // Something it told the user is replied to the same way, with what it said,
+  // and the reply is the user's next order.
+  const long = `The branches feat-cart and feat-stock are behind main by 12 commits; ${'the merge will need care. '.repeat(4).trim()}`
+  const told = (await C('tellUser', { text: long })).result.id
+  const rt = await dash('inbox/answer', { id: told, version: 1, answer: 'Update them with main' })
+  assert.ok(rt.ok, rt.description)
+  await waitFor(() => screen('ia1').includes(`GOT:Inbox #${told} ("${long.replace(/\s+/g, ' ')}"), you told the user this, and they reply from their inbox: Update them with main`), { what: 'the reply typed, with the whole note' })
+  const note = (await dash('inbox')).result.find(i => i.id === told)
+  assert.deepEqual([!!note.resolved_at, note.answer], [true, 'Update them with main'])
+  // What it quotes gives way to what the user wrote: always one line a machine types.
+  const told2 = (await C('tellUser', { text: 'x'.repeat(1900) })).result.id
+  const rt2 = await dash('inbox/answer', { id: told2, version: 1, answer: 'y'.repeat(1900) })
+  assert.ok(rt2.ok, rt2.description)
+  await waitFor(() => screen('ia1').includes(`, you told the user this, and they reply from their inbox: ${'y'.repeat(40)}`), { what: 'a long reply typed' })
   // Dismissed without an answer: closed, and its coordinator told not to wait.
   const id0 = await ask('Rename the release?')
   const d = await dash('inbox/dismiss', { id: id0 })
