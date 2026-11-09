@@ -11,6 +11,7 @@ import { terminalOf, hostLine, hostAction } from './machines.js'
 import { reopenable, reopen, addWorkerTo, saveTemplateDialog } from './squads.js'
 import { orgSquads, orgZoom, linksDialog } from './org.js'
 import { renderBack } from './back.js'
+import { voiceButton } from './voice.js'
 
 // The terminal a session view shows (null: its chat).
 // (An observer has no terminals: its chat instead.)
@@ -57,7 +58,8 @@ function renderHead() {
   if (r.view === 'inbox') {
     // (Its subtitle, how many wait on you, is the inbox's own: see renderInbox.)
     setHtml($('topTitle'), esc(T.inbox))
-    setHtml($('topRight'), '')
+    // (Hands-free: what waits on you, read aloud and answered by voice.)
+    setHtml($('topRight'), voiceButton())
     return
   }
   if (r.view === 'teams') {

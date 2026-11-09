@@ -58,7 +58,7 @@ const drafts = new Map()
 const picks = new Map()
 
 // Why an answer can't be typed in the coordinator's terminal from here (null: it can).
-function cantAnswer(i) {
+export function cantAnswer(i) {
   const h = hosts.get(sessions.get(i.session)?.host_id)
   if (!h?.online) return T.inboxNoMachine
   if (!h.info?.answers) return T.inboxOldMachine

@@ -437,6 +437,121 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await expect(detail).toContainText('answered: Update them with main')
 })
 
+test('the inbox read aloud: each decision with its options, answered by voice and sent only on a yes; a note replied to', async ({ page }) => {
+  // The browser's speech, played by the test: what it says is kept, what is "heard" is queued.
+  await page.addInitScript(() => {
+    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    window.__said = []
+    window.__heard = []
+    window.SpeechRecognition = class {
+      start() { setTimeout(() => { const t = window.__heard.shift(); if (t != null) this.onresult?.({ results: [[{ transcript: t }]] }); this.onend?.() }, 20) }
+      abort() {}
+    }
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text } }
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak(u) { window.__said.push(u.text); setTimeout(() => u.onend?.(), 5) }, cancel() {}, getVoices: () => [] } })
+  })
+  await server.call('api/terminals/open', { host: machine.id, spec: { name: 'voicec', role: 'coordinator' } })
+  const c = await startSession(server, 'voicec', 'coordinator', undefined, machine.identities.get('voicec'))
+  await signIn(page, '#/inbox')
+  // Only this test's entries in the inbox.
+  await page.evaluate(async () => {
+    const open = (await fetch('/api/c/default/inbox').then(r => r.json())).result.filter(i => !i.resolved_at)
+    for (const i of open) await fetch('/api/c/default/inbox/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: i.id }) })
+  })
+  const { id } = await c.call('askUser', { text: 'Ship on **Friday**?', options: ['Yes', 'No'], recommended: 'No: QA first' })
+  const { id: note } = await c.call('tellUser', { text: 'The branches are behind main' })
+  await expect(page.locator('#inbox')).toContainText('Ship on')
+  // A "no" to what it understood: asked again. Then the second option with a detail, and a yes.
+  await page.evaluate(() => window.__heard.push('one', 'no', 'la dos, y avisa a QA', 'sí', 'Update them with main', 'yes'))
+  await page.locator('#topRight [data-voice]').click()
+  await expect(page.locator('#voiceBar')).toBeVisible()
+  await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id} ("Ship on **Friday**?"), the user answers from their inbox: No. avisa a QA`)
+  await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${note} ("The branches are behind main"), you told the user this, and they reply from their inbox: Update them with main`)
+  // Only once each: the "one" that got a "no" was never sent.
+  expect(machine.answers.filter(a => a.text.includes(`Inbox #${id} `)).length).toBe(1)
+  const said = await page.evaluate(() => window.__said.join('\n'))
+  expect(said).toContain('You have 1 decision and 1 note.')
+  expect(said).toContain('A decision from voicec. Ship on Friday? Option 1: Yes. Option 2: No. It recommends 2.')
+  expect(said).toContain('Option 1, Yes. Shall I send it?')
+  expect(said).toContain('Option 2, No, and: avisa a QA. Shall I send it?')
+  expect(said).toContain('Your answer: Update them with main. Shall I send it?')
+  expect(said).toContain('A note from voicec. The branches are behind main. Say "done", "next", or reply to it.')
+  // Nothing left: it says so, and the bar goes.
+  await expect(page.locator('#voiceBar')).toHaveCount(0)
+  expect(await page.evaluate(() => window.__said.at(-1))).toBe('Nothing left.')
+})
+
+test('the inbox read aloud: "stop" ends it, also while it asks whether to send, and nothing is sent', async ({ page }) => {
+  await page.addInitScript(() => {
+    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    window.__said = []
+    window.__heard = ['la uno', 'para']
+    window.SpeechRecognition = class {
+      start() { setTimeout(() => { const t = window.__heard.shift(); if (t != null) this.onresult?.({ results: [[{ transcript: t }]] }); this.onend?.() }, 20) }
+      abort() {}
+    }
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text } }
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak(u) { window.__said.push(u.text); setTimeout(() => u.onend?.(), 5) }, cancel() {}, getVoices: () => [] } })
+  })
+  await signIn(page, '#/inbox')
+  const c = await startSession(server, 'voicec', 'coordinator', undefined, machine.identities.get('voicec'))
+  const { id } = await c.call('askUser', { text: 'Rename the release?', options: ['Yes', 'No'] })
+  await expect(page.locator('#inbox')).toContainText('Rename the release?')
+  await page.locator('#topRight [data-voice]').click()
+  await expect.poll(() => page.evaluate(() => window.__said.join('\n'))).toContain('Option 1, Yes. Shall I send it?')
+  await expect(page.locator('#voiceBar')).toHaveCount(0)
+  await expect(page.locator('#topRight [data-voice]')).toHaveAttribute('aria-pressed', 'false')
+  expect(machine.answers.some(a => a.text.includes(`Inbox #${id} `))).toBe(false)
+})
+
+test('the inbox read aloud: its speed changes with a tap on the card, at once, and is remembered', async ({ page }) => {
+  // A voice that keeps talking until it is cut short, as a long question would.
+  await page.addInitScript(() => {
+    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    window.__said = []
+    window.SpeechRecognition = class { start() { setTimeout(() => this.onend?.(), 20) } abort() {} }
+    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text } }
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: {
+      speak(u) { window.__said.push({ text: u.text, rate: u.rate }); window.__u = u; setTimeout(() => u.onboundary?.({ charIndex: 40 }), 5) },
+      cancel() { const u = window.__u; window.__u = null; setTimeout(() => u?.onend?.(), 0) },
+      getVoices: () => [],
+    } })
+  })
+  await signIn(page, '#/inbox')
+  await page.evaluate(async () => {
+    const open = (await fetch('/api/c/default/inbox').then(r => r.json())).result.filter(i => !i.resolved_at)
+    for (const i of open) await fetch('/api/c/default/inbox/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: i.id }) })
+  })
+  const c = await startSession(server, 'voicec', 'coordinator', undefined, machine.identities.get('voicec'))
+  await c.call('askUser', { text: 'Move the launch to Tuesday? The videos are not ready. And the posts wait for them.', options: ['Yes', 'No'] })
+  await expect(page.locator('#inbox')).toContainText('Move the launch')
+  await page.locator('#topRight [data-voice]').click()
+  const speed = page.locator('#voiceBar [data-voicespeed]')
+  await expect(speed).toHaveText('Normal')
+  await expect(speed).toHaveAttribute('aria-label', 'Reading speed: Normal. Tap to change it')
+  // At once: what it was saying is said again, from the sentence it was in, faster.
+  // (A tap on the card cuts the welcome short: then it reads the question.)
+  await page.locator('#voiceBar [data-voicecut]').click()
+  await expect(page.locator('#voiceBar .voice-text')).toContainText('Move the launch')
+  const before = await page.evaluate(() => window.__said.length)
+  await speed.click()
+  await expect(speed).toHaveText('Fast')
+  await expect.poll(() => page.evaluate(() => window.__said.at(-1)?.rate)).toBe(1.1)
+  expect(await page.evaluate(() => window.__said.length)).toBe(before + 1)
+  expect(await page.evaluate(() => window.__said.at(-1).text)).toMatch(/^Move the launch to Tuesday\? The videos are not ready\./)
+  await speed.click()
+  await expect(speed).toHaveText('Faster')
+  await speed.click()
+  await expect(speed).toHaveText('Normal')
+  await speed.click()
+  await expect(speed).toHaveText('Fast')
+  await page.locator('#voiceBar [data-voicestop]').click()
+  await expect(page.locator('#voiceBar')).toHaveCount(0)
+  // Remembered here, for the next time.
+  expect(await page.evaluate(() => localStorage.getItem('squadra.voice-rate'))).toBe('1.1')
+  await page.evaluate(() => localStorage.removeItem('squadra.voice-rate'))
+})
+
 test('the inbox: pending and done apart; done a page at a time, by words or team; what arrives shows by itself', async ({ page }) => {
   const a = await startSession(server, 'pagea', 'coordinator')
   const b = await startSession(server, 'pageb', 'coordinator')
