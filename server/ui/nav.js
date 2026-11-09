@@ -64,7 +64,7 @@ function sessionRow(s, r) {
   const a = attention(s)
   const on = r.view === 'session' && r.name === s.name
   const say = [T.roleName[s.role] ?? T.roleName.worker, s.name, st.text, a.say].filter(Boolean).join(' · ')
-  return `<a href="#/s/${encodeURIComponent(s.name)}" class="rail-item rail-sess ${role}${on ? ' on' : ''}${s.online ? '' : ' offline'}"${on ? ' aria-current="page"' : ''} title="${esc(st.text)}" aria-label="${esc(say)}">`
+  return `<a href="#/s/${encodeURIComponent(s.name)}" class="rail-item rail-sess ${role}${on ? ' on' : ''}${s.online ? '' : ' offline'}"${on ? ' aria-current="page"' : ''} title="${esc(st.title ? `${st.text}\n${st.title}` : st.text)}" aria-label="${esc(say)}">`
     + `<span class="role ${role}" aria-hidden="true"></span>${agentMark(s)}<span class="name">${esc(s.name)}</span>${a.html}<span class="dot ${st.dot || 'off'}" aria-hidden="true"></span></a>`
 }
 
@@ -109,26 +109,18 @@ export function renderNav() {
   const archivedCount = sortedSessions({ archived: true }).length
   if (archivedCount || r.view === 'archived') html += `<div class="rail-group"><a href="#/archived"${here(r.view === 'archived')}>${icon('archive')}<span class="name">${esc(T.archived)}</span><span class="rail-count">${archivedCount}</span></a></div>`
   setHtml($('nav'), html)
-  // On a phone, the three places and Ctrl+K at the bottom, within the thumb's reach.
+  // On a phone, the three places, Ctrl+K and the settings at the bottom, within
+  // the thumb's reach. (There is no sidebar there: all it has is reached from these.)
   setHtml($('tabbar'), `<a href="#/"${here(r.view === 'inbox')}>${icon('inbox')}<span>${esc(T.inbox)}</span>${inboxN ? `<span class="badge">${inboxN}</span>` : ''}</a>
     <a href="#/teams"${here(isTeams(r) || r.view === 'session')}>${icon('teams')}<span>${esc(T.teams)}</span></a>
     <a href="#/hosts"${here(isMachines(r))}>${icon('machines')}<span>${esc(T.machines)}</span></a>
-    <button type="button" class="rail-item" data-palette>${icon('search')}<span>${esc(T.goToShort)}</span></button>`)
+    <button type="button" class="rail-item" data-palette>${icon('search')}<span>${esc(T.goToShort)}</span></button>
+    <button type="button" class="rail-item" data-settings aria-haspopup="dialog">${icon('settings')}<span>${esc(T.settings)}</span></button>`)
 }
-$('tabbar').addEventListener('click', async e => { if (e.target.closest('[data-palette]')) (await import('./palette.js')).openPalette() })
-
-// --- the drawer on narrow screens -----------------------------------------------
-export function openRail(open) {
-  $('rail').classList.toggle('open', open)
-  $('railScrim').hidden = !open
-  $('menuBtn').setAttribute('aria-expanded', String(open))
-  if (open) $('rail').querySelector('.rail-item.on, .rail-item')?.focus()
-}
-const railOpen = () => $('rail').classList.contains('open')
-$('menuBtn').addEventListener('click', () => openRail(!railOpen()))
-$('railScrim').addEventListener('click', () => openRail(false))
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && railOpen()) { openRail(false); $('menuBtn').focus() } })
-window.addEventListener('hashchange', () => { if (railOpen()) openRail(false) })
+$('tabbar').addEventListener('click', async e => {
+  if (e.target.closest('[data-palette]')) (await import('./palette.js')).openPalette()
+  if (e.target.closest('[data-settings]')) (await import('./people.js')).openSettings()
+})
 
 $('nav').addEventListener('click', e => {
   const fold = e.target.closest('[data-squad]')
@@ -138,12 +130,6 @@ $('nav').addEventListener('click', e => {
     store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen))
     return renderNav()
   }
-  if (e.target.closest('#addHostBtn')) {
-    openRail(false)
-    return addMachineDialog()
-  }
-  if (e.target.closest('[data-newteam]')) {
-    openRail(false)
-    location.hash = '#/new'
-  }
+  if (e.target.closest('#addHostBtn')) return addMachineDialog()
+  if (e.target.closest('[data-newteam]')) location.hash = '#/new'
 })

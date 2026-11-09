@@ -7,20 +7,20 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { randomBytes } from 'node:crypto'
 import { serverNoticeIsGood } from '../plugins/squadra/signing.js'
 import { execFileSync } from 'node:child_process'
+import { tempDir } from './tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'companies-admin-token-0123456789'
 const PORT = 24000 + Math.floor(Math.random() * 2000)
 const URL_ = `http://127.0.0.1:${PORT}`
-const dataDir = mkdtempSync(join(tmpdir(), 'squadra-companies-'))
+const dataDir = tempDir('squadra-companies-')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let server
 
@@ -288,7 +288,7 @@ test('a company at its database limit takes nothing more from its sessions, and 
 
 test('on a disk about to fill up, sessions can add nothing, and can still be deleted', async () => {
   const port = PORT + 1
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-companies-disk-'))
+  const dir = tempDir('squadra-companies-disk-')
   const low = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
     env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN, SQUADRA_MIN_FREE_MB: '999999999999' },
     stdio: 'ignore',
@@ -498,7 +498,7 @@ test('a server notice names its company: it can\'t be replayed in another', asyn
 })
 
 test('a server with data keeps it as the first company, with its machines and sessions, and a copy from before', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-companies-up-'))
+  const dir = tempDir('squadra-companies-up-')
   const port = PORT + 3000
   const start = async () => {
     const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore' })
@@ -547,7 +547,7 @@ test('limits are per company, can be changed, and bad ones are refused', async (
 })
 
 test('after a restart every company is back, with its sessions, machines and limits', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-companies-restart-'))
+  const dir = tempDir('squadra-companies-restart-')
   const port = PORT + 3100
   const start = async () => {
     const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore' })
@@ -603,11 +603,14 @@ test('what is done in a company is written down in it: who, what and about what,
 
 test('retention: a company keeps messages and activity for as long as it says', async () => {
   const [a, b] = [await newCompany('Keep A'), await newCompany('Keep B')]
-  assert.deepEqual(await read(a, 'company/retention'), { retention_days: 7, event_hours: 24 })
+  assert.deepEqual(await read(a, 'company/retention'), { retention_days: 7, event_hours: 24, inbox_days: 90 })
   assert.deepEqual(ok(await act(a, 'company/retention/set', { retention_days: 30 })).retention_days, 30)
   assert.equal((await read(a, 'company/retention')).retention_days, 30)
   assert.equal((await read(b, 'company/retention')).retention_days, 7)
-  for (const bad of [{ retention_days: 0 }, { retention_days: 4000 }, { event_hours: 'x' }]) {
+  // (What is done in the inbox, too.)
+  assert.equal(ok(await act(a, 'company/retention/set', { inbox_days: 365 })).inbox_days, 365)
+  assert.equal((await read(a, 'company/retention')).inbox_days, 365)
+  for (const bad of [{ retention_days: 0 }, { retention_days: 4000 }, { event_hours: 'x' }, { inbox_days: 4000 }]) {
     assert.equal((await act(a, 'company/retention/set', bad)).error_code, 400)
   }
 })
@@ -624,7 +627,7 @@ test('exporting a company: its database and attachments, in a file anyone can op
   const res = await fetch(`${URL_}/${api(a, 'company/export')}`, { headers: { Authorization: `Bearer ${ADMIN}` } })
   assert.equal(res.status, 200)
   assert.match(res.headers.get('content-disposition'), new RegExp(`squadra-${a.id}-`))
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-export-'))
+  const dir = tempDir('squadra-export-')
   writeFileSync(join(dir, 'out.tar.gz'), Buffer.from(await res.arrayBuffer()))
   execFileSync('tar', ['-xzf', 'out.tar.gz'], { cwd: dir })
   const about = JSON.parse(readFileSync(join(dir, 'company.json'), 'utf8'))
@@ -643,7 +646,7 @@ test('exporting a company: its database and attachments, in a file anyone can op
 })
 
 test('deleting a company: stopped at once, back if asked for, and gone when its time is up', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-companies-del-'))
+  const dir = tempDir('squadra-companies-del-')
   const port = PORT + 3200
   const start = async grace => {
     const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN, SQUADRA_COMPANY_GRACE_MS: String(grace) }, stdio: 'ignore' })

@@ -5,6 +5,7 @@ import { esc, kfmt } from './format.js'
 import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
+import { permissionsSection } from './permissions.js'
 
 // Beside a session's conversation: its team, and where and how it runs.
 
@@ -35,6 +36,7 @@ export function renderSessionAside() {
   ].filter(f => f[1])
   setHtml(box, `${members.length ? `<section><h2 class="tq-label">${esc(T.svTeam)}</h2><ul class="sv-members">${members.map(m => member(m, s.name)).join('')}</ul><a class="ibx-link sv-small" href="#/q/${encodeURIComponent(team)}">${esc(T.svSeeTeam)}</a></section>` : ''}
     ${facts.length ? `<section><h2 class="tq-label">${esc(T.svDetails)}</h2><dl class="ibx-facts sv-facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl></section>` : ''}
+    ${s.role !== 'solo' && s.opened_role !== 'solo' ? permissionsSection({ session: s.name }) : ''}
     ${a.observe === 'off' ? `<p class="sv-small sv-quiet">${esc(T.svNotObserved)}</p>` : ''}`)
 }
 export const refreshSessionAside = () => { if (currentRoute().view === 'session' && !$('session').hidden) renderSessionAside() }

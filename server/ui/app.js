@@ -1,6 +1,6 @@
 import { $, store } from './dom.js'
 import { T, LANG } from './i18n.js'
-import { state, sessions, hosts } from './state.js'
+import { state, sessions, hosts, switchCompany } from './state.js'
 import { esc } from './format.js'
 import { begin, loginScreen, noCompany, signOut } from './signin.js'
 import { openSettings } from './people.js'
@@ -76,10 +76,7 @@ function enter(me) {
   connect()
 }
 
-$('companySelect').addEventListener('change', e => {
-  store.set('squadraCompany', e.target.value)
-  location.href = `?company=${encodeURIComponent(e.target.value)}`
-})
+$('companySelect').addEventListener('change', e => switchCompany(e.target.value))
 
 export async function logOut() {
   await signOut()
@@ -98,8 +95,6 @@ $('nav').setAttribute('aria-label', T.mainNav)
 $('companyLabel').textContent = T.company
 $('searchBtn').innerHTML = `${icon('search')}<span>${esc(T.goTo)}</span><kbd>${esc(T.searchShortcut(mac))}</kbd>`
 $('settingsBtn').innerHTML = `${icon('settings')}<span>${esc(T.settings)}</span>`
-$('menuBtn').innerHTML = icon('menu')
-$('menuBtn').setAttribute('aria-label', T.openMenu)
 
 // The sign-in page's own switches. (The button shows the mode it switches to.)
 function themeButtons() {

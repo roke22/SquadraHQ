@@ -1,6 +1,6 @@
 import { $ } from './dom.js'
 import { T } from './i18n.js'
-import { state, sessions, hosts, can } from './state.js'
+import { state, sessions, hosts, can, switchCompany } from './state.js'
 import { esc } from './format.js'
 import { sortedSessions, status, agentMark } from './content.js'
 import { icon } from './icons.js'
@@ -70,11 +70,13 @@ function candidates() {
     { group: 'actions', label: T.actInvite, lead: icon('teams'), run: async () => (await import('./people.js')).openSettings('members') },
   )
   items.push({ group: 'actions', label: T.actTheme, lead: icon('settings'), run: toggleTheme })
+  // (There is no sidebar on a phone: its choice of company is here too.)
+  for (const c of state.me?.companies ?? []) if (c.id !== state.company) items.push({ group: 'companies', label: c.name, sub: T.switchCompany, lead: icon('chevron'), run: () => switchCompany(c.id) })
   return items
 }
 
-const ORDER_EMPTY = ['inbox', 'screens', 'sessions', 'actions']
-const ORDER_QUERY = ['sessions', 'teams', 'inbox', 'screens', 'actions']
+const ORDER_EMPTY = ['inbox', 'screens', 'sessions', 'actions', 'companies']
+const ORDER_QUERY = ['sessions', 'teams', 'inbox', 'screens', 'actions', 'companies']
 const PER_GROUP = 8
 
 let shown = [] // what is listed, in order

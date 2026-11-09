@@ -44,7 +44,7 @@ export function checkEnrollRate(req) {
 const offeredProtocols = req => String(req.headers['sec-websocket-protocol'] ?? '').split(',').map(x => x.trim())
 export const offeredCredential = req => offeredProtocols(req).find(x => x.startsWith('auth.'))?.slice('auth.'.length) ?? ''
 
-export function createMachines(platform, { sessions, observation }) {
+export function createMachines(platform, { sessions, observation, permissions }) {
   const {
     bus, db, broadcast, SERVER_KEY, joinToken, signAsServer, allow, takeChallenge, proofIsGood, credentialPrefix,
     routeEnrollment, log, companyId, audit,
@@ -294,6 +294,8 @@ export function createMachines(platform, { sessions, observation }) {
       persona: t?.persona && PERSONA_ID_RE.test(String(t.persona.id)) && ['skill', 'agent'].includes(t.persona.kind)
         ? { id: t.persona.id, kind: t.persona.kind, name: str(t.persona.name, 64) } : null,
       created_at: Number.isFinite(t?.created_at) ? t.created_at : null,
+      // The permission profile it was opened with, by name (only for showing).
+      profile: str(t?.profile, 40),
     })).filter(t => t.id && NAME_RE.test(t.id))
     return {
       hostname: str(info.hostname, 100),
@@ -317,6 +319,8 @@ export function createMachines(platform, { sessions, observation }) {
       allow_input: info.allow_input !== false,
       allow_resume: info.allow_resume === true, // (older machines don't say: taken as no)
       answers: info.answers === true, // it types answers from the user's inbox (older machines can't)
+      // How far it takes permission profiles from the dashboard (older machines don't say: none).
+      permission_profiles: ['allow', 'restrict', 'off'].includes(info.permission_profiles) ? info.permission_profiles : null,
       plugin: info.plugin && typeof info.plugin === 'object'
         ? { installed: info.plugin.installed === true, enabled: info.plugin.enabled === true, version: str(info.plugin.version, 40) }
         : null,
@@ -806,6 +810,26 @@ export function createMachines(platform, { sessions, observation }) {
     }
   }
   const opening = new Map() // "host\0name" -> since: an open in progress
+
+  // The permission profile the session follows (its own, or its team's), as
+  // rules for its machine to give Claude Code. Never opened with less than it
+  // says: a machine that can't apply it (too old, or set not to take them from
+  // the dashboard) doesn't open the session. Codex CLI and Grok CLI have no
+  // such rules: a profile that only allows things is left out for them, one
+  // that asks or forbids keeps them from opening.
+  function withPermissions(id, name, role, agent, spec) {
+    const p = permissions.compile(permissions.effectiveProfile(name, role, spec.coordinator ?? null))
+    if (!p || (!p.allow.length && !p.ask.length && !p.deny.length && !p.notes)) return
+    const conflict = (reason, text) => new ApiError(409, `Conflict: ${text}`, { parameters: { reason } })
+    if (agent !== 'claude') {
+      if (p.ask.length || p.deny.length) throw conflict('profile_agent', `"${name}" follows the permission profile "${p.name}", which only Claude Code can apply: open it with Claude Code, or give it no profile`)
+      return
+    }
+    const takes = hostLinks.get(id)?.info?.permission_profiles
+    if (takes == null) throw conflict('old_machine', `"${name}" follows the permission profile "${p.name}", and its machine is too old to apply one: update it (squadra-host update), or give the session no profile`)
+    // (How far it takes them is the machine's to say, as it is now: it refuses what it doesn't.)
+    spec.permissions = { profile: p.name, allow: p.allow, ask: p.ask, deny: p.deny, notes: p.notes }
+  }
   async function openNow(id, name, spec, existing, actor) {
     let created = false
     // The role it was opened with (the dashboard trusts that one, not whatever
@@ -819,6 +843,8 @@ export function createMachines(platform, { sessions, observation }) {
     if (agent === 'claude') delete spec.agent; else spec.agent = agent
     // A coordinator's links are the ones set here, never what the page sends.
     delete spec.links
+    // Nor its permissions: those of the profile it follows (below).
+    delete spec.permissions
     if (openedRole === 'coordinator') { const l = linksOf(name); if (l.length) spec.links = l }
     if (!existing) {
       spec.identity = register(name, false).secret
@@ -838,6 +864,7 @@ export function createMachines(platform, { sessions, observation }) {
     if (openedRole === 'worker' && !spec.coordinator) spec.coordinator = 'coord'
     if (openedRole === 'worker' && NAME_RE.test(String(spec.coordinator ?? ''))) db.prepare('UPDATE identities SET coordinator = ? WHERE name = ?').run(spec.coordinator, name)
     try {
+      withPermissions(id, name, openedRole, agent, spec)
       const result = await askHost(id, { t: 'open', spec })
       log(`opened session "${name}" on host ${id}`)
       if (openedRole === 'worker') void approveOnCoordinator(spec.coordinator, name, actor)

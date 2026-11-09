@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url'
 import { createCipheriv, createDecipheriv, createHash, createPrivateKey, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, sign, verify } from 'node:crypto'
 import { promisify } from 'node:util'
 
-const VERSION = '0.0.8'
+const VERSION = '0.0.9'
 // Who signs releases (scripts/release-sign.mjs): `update` only installs what
 // this key signed. Empty: this copy has no key to check with.
 const RELEASE_PUBLIC_KEY = 'MCowBQYDK2VwAyEA49ojJq4r4KLiWcRJiDxui2HzSZYpZA1qCBI4LLtOOyo'
@@ -242,6 +242,15 @@ function writeJson(file, data, mode = 0o600) {
 //                     (/clear) before a new task (default: same as allow_input)
 //   coordinators      if set, the only coordinator names a worker may be given
 //                     (and a coordinator here may be linked with)
+//   permissions_from_dashboard  how far a permission profile from the
+//                     dashboard goes in the sessions it opens: "allow" (its rules
+//                     that allow, ask and forbid), "restrict" (only those that
+//                     ask or forbid: what it allows is left out) or "off" (none:
+//                     a session that follows one isn't opened). Default: "allow"
+//                     if allow_input, else "restrict". Whatever it says, nothing
+//                     from the dashboard allows sudo, any command at all or an
+//                     interpreter with any arguments, or writing outside the
+//                     session's folder.
 //   claude_command    the Claude Code executable
 //   codex_command     the Codex CLI executable (default "codex")
 //   grok_command      the Grok CLI executable (default "grok")
@@ -265,11 +274,11 @@ function loadSettings() {
     // Settings that exist but can't be read: the strictest ones, never the defaults.
     if (err.code !== 'ENOENT') {
       if (!loadSettings.warned) { loadSettings.warned = true; log(`⚠️  cannot read ${SETTINGS_FILE} (${err.message}): no folders, no typing, no permission relay until it is fixed`) }
-      return { ...DEFAULT_SETTINGS, folders: [], allow_input: false, permission_relay: false, allow_resume: false, allow_clear: false, allow_home: false, folders_from_dashboard: false, coordinators: NO_COORDINATOR }
+      return { ...DEFAULT_SETTINGS, folders: [], allow_input: false, permission_relay: false, allow_resume: false, allow_clear: false, allow_home: false, folders_from_dashboard: false, permissions_from_dashboard: 'off', coordinators: NO_COORDINATOR }
     }
   }
   loadSettings.warned = false
-  const strict = { ...DEFAULT_SETTINGS, folders: [], allow_input: false, permission_relay: false, allow_resume: false, allow_clear: false, allow_home: false, folders_from_dashboard: false, coordinators: NO_COORDINATOR }
+  const strict = { ...DEFAULT_SETTINGS, folders: [], allow_input: false, permission_relay: false, allow_resume: false, allow_clear: false, allow_home: false, folders_from_dashboard: false, permissions_from_dashboard: 'off', coordinators: NO_COORDINATOR }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     warnSettings(`⚠️  ${SETTINGS_FILE} must hold a JSON object: no folders, no typing, no permission relay until it is fixed`)
     return strict
@@ -293,6 +302,12 @@ function loadSettings() {
   s.allow_clear = bool('allow_clear', s.allow_input)
   s.allow_resume = bool('allow_resume', s.allow_input)
   s.folders_from_dashboard = bool('folders_from_dashboard', s.allow_input)
+  // (A value it doesn't know is read as the strict one that still opens sessions.)
+  if (s.permissions_from_dashboard === undefined) s.permissions_from_dashboard = s.allow_input ? 'allow' : 'restrict'
+  else if (!['allow', 'restrict', 'off'].includes(s.permissions_from_dashboard)) {
+    warnSettings(`⚠️  permissions_from_dashboard in ${SETTINGS_FILE} must be "allow", "restrict" or "off": taken as "restrict"`)
+    s.permissions_from_dashboard = 'restrict'
+  }
   // A coordinators pin that can't be read refuses every coordinator (it
   // never turns into "any").
   if (s.coordinators === undefined || (Array.isArray(s.coordinators) && s.coordinators.length === 0)) s.coordinators = []
@@ -626,6 +641,7 @@ async function listTerminals() {
       compact_window: spec.compact_window ?? null,
       persona: spec.persona ?? null,
       agent: AGENT_IDS.includes(spec.agent) ? spec.agent : 'claude',
+      profile: typeof spec.profile === 'string' ? spec.profile : null,
       created_at: Number(created) * 1000,
     })
   }
@@ -646,7 +662,7 @@ function insideAllowed(real, folders) {
 // The only thing a server can ask for. Anything unexpected is refused.
 export function validateSpec(spec, settings, current) {
   if (!spec || typeof spec !== 'object' || Array.isArray(spec)) throw new Error('invalid request')
-  const allowed = new Set(['name', 'role', 'coordinator', 'folder', 'compact_window', 'resume', 'identity', 'persona', 'links', 'agent'])
+  const allowed = new Set(['name', 'role', 'coordinator', 'folder', 'compact_window', 'resume', 'identity', 'persona', 'links', 'agent', 'permissions'])
   for (const k of Object.keys(spec)) if (!allowed.has(k)) throw new Error(`unknown field "${plain(k).slice(0, 40)}"`)
   const name = String(spec.name ?? '')
   if (!NAME_RE.test(name)) throw new Error('name must match [A-Za-z0-9_-]{1,32}')
@@ -685,13 +701,56 @@ export function validateSpec(spec, settings, current) {
   if (!AGENT_IDS.includes(agent)) throw new Error(`agent must be one of ${AGENT_IDS.join(', ')}`)
   // A coordinator's links: coordinators of other squads it may talk with.
   const links = spec.links == null ? [] : checkLinks(spec.links, name, role, settings)
+  // What it may do without asking, from its permission profile (Claude Code only).
+  const permissions = spec.permissions == null ? null : checkPermissions(spec.permissions, settings, agent)
   const real = checkFolder(spec.folder, settings)
   if (current.some(t => t.name === name)) throw new Error(`a session named "${name}" is already open on this machine`)
   if (current.length >= settings.max_sessions) throw new Error(`this machine allows at most ${settings.max_sessions} sessions`)
   // Which folder exactly (device and inode), to check after the start that
   // the session is in this one and not in another put at the same path.
   const id = statSync(real)
-  return { name, role, coordinator, folder: real, folderId: `${id.dev}:${id.ino}`, compact_window: compact, resume: spec.resume === true, identity: spec.identity ?? null, persona: spec.persona || null, links, home: isHome(real), agent }
+  return { name, role, coordinator, folder: real, folderId: `${id.dev}:${id.ino}`, compact_window: compact, resume: spec.resume === true, identity: spec.identity ?? null, persona: spec.persona || null, links, home: isHome(real), agent, permissions }
+}
+
+// A permission profile from the dashboard: Claude Code's own rules, checked
+// one by one, and only as far as this machine takes them
+// (permissions_from_dashboard). Some are never taken from the dashboard,
+// whatever it says: an allow for sudo, for any command at all or an
+// interpreter with any arguments, or for files outside the session's folder.
+// A rule Claude Code would read differently from how it looks (a path
+// anchored to where its settings file is, an MCP rule with arguments) is
+// refused too. Returns what the session gets, or null for nothing.
+const RULE_RE = /^(?:(?:Bash|PowerShell|Read|Edit|Write|NotebookEdit|WebFetch|WebSearch|Glob|Grep|Agent|Skill)(?:\((?:[^()\x00-\x1f\x7f]|\([^()\x00-\x1f\x7f]*\)){1,300}\))?|mcp__[A-Za-z0-9_-]+(?:__(?:[A-Za-z0-9_-]+|\*))?)$/
+const PERMISSION_RULES_MAX = 300
+const NEVER_ALLOWED = [
+  [/^(?:Bash|PowerShell)$|^(?:Bash|PowerShell)\(\s*[*:]/, 'any command at all'],
+  [/^(?:Bash|PowerShell)\(\s*(?:sudo|su|doas|pkexec|run0)\b/, 'sudo'],
+  [/^(?:Bash|PowerShell)\(\s*(?:bash|sh|zsh|dash|fish|ksh|python[\d.]*|node|nodejs|ruby|perl|php|deno|bun|lua|eval|exec|env|xargs|ssh|nohup|npx|pwsh|powershell)\s*(?::\*|\*)\s*\)$/, 'an interpreter with any arguments'],
+  [/^(?:Edit|Write|NotebookEdit|Read)\(\s*(?:\/\/|~|\$)|^(?:Edit|Write|NotebookEdit|Read)\((?:[^)]*\/)?\.\.(?:\/|\))/, 'files outside its folder'],
+]
+export function checkPermissions(p, settings, agent) {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error('invalid permissions')
+  for (const k of Object.keys(p)) if (!['profile', 'allow', 'ask', 'deny', 'notes'].includes(k)) throw new Error(`unknown field "permissions.${plain(k).slice(0, 40)}"`)
+  const profile = typeof p.profile === 'string' ? p.profile.replace(/[\x00-\x1f\x7f]/g, ' ').trim().slice(0, 40) : ''
+  if (!profile) throw new Error('the permission profile has no name')
+  if (agent !== 'claude') throw new Error(`a permission profile ("${plain(profile)}") is only for Claude Code sessions`)
+  if (settings.permissions_from_dashboard === 'off') throw new Error(`this machine takes no permission profiles from the dashboard ("permissions_from_dashboard": "off" in its settings.json), and this session follows "${plain(profile)}"`)
+  const list = (what) => {
+    const v = p[what] ?? []
+    if (!Array.isArray(v) || v.length > PERMISSION_RULES_MAX) throw new Error(`permissions.${what} must be a list of at most ${PERMISSION_RULES_MAX} rules`)
+    return v.map(r => {
+      if (typeof r !== 'string' || !RULE_RE.test(r)) throw new Error(`"${plain(String(r)).slice(0, 80)}" is not a permission rule`)
+      if (/^(?:Edit|Write|NotebookEdit|Read)\(\s*\/(?!\/)/.test(r)) throw new Error(`${plain(r).slice(0, 80)}: write ./path for its folder or //path for an absolute one (Claude Code reads /path from where its settings file is)`)
+      return r
+    })
+  }
+  const deny = list('deny'), ask = list('ask')
+  let allow = list('allow')
+  for (const r of allow) for (const [re, what] of NEVER_ALLOWED) if (re.test(r)) throw new Error(`the permission profile "${plain(profile)}" allows ${what} (${plain(r).slice(0, 80)}): this machine never takes that from the dashboard`)
+  // (Only what asks or forbids: less than the profile says it allows, never less than it forbids.)
+  if (settings.permissions_from_dashboard === 'restrict') allow = []
+  const notes = typeof p.notes === 'string' ? p.notes.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ' ').trim().slice(0, 2000) : ''
+  return { profile, allow, ask, deny, notes, restricted: settings.permissions_from_dashboard === 'restrict' && (p.allow ?? []).length > 0 }
 }
 
 // The coordinators of other squads a coordinator is linked with (each one
@@ -1187,6 +1246,11 @@ function ownConversation(dir, folder, matches = (id, transcript) => transcript.e
 
 // The command a session runs, after the "env" that starts it. env: the one
 // sessionEnv gave. dir: the plugin's folder for this session.
+// What the user wrote in the dashboard about what this session may do.
+function permissionNotes(p) {
+  return `PERMISSIONS. This session follows the permission profile "${p.profile}", set by the user in the Squadra dashboard. Claude Code's permission rules enforce it; what the user wrote about it, as the reason (quoted):\n${JSON.stringify(p.notes)}\nWork within it: don't look for another way to do what it rules out. If a task needs it, say so in your report instead.`
+}
+
 function sessionCommand(s, claude, dir, env) {
   // (A standalone session takes no messages: no development channel, and so
   // no dialog about it at every start. The plugin still reports its activity.)
@@ -1198,18 +1262,32 @@ function sessionCommand(s, claude, dir, env) {
   }
   // The persona, in the system prompt: a skill's text from a private copy
   // (what the session reads is what was checked, not the file as it may be
-  // later), an agent by its name.
+  // later), an agent by its name. And what the user wrote about its
+  // permissions, after it: the reason for the rules below.
   const promptFile = join(dir, 'persona.md')
-  if (s.personaInfo?.kind === 'skill') {
+  const prompt = [
+    ...(s.personaInfo?.kind === 'skill' ? [skillPrompt(s.personaInfo)] : []),
+    ...(s.permissions?.notes ? [permissionNotes(s.permissions)] : []),
+  ].join('\n\n')
+  const writePrivate = (file, text) => {
     ensurePrivateDir(dir)
-    const tmp = join(dir, `.persona.md.${process.pid}.${Date.now()}`)
-    writeFileSync(tmp, skillPrompt(s.personaInfo), { mode: 0o600, flag: 'wx' })
-    renameSync(tmp, promptFile)
-    argv.push('--append-system-prompt-file', promptFile)
-  } else {
-    rmSync(promptFile, { force: true })
-    if (s.personaInfo?.kind === 'agent') argv.push('--agent', s.personaInfo.name)
+    const tmp = join(dir, `.${basename(file)}.${process.pid}.${Date.now()}`)
+    writeFileSync(tmp, text, { mode: 0o600, flag: 'wx' })
+    renameSync(tmp, file)
   }
+  if (prompt) {
+    writePrivate(promptFile, prompt)
+    argv.push('--append-system-prompt-file', promptFile)
+  } else rmSync(promptFile, { force: true })
+  if (s.personaInfo?.kind === 'agent') argv.push('--agent', s.personaInfo.name)
+  // Its permission profile, as Claude Code's own rules: they are added to the
+  // user's and the project's, and a rule that forbids wins over any that
+  // allows, wherever each one is.
+  const permissionsFile = join(dir, 'permissions.json')
+  if (s.permissions) {
+    writePrivate(permissionsFile, JSON.stringify({ permissions: { allow: s.permissions.allow, ask: s.permissions.ask, deny: s.permissions.deny } }, null, 2) + '\n')
+    argv.push('--settings', permissionsFile)
+  } else rmSync(permissionsFile, { force: true })
   return argv
 }
 
@@ -1768,7 +1846,7 @@ async function startSession(s, settings, claude, dir, typed) {
   if (s.identity) writePrivate(dir, 'identity.json', { name: s.name, secret: s.identity, server: claudeCode.plugin.serverUrl() })
   const tname = PREFIX + s.name
   const { argv, envArgs } = launchCommand(s, settings, claude, dir, typed)
-  const meta = JSON.stringify({ owner: OWNER_TAG, role: s.role, coordinator: s.coordinator, folder: s.folder, compact_window: s.compact_window, persona: s.personaInfo ? { id: s.personaInfo.id, kind: s.personaInfo.kind, name: s.personaInfo.name } : null, ...(typed ? { agent: s.agent } : {}) })
+  const meta = JSON.stringify({ owner: OWNER_TAG, role: s.role, coordinator: s.coordinator, folder: s.folder, compact_window: s.compact_window, persona: s.personaInfo ? { id: s.personaInfo.id, kind: s.personaInfo.kind, name: s.personaInfo.name } : null, ...(typed ? { agent: s.agent } : {}), ...(s.permissions ? { profile: s.permissions.profile } : {}) })
   await tmux([
     'start-server', ';',
     'set-option', '-g', 'history-limit', '10000', ';',
@@ -1780,7 +1858,8 @@ async function startSession(s, settings, claude, dir, typed) {
     'set-option', '-t', `=${tname}:`, '@squadra', meta,
   ])
   await checkStartedWhere(tname, s, dir)
-  log(`opened "${plain(s.name)}" (${s.role}${typed ? `, ${typed.name}` : ''}${s.personaInfo ? `, ${s.personaInfo.kind} "${plain(s.personaInfo.name)}"` : ''}) in ${s.folder}`)
+  log(`opened "${plain(s.name)}" (${s.role}${typed ? `, ${typed.name}` : ''}${s.personaInfo ? `, ${s.personaInfo.kind} "${plain(s.personaInfo.name)}"` : ''}${s.permissions ? `, permission profile "${plain(s.permissions.profile)}"` : ''}) in ${s.folder}`)
+  if (s.permissions?.restricted) log(`  what its profile allows was left out: this machine takes only what asks or forbids from the dashboard ("permissions_from_dashboard": "restrict")`)
   return { id: s.name, name: s.name }
 }
 
@@ -2131,6 +2210,8 @@ async function hostInfo() {
     allow_resume: settings.allow_resume,
     // (It types answers from the user's inbox: older copies don't.)
     answers: true,
+    // How far it takes permission profiles from the dashboard.
+    permission_profiles: settings.permissions_from_dashboard,
     terminals: await listTerminals(),
   }
 }
@@ -2507,6 +2588,9 @@ Settings: ${SETTINGS_FILE}
                           from another session (default: same as allow_input)
   allow_clear             whether a worker's coordinator may have its context cleared (/clear)
                           before giving it a new task (default: same as allow_input)
+  permissions_from_dashboard  how far a permission profile from the dashboard goes: "allow",
+                          "restrict" (only what asks or forbids) or "off" (default: "allow"
+                          if allow_input, else "restrict")
   coordinators            if set, the only coordinator names workers here may be given
                           (and coordinators here may be linked with)
   claude_command          the Claude Code executable (default "claude")

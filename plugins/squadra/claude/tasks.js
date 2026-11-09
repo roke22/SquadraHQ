@@ -54,12 +54,23 @@ const BACKGROUND_NOTICE_MS = Number(process.env.SQUADRA_BACKGROUND_NOTICE_MS) ||
 // which they don't read: once per turn, a reminder to use the inbox. (A guess
 // from its last words; only ever a reminder.)
 const ASKS_USER_RE = /necesito que (?:decidas|confirmes|me digas|hagas)|queda(?:n)? pendientes? (?:para ti|de ti|de una persona)|pendientes? para ti|decide[sn]? t[uú]|tu (?:ok|confirmaci[oó]n|decisi[oó]n|aprobaci[oó]n)|dime (?:qu[eé]|si)|¿(?:quieres|prefieres|apruebas|hago|subo|lo hago|seguimos|procedo)|need you to (?:decide|confirm)|your (?:call|decision|approval|ok)|do you want me to|should i (?:go ahead|proceed|deploy|apply)|let me know (?:if|whether|which)/i
+// Words that point at the inbox: what it says is already there, not asked here.
+const MENTIONS_INBOX_RE = /\binbox\b|\bbandeja\b|\bbuz[oó]n\b/i
 function chatAskHint(s, lastText) {
   if (S !== s || s.role !== 'coordinator' || s.inboxThisTurn || s.chatAskHinted) return ''
+  // (With a question of its own still open in the inbox, "your decision" is most likely that one.)
+  if (s.openAsks?.size || MENTIONS_INBOX_RE.test(String(lastText ?? ''))) return ''
   const hit = ASKS_USER_RE.exec(String(lastText ?? ''))
   if (!hit) return ''
   s.chatAskHinted = true
   return `[Squadra] Before you finish: you are asking the user for something here ("${hit[0]}"), but they read their inbox, not this conversation. Put each decision that is theirs in its own ask_user (with its options and what you recommend), and what they should know or do in tell_user, then end your turn (help("inbox")).`
+}
+
+// The user's answer from the inbox is typed in as a prompt ("Inbox #12 (…), the
+// user answers…" or "…dismissed it…"): that question is no longer open.
+export function inboxAnswered(s, prompt) {
+  if (s.role !== 'coordinator' || !s.openAsks?.size) return
+  for (const m of String(prompt).matchAll(/(?:^|\n)\s*Inbox #(\d+) \(/g)) s.openAsks.delete(Number(m[1]))
 }
 
 export async function stopCheck(s, { background = false, lastText = '' } = {}) {

@@ -23,6 +23,7 @@ export const state = {
   sessionView: null,
   menuEl: null,
   squadMeta: new Map(), // coordinator -> {title, goal, x, y}
+  permissions: { profiles: [], teams: {}, sessions: {} }, // permission profiles, and who follows which
   termView: null,
   // Each sign-in has its own stream loop: an older one (waiting to reconnect
   // when the user logged out) stops instead of opening a second stream.
@@ -41,9 +42,16 @@ export const can = needed => ROLES.indexOf(state.role) >= ROLES.indexOf(needed)
 export const sessions = new Map()      // name -> session view (from server)
 export const hosts = new Map()         // host id -> host view (machines running squadra-host)
 export const templateListeners = new Set()
+export const profileListeners = new Set() // (the permission profiles changed)
 export const linkListeners = new Set()
 export const linksOf = name => state.links.filter(l => l.a === name || l.b === name).map(l => (l.a === name ? l.b : l.a))
 export const unread = new Map()         // name -> count (while not visible)
 export const views = new Set()          // live ChatViews
 
 export const hostListeners = new Set()
+
+// To another of the user's companies: the page loads again in it.
+export function switchCompany(id) {
+  store.set('squadraCompany', id)
+  location.href = `?company=${encodeURIComponent(id)}`
+}

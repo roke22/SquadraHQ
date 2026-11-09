@@ -6,17 +6,17 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connect } from 'node:net'
+import { tempDir } from './tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'security-admin-token-0123456789'
 const PORT = 21000 + Math.floor(Math.random() * 2000)
 const URL_ = `http://127.0.0.1:${PORT}`
-const dataDir = mkdtempSync(join(tmpdir(), 'squadra-sec-'))
+const dataDir = tempDir('squadra-sec-')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let server, JOIN
 
@@ -61,7 +61,7 @@ test('the dashboard asks browsers to stay on https also behind a TLS proxy', asy
   assert.equal((await fetch(`${URL_}/`)).headers.get('strict-transport-security'), null)
   const port = PORT + 3000
   const proxied = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: mkdtempSync(join(tmpdir(), 'squadra-hsts-')), SQUADRA_SERVER_TOKEN: ADMIN, PUBLIC_URL: 'https://squadra.example.com' },
+    env: { ...process.env, PORT: String(port), DATA_DIR: tempDir('squadra-hsts-'), SQUADRA_SERVER_TOKEN: ADMIN, PUBLIC_URL: 'https://squadra.example.com' },
     stdio: 'ignore',
   })
   try {
@@ -823,7 +823,7 @@ test('machines connect with a one-time ticket, and their secret never goes in th
 })
 
 test('a server that cannot start ends with an error, for whatever started it', async () => {
-  const data = mkdtempSync(join(tmpdir(), 'squadra-nostart-'))
+  const data = tempDir('squadra-nostart-')
   const port = PORT + 3700 + Math.floor(Math.random() * 200)
   // (Files that exist, but aren't a certificate and a key.)
   writeFileSync(join(data, 'bad.crt'), 'not a certificate')
@@ -837,7 +837,7 @@ test('a server that cannot start ends with an error, for whatever started it', a
 })
 
 test('the cap on sessions also holds for registrations that arrive together', async t => {
-  const data = mkdtempSync(join(tmpdir(), 'squadra-cap-'))
+  const data = tempDir('squadra-cap-')
   const port = PORT + 3900 + Math.floor(Math.random() * 90)
   const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, SQUADRA_MAX_SESSIONS: '2', SQUADRA_SERVER_TOKEN: 'cap-test-server-token' }, stdio: 'ignore' })
   t.after(() => p.kill('SIGKILL'))
@@ -873,7 +873,7 @@ test('text with many joiners keeps them where they belong', async () => {
 })
 
 test('the tokens are printed the time they are made, and not at every start', async () => {
-  const data = mkdtempSync(join(tmpdir(), 'squadra-banner-'))
+  const data = tempDir('squadra-banner-')
   const start = env => new Promise((resolve, reject) => {
     const port = PORT + 3100 + Math.floor(Math.random() * 500)
     const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, SQUADRA_SERVER_TOKEN: '', SWARM_SERVER_TOKEN: '', ...env }, stdio: ['ignore', 'ignore', 'pipe'] })
@@ -980,7 +980,7 @@ test('approval: an unapproved name reaches no follower through a group, nor thos
 // The installer's command, run for real with programs that write down how they
 // were called: tmux, Claude Code and Node are stand-ins, so nothing is installed.
 function installerBench(extra = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-bench-'))
+  const dir = tempDir('squadra-bench-')
   const log = join(dir, 'log')
   const tool = (name, body) => { writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`); chmodSync(join(dir, name), 0o755) }
   for (const name of ['curl', 'bash', 'sha256sum', 'cat', 'rm', 'mktemp', 'env', 'cp']) {

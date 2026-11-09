@@ -2,6 +2,7 @@ import { store } from './dom.js'
 import { T, COLLATOR } from './i18n.js'
 import { sessions, companyPref } from './state.js'
 import { esc, dur, now } from './format.js'
+import { nowPhrase } from './doing.js'
 
 export const MAX_VIEW_ITEMS = 600   // per chat view
 export const MAX_RENDER_TEXT = 8000 // characters of one text shown
@@ -101,15 +102,20 @@ function md(src) {
   return out.join('').replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[Number(i)])
 }
 
-// session status (sidebar, pane headers, status bars)
+// The tool and its exact arguments, for a tooltip.
+const toolLine = t => [t?.name, t?.summary].filter(Boolean).join(' · ')
+
+// session status (sidebar, pane headers, status bars). title: the detail
+// behind text, when there is more (the command it runs).
 export function status(s) {
   if (!s) return { dot: '', text: '' }
   const a = s.activity ?? {}
   if (!s.online) return { dot: '', text: T.offline(s.last_seen_at ? dur(now() - s.last_seen_at * 1000) : '—') }
   switch (a.state) {
-    case 'tool': return { dot: 'ok pulse', text: `${a.tool?.name ?? T.tool} · ${dur(now() - (a.tool?.since ?? now()))} · ${a.tool?.summary ?? ''}` }
+    // (A phrase, not the command: the command itself is in the tooltip.)
+    case 'tool': return { dot: 'ok pulse', text: `${nowPhrase(a.tool)} · ${dur(now() - (a.tool?.since ?? now()))}`, title: toolLine(a.tool) }
     case 'working': return { dot: 'ok pulse', text: T.working(dur(now() - (a.since ?? now()))) }
-    case 'waiting': return { dot: 'warn pulse', waiting: true, text: a.tool?.name ? T.waitingTool(a.tool.name, a.tool.summary ?? '') : T.waitingInput(a.waiting) }
+    case 'waiting': return { dot: 'warn pulse', waiting: true, text: a.tool?.name ? T.waitingTool(nowPhrase(a.tool)) : T.waitingInput(a.waiting), ...(a.tool?.name ? { title: toolLine(a.tool) } : {}) }
     case 'compacting': return { dot: 'info pulse', text: T.compacting }
     case 'idle': return { dot: 'ok', text: T.idle(dur(now() - (a.since ?? now()))) }
     case 'ended': return { dot: '', text: T.ended }

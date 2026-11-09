@@ -13,7 +13,7 @@
   <a href="https://github.com/roke22/SquadraHQ/stargazers"><img src="https://img.shields.io/github/stars/roke22/SquadraHQ?style=social" alt="Estrellas en GitHub"></a>
 </p>
 
-<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/SquadraHQ/">Web</a> · <a href="https://roke22.github.io/SquadraHQ/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a> · v0.0.8</p>
+<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/SquadraHQ/">Web</a> · <a href="https://roke22.github.io/SquadraHQ/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a> · v0.0.9</p>
 
 ---
 
@@ -67,6 +67,7 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Dejarlo trabajando solo:** los workers deciden los detalles técnicos y el coordinador aprueba sus acciones seguras, así el equipo sigue mientras no estás.
 - **Vigilarlo desde cualquier sitio:** todos los equipos y agentes en directo en tu navegador, también en el móvil (añádelo a la pantalla de inicio y se abre como una app), y todo lo que te espera arriba en la bandeja.
 - **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal; respondes desde el panel con una tecla numérica o con tus palabras, o descartas una pregunta y a su coordinador se le dice que no espere.
+- **Decidir qué puede hacer cada agente:** escribe un perfil de permisos con tus palabras (editar ficheros, pasar los tests, hacer commit, pero nunca push, por ejemplo) y dáselo a un equipo o a una sesión; llega a Claude Code como reglas de permisos de verdad, hasta donde cada máquina lo permita.
 - **Seguir el plan de cada equipo:** el coordinador mantiene en la página del equipo la lista de tareas en las que trabaja, quién lleva cada una y en qué estado está.
 - **Ver qué ha hecho cada agente sin leerlo todo:** junto a su terminal y su conversación, qué hace ahora y una línea de tiempo con lo importante (sus órdenes, los ficheros que editó, pruebas y commits, permisos e informes), sacada de lo que ya informa, así que no gasta tokens.
 - **Usar todos tus ordenadores y cuentas:** cada agente funciona en cualquier máquina que añadas, con la sesión de Claude Code de esa máquina.

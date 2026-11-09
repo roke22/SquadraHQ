@@ -2,6 +2,7 @@ import { createPlatform, guarded } from './platform/index.js'
 import { createSessions } from './sessions/index.js'
 import { createMessaging, createInbox, createPlans } from './messaging/index.js'
 import { createObservation } from './observation/index.js'
+import { createPermissions } from './permissions/index.js'
 import { createMachines } from './machines/index.js'
 import { createOrganization } from './organization/index.js'
 import { createDashboard } from './dashboard/index.js'
@@ -16,6 +17,7 @@ import { cleanExports } from './company-export.js'
 //   sessions       identities, their queues, who holds a name and who is online
 //   messaging      messages, groups, attachments
 //   observation    what each session is doing
+//   permissions    permission profiles: what the agents may do without asking
 //   machines       squadra-host: joining, its link, terminals
 //   organization   squads, links between them, templates
 //   dashboard      what the dashboard reads and does
@@ -26,9 +28,10 @@ export function createCompany(server, options) {
   const inbox = createInbox(platform, { sessions })
   const plans = createPlans(platform, { sessions })
   const observation = createObservation(platform)
-  const machines = createMachines(platform, { sessions, observation })
+  const permissions = createPermissions(platform, { sessions })
+  const machines = createMachines(platform, { sessions, observation, permissions })
   const organization = createOrganization(platform, { sessions, messaging, observation, machines })
-  const dashboard = createDashboard(platform, { sessions, messaging, inbox, plans, observation, machines, organization })
+  const dashboard = createDashboard(platform, { sessions, messaging, inbox, plans, observation, machines, organization, permissions })
 
   // What a session can ask for, by its name in the request.
   const methods = {

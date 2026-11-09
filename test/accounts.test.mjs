@@ -6,20 +6,20 @@
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { totpCode, totpStep } from '../server/accounts/totp.js'
+import { tempDir } from './tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'accounts-admin-token-0123456789'
 const PORT = 26000 + Math.floor(Math.random() * 2000)
 const URL_ = `http://127.0.0.1:${PORT}`
 const ORIGIN = URL_
-const dataDir = mkdtempSync(join(tmpdir(), 'squadra-accounts-'))
+const dataDir = tempDir('squadra-accounts-')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const PASSWORD = 'correct horse battery'
 let server
@@ -253,6 +253,7 @@ test('each role does what the table says, in its own company only', async () => 
     ['hosts/enroll', { name: 'm' }, 'manager'], ['hosts/rename', { host: 'h', name: 'n' }, 'manager'], ['hosts/remove', { host: 'h' }, 'manager'], ['hosts/folders', { host: 'h', action: 'add', path: '/a' }, 'manager'],
     ['templates/save', { name: '' }, 'manager'], ['templates/delete', { name: 'x' }, 'manager'], ['links/add', {}, 'manager'], ['links/delete', {}, 'manager'],
     ['org/squad', {}, 'manager'], ['org/positions', {}, 'manager'], ['org/describe', {}, 'manager'],
+    ['permissions/save', { name: '' }, 'manager'], ['permissions/delete', { id: 'x' }, 'manager'], ['permissions/assign', {}, 'manager'],
     ['members', undefined, 'manager'], ['members/invite', { email: 'bad' }, 'manager'], ['members/role', {}, 'manager'], ['members/remove', {}, 'manager'], ['join-token', undefined, 'manager'],
   ]
   const order = ['observer', 'operator', 'manager']
@@ -464,7 +465,7 @@ test('signing in is limited per address and per email, also for an email nobody 
 test('the server token stays on /api only if the server was started to keep it', async () => {
   const port = PORT + 3000
   const proc = spawn(process.execPath, [join(ROOT, 'server/server.js'), '--allow-token-api'], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: mkdtempSync(join(tmpdir(), 'squadra-accounts-')), SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore',
+    env: { ...process.env, PORT: String(port), DATA_DIR: tempDir('squadra-accounts-'), SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore',
   })
   try {
     const at = `http://127.0.0.1:${port}`

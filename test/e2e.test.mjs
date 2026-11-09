@@ -7,14 +7,14 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { spawn, execFileSync } from 'node:child_process'
-import { chmodSync, readdirSync, mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync, realpathSync, statSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, readdirSync, writeFileSync, readFileSync, mkdirSync, existsSync, appendFileSync, realpathSync, statSync, rmSync, symlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 import { createServer as createHttpServer } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
 import { connect as connectSocket } from 'node:net'
+import { tempDir, removeLater } from './tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SERVER_TOKEN = 'test-server-token-0123456789'
@@ -36,7 +36,7 @@ async function waitFor(fn, { timeout = 8000, interval = 50, what = 'condition' }
 // --- server ------------------------------------------------------------------
 
 let serverProc
-const dataDir = mkdtempSync(join(tmpdir(), 'squadra-data-'))
+const dataDir = tempDir('squadra-data-')
 
 async function api(method, params = {}, auth, instance) {
   if (method === 'claimSession' && instance === undefined) instance = params.instance
@@ -72,7 +72,7 @@ const plugins = []
 
 class Plugin {
   constructor(name, extraEnv = {}, { configDir, envFile = '', launch = true, noServer = false, persona } = {}) {
-    this.configDir = configDir ?? mkdtempSync(join(tmpdir(), `squadra-cfg-${name || 'none'}-`))
+    this.configDir = configDir ?? tempDir(`squadra-cfg-${name || 'none'}-`)
     mkdirSync(join(this.configDir, 'channels', 'squadra'), { recursive: true })
     writeFileSync(join(this.configDir, 'channels', 'squadra', '.env'), `${noServer ? '' : `SQUADRA_URL=${URL_}\nSQUADRA_SERVER_TOKEN=${SERVER_TOKEN}\n`}${envFile}`)
     const env = { ...process.env, CLAUDE_CONFIG_DIR: this.configDir, SQUADRA_LAUNCH_START: 'test-start', ...extraEnv }
@@ -397,7 +397,7 @@ test('plugin: approved/ as a link to another folder empties nothing', async () =
   await p.init()
   await p.tool('login', { role: 'coordinator', name: 'applink' })
   const stateDir = join(p.configDir, 'channels', 'squadra', 'applink')
-  const other = mkdtempSync(join(tmpdir(), 'squadra-precious-'))
+  const other = tempDir('squadra-precious-')
   writeFileSync(join(other, 'keep.txt'), 'mine')
   symlinkSync(other, join(stateDir, 'approved'))
   await sleep(6000) // (it looks every 5 s)
@@ -1100,7 +1100,7 @@ test('observation: a transcript read that ends inside a UTF-8 character does not
   const entry = (pad = '') => JSON.stringify({ type: 'assistant', pad, message: { content: [{ type: 'text', text: TEXT }] } }) + '\n'
   const firstByte = line => Buffer.from(line).indexOf(Buffer.from('ñ'))
   const textsAfter = async write => {
-    const path = join(mkdtempSync(join(tmpdir(), 'squadra-utf8-')), 't.jsonl')
+    const path = join(tempDir('squadra-utf8-'), 't.jsonl')
     writeFileSync(path, '')
     const sent = []
     const o = createObserver({ level: 'full', send: async batch => { sent.push(...batch) } })
@@ -1137,6 +1137,87 @@ test('observation: a transcript read that ends inside a UTF-8 character does not
   }), [TEXT])
 })
 
+test('permission profiles: written in the dashboard, checked, and followed by a team or a session', async () => {
+  const post = (what, body) => dashPost(`/api/${what}`, body)
+  const profiles = async () => (await dash('/api/state')).result.permissions
+  // Two built in, kept as they are.
+  const start = await profiles()
+  assert.deepEqual(start.profiles.slice(0, 2).map(p => [p.id, p.builtin]), [['readonly', true], ['dev', true]])
+  assert.match((await post('permissions/save', { id: 'dev', name: 'Mine' })).description, /built-in profiles are kept as they are/)
+  assert.match((await post('permissions/delete', { id: 'readonly' })).description, /cannot be deleted/)
+  // Only what Claude Code reads as a rule, and only capabilities it knows.
+  assert.match((await post('permissions/save', { name: 'X', extra: { allow: ['rm -rf /'] } })).description, /is not a Claude Code permission rule/)
+  assert.match((await post('permissions/save', { name: 'X', extra: { deny: ['mcp__github__create_issue(repo:x)'] } })).description, /is not a Claude Code permission rule/)
+  assert.match((await post('permissions/save', { name: 'X', caps: { teleport: 'allow' } })).description, /unknown capability/)
+  assert.match((await post('permissions/save', { name: 'X', caps: { push: 'maybe' } })).description, /allow, ask or deny/)
+  assert.match((await post('permissions/save', { name: '  ' })).description, /needs a name/)
+  const saved = await post('permissions/save', { name: '  Front\nend ', notes: 'No deploys.', caps: { commit: 'allow', push: 'default', web: 'ask' }, extra: { deny: ['Bash(make deploy *)', 'Bash(make deploy *)', ''] } })
+  assert.ok(saved.ok, saved.description)
+  assert.equal(saved.result.name, 'Front end')
+  assert.deepEqual(saved.result.caps, { commit: 'allow', web: 'ask' })
+  assert.deepEqual(saved.result.extra.deny, ['Bash(make deploy *)'])
+  assert.match((await post('permissions/save', { name: 'front END' })).description, /already a profile called/)
+  // Followed by a team, or by one session on its own (or by none, whatever its team's).
+  assert.ok((await post('permissions/assign', { coordinator: 'pteam', profile: saved.result.id })).ok)
+  assert.match((await post('permissions/assign', { coordinator: 'pteam', profile: 'nope' })).description, /profile not found/)
+  assert.match((await post('permissions/assign', { session: 'ghost', profile: 'dev' })).description, /session not found/)
+  let st = await profiles()
+  assert.equal(st.teams.pteam, saved.result.id)
+  // Deleted: whoever followed it follows none.
+  assert.ok((await post('permissions/delete', { id: saved.result.id })).ok)
+  st = await profiles()
+  assert.equal(st.teams.pteam, undefined)
+  assert.ok(!st.profiles.some(p => p.id === saved.result.id))
+})
+
+test('observation: a command goes with what it is for, in Claude\'s words, unless it touches secrets', async () => {
+  const { createObserver } = await import(join(ROOT, 'plugins/squadra/observe.js'))
+  const sent = []
+  const o = createObserver({ level: 'activity', send: async batch => { sent.push(...batch) } })
+  const pre = (id, tool_input, tool_name = 'Bash') => o._onHook({ ts: Date.now(), input: { hook_event_name: 'PreToolUse', tool_name, tool_use_id: id, tool_input, cwd: '/x' } })
+  pre('a', { command: 'python3 manage.py shell -c "print(Order.objects.count())"', description: 'Count the orders\nsecond line' })
+  pre('b', { command: 'cat .env', description: 'Read the API key from .env' })
+  pre('c', { command: 'ls' })
+  pre('d', { file_path: '/x/a.js', description: 'not a command' }, 'Read')
+  await o.stop()
+  const what = id => sent.find(e => e.kind === 'tool_start' && e.id === id)?.what
+  assert.equal(what('a'), 'Count the orders')
+  assert.equal(what('b'), undefined)
+  assert.equal(what('c'), undefined)
+  assert.equal(what('d'), undefined)
+})
+
+test('dashboard: what a session is doing now is said as a phrase, not as its command', async () => {
+  globalThis.document ??= { documentElement: {} }
+  const { nowPhrase } = await import(join(ROOT, 'server/ui/doing.js'))
+  const { T } = await import(join(ROOT, 'server/ui/i18n.js'))
+  const bash = (summary, what) => nowPhrase({ name: 'Bash', summary, what })
+  // Recognised: the same phrase whatever Claude wrote as its description.
+  assert.equal(bash('cd /var/www/app && npm test 2>&1 | tail -20', 'Run the tests'), T.nowTests)
+  assert.equal(bash('git -C /x commit -m "fix"'), T.nowCommit)
+  assert.equal(bash('rg -n "function" src'), T.nowSearch('function', ''))
+  assert.equal(bash('curl -s https://api.github.com/repos/x | jq .'), T.nowFetch('api.github.com'))
+  // Otherwise its description, or only the program's name, never the whole line.
+  assert.equal(bash('python3 manage.py shell -c "a very long line"', 'Inspect the orders table'), 'Inspect the orders table')
+  assert.equal(bash('FOO=1 sudo ./deploy.sh --all'), T.nowRun('deploy.sh'))
+  assert.equal(bash('for f in *.png; do convert $f; done'), T.nowRunSome)
+  assert.equal(bash('command … (touches secrets: not shown)'), T.nowSecretCommand)
+  // Other tools: the file's name, not its path.
+  assert.equal(nowPhrase({ name: 'Read', summary: 'plugins/squadra/observe.js (from line 300)' }), T.nowRead('observe.js'))
+  assert.equal(nowPhrase({ name: 'Edit', summary: 'src/a/tools.js (+3 −1)' }), T.nowEdit('tools.js'))
+  assert.equal(nowPhrase({ name: 'Grep', summary: '"function" in src (*.js)' }), T.nowSearch('function', 'src'))
+  assert.equal(nowPhrase({ name: 'mcp__plugin_squadra_squadra__reply', summary: 'chat_id: Maria' }), T.nowReply('Maria'))
+  assert.equal(nowPhrase({ name: 'mcp__claude-in-chrome__navigate', summary: 'url: https://x' }), T.nowMcp('navigate', 'claude-in-chrome'))
+  // Every phrase in both languages.
+  const { readFileSync: rf } = await import('node:fs')
+  const src = rf(join(ROOT, 'server/ui/i18n.js'), 'utf8')
+  const en = src.slice(src.indexOf('  en: {'), src.indexOf('  es: {'))
+  const es = src.slice(src.indexOf('  es: {'))
+  const keys = text => [...text.matchAll(/^    (now\w+):/gm)].map(m => m[1])
+  assert.ok(keys(en).length > 30)
+  assert.deepEqual(keys(es), keys(en))
+})
+
 test('observation: a transcript read shorter than the size reported adds nothing and skips nothing', async () => {
   const { createObserver } = await import(join(ROOT, 'plugins/squadra/observe.js'))
   const fs = (await import('node:fs')).default
@@ -1144,7 +1225,7 @@ test('observation: a transcript read shorter than the size reported adds nothing
   const TEXT = 'hola '.repeat(50).trim()
   const line = JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: TEXT }] } }) + '\n'
   const half = Math.floor(line.length / 2)
-  const path = join(mkdtempSync(join(tmpdir(), 'squadra-short-')), 't.jsonl')
+  const path = join(tempDir('squadra-short-'), 't.jsonl')
   writeFileSync(path, '')
   const sent = []
   const o = createObserver({ level: 'full', send: async batch => { sent.push(...batch) } })
@@ -1790,6 +1871,11 @@ test('task reports: a worker can\'t end a task without its final report, and its
   await wk.waitChannel(p => p.content === 'Task: the reports page', 'task 3')
   assert.equal(await stopHook(), null)
   assert.equal(await stopHook(true), null)
+  // Waiting in Claude Code's queue (the transcript has its whole text, but
+  // Claude doesn't): still nothing is asked about it.
+  appendFileSync(transcript, JSON.stringify({ type: 'queue-operation', operation: 'enqueue', content: `<channel source="squadra" chat_id="trc" message_id="${t3}" user="trc"> Task: the reports page </channel>` }) + '\n')
+  await sleep(1000)
+  assert.equal(await stopHook(), null)
   // Put into a turn already going (no prompt for it, only the transcript shows
   // it): now it is asked for, and only that task.
   appendFileSync(transcript, JSON.stringify({ type: 'attachment', attachment: { type: 'queued_command', prompt: `<channel source="squadra" chat_id="trc" message_id="${t3}" user="trc"> Task: the reports page </channel>` } }) + '\n')
@@ -1870,7 +1956,7 @@ test('plugin: a session opened with SQUADRA_NAME knows its role from the instruc
 
 test('observation: a long config path (typical on macOS) moves the socket to a private /tmp folder', async () => {
   // Unix socket paths are limited to ~104 bytes on macOS.
-  const deep = join(mkdtempSync(join(tmpdir(), 'squadra-long-')), 'a-very-long-folder-name-like-macos-var-folders', 'another-long-segment-for-good-measure')
+  const deep = join(tempDir('squadra-long-'), 'a-very-long-folder-name-like-macos-var-folders', 'another-long-segment-for-good-measure')
   mkdirSync(deep, { recursive: true })
   const w = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' }, { configDir: deep })
   await w.init()
@@ -1878,7 +1964,7 @@ test('observation: a long config path (typical on macOS) moves the socket to a p
   const { socketDirFor, isPrivateDir } = await import(join(ROOT, 'plugins/squadra/paths.js'))
   // (The plugin works with the config folder's real path: on macOS
   // /var/folders is /private/var/folders.)
-  const dir = socketDirFor(join(realpathSync(deep), 'channels', 'squadra', 'run'))
+  const dir = removeLater(socketDirFor(join(realpathSync(deep), 'channels', 'squadra', 'run')))
   assert.match(dir, /^\/tmp\/squadra-/)
   await waitFor(() => existsSync(dir), { what: 'socket folder' })
   assert.ok(isPrivateDir(dir), 'socket folder is private')
@@ -2100,7 +2186,7 @@ test('secrets: camelCase names, a MySQL password in a message, and files named i
 test('a worker opened from the dashboard trusts the coordinator it was opened for, even if an older one had that name', async () => {
   const c1 = (await api('register', { name: 'cpin1' }, SERVER_TOKEN)).result
   // The worker's state still remembers an earlier session called cpin1.
-  const cfg = mkdtempSync(join(tmpdir(), 'squadra-cfg-wpin-'))
+  const cfg = tempDir('squadra-cfg-wpin-')
   const dir = join(cfg, 'channels', 'squadra', 'wpin1')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'coordinator-pin.json'), JSON.stringify({ name: 'cpin1', identity: 'an-earlier-cpin1', created_at: 1 }))
@@ -2311,7 +2397,7 @@ test('signing: text that only differs in what the server removes still verifies'
 })
 
 test('transport: plain http to another machine, or a certificate nobody checks, gets no secret', async t => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-tls-'))
+  const dir = tempDir('squadra-tls-')
   const login = async (envFile, env = {}) => {
     const p = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1', ...env }, { noServer: true, envFile })
     await p.init()
@@ -2410,7 +2496,7 @@ test('server key: a session gives nothing to anything but the server it remember
   const { generateKeyPairSync, randomBytes, sign } = await import('node:crypto')
   const proxy = await hostileProxy()
   t.after(() => proxy.close())
-  const configDir = mkdtempSync(join(tmpdir(), 'squadra-cfg-impostor-'))
+  const configDir = tempDir('squadra-cfg-impostor-')
   const envFile = `SQUADRA_URL=${proxy.url}\nSQUADRA_SERVER_TOKEN=${SERVER_TOKEN}\n`
   const first = new Plugin('imp1', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_COORDINATOR: 'impc' }, { noServer: true, configDir, envFile })
   await first.init()
@@ -2487,7 +2573,7 @@ test('server key: a coordinator only takes notices the server signed, once', asy
 
 test('observation: a hook socket client cannot fill the memory', async () => {
   const { createObserver } = await import(join(ROOT, 'plugins/squadra/observe.js'))
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-sock-'))
+  const dir = tempDir('squadra-sock-')
   const prompts = []
   const o = createObserver({ level: 'full', send: async () => {}, onPrompt: p => prompts.push(p) })
   const sock = join(dir, 'p.sock')
@@ -2616,7 +2702,7 @@ test('the attachment guard knows the server\'s own files and common credentials,
 })
 
 test('a launch.json is for its own start: a project setting the same name gets the question, and leaves the ticket', async () => {
-  const configDir = mkdtempSync(join(tmpdir(), 'squadra-cfg-ticket-'))
+  const configDir = tempDir('squadra-cfg-ticket-')
   const stateDir = join(configDir, 'channels', 'squadra', 'tick1')
   mkdirSync(stateDir, { recursive: true })
   const ticket = join(stateDir, 'launch.json')
@@ -2648,7 +2734,7 @@ test('a launch.json is for its own start: a project setting the same name gets t
 })
 
 test('what else in the environment changes whom Node trusts is refused unless this machine\'s .env names it', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-cfg-trust-'))
+  const dir = tempDir('squadra-cfg-trust-')
   const script = `
     import { transportProblem } from ${JSON.stringify(join(ROOT, 'plugins/squadra/core/settings.js'))}
     const url = 'https://squadra.example.com'
@@ -2682,7 +2768,7 @@ test('what else in the environment changes whom Node trusts is refused unless th
 })
 
 test('a copy of a keyed session\'s secret can\'t use up its claims while it is away', async () => {
-  const configDir = mkdtempSync(join(tmpdir(), 'squadra-cfg-claims-'))
+  const configDir = tempDir('squadra-cfg-claims-')
   const first = new Plugin('claimk', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_ROLE: 'solo' }, { configDir })
   await first.init()
   await first.waitConnected()
@@ -2705,7 +2791,7 @@ test('a copy of a keyed session\'s secret can\'t use up its claims while it is a
 
 test('a CLAUDE_CONFIG_DIR that is set and ignored stops the login: the default folder may be another copy\'s', async () => {
   // (Relative, and one where others can write: this test's own folder stays out of the way.)
-  const open = mkdtempSync(join(tmpdir(), 'squadra-cfg-open-'))
+  const open = tempDir('squadra-cfg-open-')
   chmodSync(open, 0o777)
   for (const value of ['relative/cfg', open]) {
     const p = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1', CLAUDE_CONFIG_DIR: value })
@@ -2717,7 +2803,7 @@ test('a CLAUDE_CONFIG_DIR that is set and ignored stops the login: the default f
 })
 
 test('signatures: each sender has its own list and floor, and nothing evicted can be handed over again', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'squadra-cfg-sig-'))
+  const dir = tempDir('squadra-cfg-sig-')
   const script = `
     import { signatureReplayed } from ${JSON.stringify(join(ROOT, 'plugins/squadra/core/signed.js'))}
     import { writeFileSync } from 'node:fs'
@@ -2926,6 +3012,35 @@ test('the inbox: a coordinator leaves a question or a result for the user, and n
   coord.close(); w.close(); other.close()
 })
 
+test('the inbox: what is done comes a page at a time, by team or words, and what to know is read all at once', async () => {
+  const coord = new Plugin('inbp', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_ROLE: 'coordinator' })
+  await coord.init()
+  await coord.waitConnected()
+  for (let n = 0; n < 6; n++) await coord.tool('tell_user', { text: `Note ${n} of the release` })
+  const mine = (await dash('/api/inbox')).result.filter(i => i.session === 'inbp')
+  assert.equal(mine.length, 6)
+  // All read, but only what was in front of the user: the last one stays.
+  const seen = mine.filter(i => i.text !== 'Note 5 of the release').map(i => i.id)
+  assert.equal((await dashPost('/api/inbox/read-all', { ids: seen })).result.resolved, 5)
+  assert.equal((await dashPost('/api/inbox/read-all', { ids: seen })).result.resolved, 0)
+  const open = (await dash('/api/inbox')).result.filter(i => i.session === 'inbp' && !i.resolved_at)
+  assert.deepEqual(open.map(i => i.text), ['Note 5 of the release'])
+  // A page at a time, newest first, each once.
+  const pages = []
+  let before = ''
+  do {
+    const r = (await dash(`/api/inbox/done?team=inbp&limit=2${before ? `&before=${before}` : ''}`)).result
+    pages.push(r.items.map(i => i.id))
+    before = r.next_before
+  } while (before && pages.length < 10)
+  assert.deepEqual(pages.map(p => p.length), [2, 2, 1])
+  assert.deepEqual(pages.flat().sort((a, b) => a - b), [...seen].sort((a, b) => a - b))
+  // By words, and a % is only a %.
+  assert.deepEqual((await dash('/api/inbox/done?team=inbp&q=note%203')).result.items.map(i => i.text), ['Note 3 of the release'])
+  assert.equal((await dash('/api/inbox/done?team=inbp&q=%25')).result.items.length, 0)
+  assert.equal((await dash('/api/inbox/done?before=nonsense')).ok, false)
+})
+
 test('reminders where decisions are made: a task that may be the user\'s, its worker, and a coordinator asking in its chat', async () => {
   const coord = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
   const wk = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
@@ -2945,6 +3060,15 @@ test('reminders where decisions are made: a task that may be the user\'s, its wo
   // An ordinary one: neither.
   assert.doesNotMatch(await coord.tool('reply', { chat_id: 'rmw', text: 'Fix the typo in the README' }), /This task mentions/)
   assert.equal((await wk.waitChannel(p => p.content.startsWith('Fix the typo'), 'plain task')).meta.squadra_note, undefined)
+  // A draft ("borrador") or a state ("publicado") is not a deletion or a publication.
+  assert.doesNotMatch(await coord.tool('reply', { chat_id: 'rmw', text: 'Prepara el borrador del presupuesto 12 y déjalo como borrador, no publicado' }), /This task mentions/)
+  assert.equal((await wk.waitChannel(p => p.content.startsWith('Prepara el borrador'), 'draft task')).meta.squadra_note, undefined)
+  // A report after the last plan: reminded once, not on every reply after it.
+  await coord.tool('update_plan', { tasks: [{ title: 'Issue 6', who: 'rmw', state: 'doing' }] })
+  await wk.tool('reply', { chat_id: 'rmc', text: 'Issue 6 left for the user', report: 'question' })
+  await coord.waitChannel(p => p.content === 'Issue 6 left for the user', 'report')
+  assert.match(await coord.tool('reply', { chat_id: 'rmw', text: 'Next: the footer' }), /A worker reported after your last update_plan: if that changes a task's state, send the whole list again with update_plan\. If the plan already shows it, ignore this\./)
+  assert.doesNotMatch(await coord.tool('reply', { chat_id: 'rmw', text: 'And the header' }), /reported after your last update_plan/)
   // Ending its turn asking the user for something in this chat: reminded, once a turn.
   const stop = text => runHookOut(coord, { hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: text, session_id: 's', cwd: '/x' }, ['--stop'])
   assert.match(JSON.parse(await stop('Quedan pendientes para ti: la migración 006 y la contraseña 008.')).reason, /they read their inbox, not this conversation/)
@@ -2952,8 +3076,16 @@ test('reminders where decisions are made: a task that may be the user\'s, its wo
   // A new turn in which it did use the inbox: nothing to remind.
   await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'sigue', session_id: 's', cwd: '/x' })
   await sleep(300)
-  await coord.tool('ask_user', { text: 'Drop legacy_discount, with data in all 1240 rows?', options: ['Back up, then drop', 'Keep it'] })
+  const askId = Number(/inbox \(#(\d+)\)/.exec(await coord.tool('ask_user', { text: 'Drop legacy_discount, with data in all 1240 rows?', options: ['Back up, then drop', 'Keep it'] }))[1])
   assert.equal(await stop('Te lo he dejado en la bandeja. Dime si quieres algo más.'), '')
+  // In a later turn, with that question still open: talking about it is not asking it here.
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'qué falta', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.equal(await stop('Solo falta tu decisión sobre legacy_discount.'), '')
+  // Once the user answers it from the inbox, asking in the chat is reminded again.
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: `Inbox #${askId} ("Drop legacy_discount, with data in all 1240 rows?"), the user answers from their inbox: Keep it [They are not following this session.]`, session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.match(JSON.parse(await stop('Hecho. ¿Subo la versión 1.3?')).reason, /they read their inbox, not this conversation/)
   // Nor when it asks nothing.
   await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'y ahora', session_id: 's', cwd: '/x' })
   await sleep(300)

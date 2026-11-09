@@ -5,6 +5,7 @@ import { esc } from './format.js'
 import { postJson, terminalOf } from './machines.js'
 import { personaOptions } from './squads.js'
 import { icon } from './icons.js'
+import { profiles, profileName, profileById, profileSummary } from './permissions.js'
 
 // A new team, in one page: what it is for, who is in it, where it runs, and
 // opening it. Each step says when it is done; nothing opens until the last.
@@ -20,7 +21,7 @@ function fresh() {
   const free = base => { for (let i = 1; ; i++) { const n = `${base}${i}`; if (!taken(n)) return n } }
   const w1 = free('worker'), w2 = (() => { for (let i = Number(w1.slice(6)) + 1; ; i++) if (!taken(`worker${i}`)) return `worker${i}` })()
   const online = [...hosts.values()].filter(h => h.online)
-  return { title: '', goal: '', start: 'workers', coord: { name: '', persona: '' }, workers: [{ name: w1, persona: '' }, { name: w2, persona: '' }], host: online[0]?.id ?? '', folder: online[0]?.info?.folders?.[0] ?? '', sub: '', coordTouched: false, running: false, results: {} }
+  return { title: '', goal: '', start: 'workers', coord: { name: '', persona: '' }, workers: [{ name: w1, persona: '' }, { name: w2, persona: '' }], host: online[0]?.id ?? '', folder: online[0]?.info?.folders?.[0] ?? '', sub: '', profile: '', coordTouched: false, running: false, results: {} }
 }
 
 // The agents the chosen machine can run (an older machine: Claude Code only).
@@ -100,6 +101,8 @@ export function renderNewTeam() {
       <section class="nt-sec"><h2>${esc(T.ntGoalStep)}</h2>
         <label class="field"><span>${esc(T.ntTitle)}</span><input type="text" name="title" maxlength="40" value="${esc(draft.title)}" placeholder="${esc(T.ntTitleHint)}" autocomplete="off" ${draft.running ? 'disabled' : ''}></label>
         <label class="field"><span>${esc(T.ntGoal)}</span><textarea name="goal" maxlength="300" rows="2" placeholder="${esc(T.ntGoalHint)}" ${draft.running ? 'disabled' : ''}>${esc(draft.goal)}</textarea></label>
+        ${can('manager') ? `<label class="field"><span>${esc(T.tqPermissions)}</span><select name="profile" ${draft.running ? 'disabled' : ''}><option value="">${esc(T.permNone)}</option>${profiles().map(p => `<option value="${esc(p.id)}" ${draft.profile === p.id ? 'selected' : ''}>${esc(profileName(p))}</option>`).join('')}</select></label>
+        <p class="nt-note" data-profile-say>${esc(profileSummary(profileById(draft.profile)))}</p>` : ''}
       </section>
 
       <section class="nt-sec"><h2>${esc(T.ntWhoStep)}</h2>
@@ -154,6 +157,8 @@ async function launch() {
     const spec = { name: m.name, role: m.role, folder: own?.folder ?? folder, ...(m.persona ? { persona: m.persona } : {}), ...(m.agent && m.agent !== 'claude' && agentsOf(draft.host).includes(m.agent) ? { agent: m.agent } : {}), ...(own?.compact_window ? { compact_window: own.compact_window } : { compact_window: 600000 }) }
     if (i) spec.coordinator = list[0].name
     try {
+      // (The team's permission profile first: its sessions open with it.)
+      if (!i && draft.profile) await postJson('/api/permissions/assign', { coordinator: m.name, profile: draft.profile })
       await postJson('/api/terminals/open', { host: draft.host, spec })
       draft.results[m.name] = { ok: true, text: T.ntOpened }
       // Once its coordinator exists, the team has its name and what it is for.
@@ -185,6 +190,7 @@ $('newteam').addEventListener('change', e => {
   const t = e.target
   if (t.name === 'host') { draft.host = t.value; draft.folder = hosts.get(t.value)?.info?.folders?.[0] ?? '' }
   else if (t.name === 'folder') draft.folder = t.value
+  else if (t.name === 'profile') { draft.profile = t.value; $('newteam').querySelector('[data-profile-say]').textContent = profileSummary(profileById(t.value)); return }
   else if (t.dataset.persona != null) { const i = Number(t.dataset.persona); if (i === 0) draft.coord.persona = t.value; else draft.workers[i - 1].persona = t.value; return }
   else if (t.dataset.agent != null) { const i = Number(t.dataset.agent); (i === 0 ? draft.coord : draft.workers[i - 1]).agent = t.value; return }
   else return

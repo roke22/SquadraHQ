@@ -24,6 +24,22 @@ details.ibx-group > summary { cursor: pointer; list-style: none; }
 details.ibx-group > summary::-webkit-details-marker { display: none; }
 details.ibx-group > summary:hover { color: var(--text); }
 .ibx-none { padding: 20px; color: var(--muted); }
+/* What to know, read at once. */
+.ibx-readall { margin-left: auto; margin-right: 8px; height: 26px; padding: 0 8px; font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0; text-transform: none; }
+/* Done: a search and a team above the days, more below them. */
+.ibx-tools { display: flex; gap: 8px; padding: 12px 0 0; }
+.ibx-tools input { flex: 1 1 auto; min-width: 0; height: 34px; }
+.ibx-tools select { flex: 0 1 200px; min-width: 0; height: 34px; }
+@media (max-width: 600px) {
+  .ibx-tools { flex-wrap: wrap; }
+  .ibx-tools input, .ibx-tools select { flex: 1 1 100%; height: 40px; font-size: 16px; }
+}
+.ibx-more { display: flex; justify-content: center; padding: 16px 0 4px; }
+.ibx-end { padding: 16px 4px 4px; text-align: center; font-size: var(--fs-sm); color: var(--muted); }
+/* Just arrived: marked a moment, where it landed. */
+.ibx-item.new { animation: ibx-new 2.6s var(--ease); }
+@keyframes ibx-new { from, 35% { background: color-mix(in srgb, var(--info) 14%, var(--panel)); } }
+@media (prefers-reduced-motion: reduce) { .ibx-item.new { animation: none; box-shadow: inset 3px 0 0 var(--info); } }
 
 .ibx-item { display: flex; gap: 12px; padding: 13px 16px; color: inherit; text-decoration: none; transition: background-color var(--t-fast) var(--ease); }
 .ibx-item:hover { background: color-mix(in srgb, var(--raised) 60%, var(--panel)); }
@@ -39,7 +55,6 @@ details.ibx-group > summary:hover { color: var(--text); }
 .ibx-who .role { width: 12px; height: 12px; }
 .ibx-upd { color: var(--warn); font-weight: 500; }
 
-.ibx-back { display: none; }
 
 /* The one open: a card, headed like a message (who, team, what, when), then
    what it says and how to answer, then its facts in a quiet footer. */
@@ -109,7 +124,6 @@ details.ibx-group > summary:hover { color: var(--text); }
   .ibx.has-pick .ibx-list { display: none; }
   .ibx-close { display: none; }
   .ibx-detail.enter { animation: none; }
-  .ibx-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 0 6px -6px; padding: 0 6px; color: var(--text); text-decoration: none; font-weight: 500; }
   .ibx-q { font-size: 19px; }
   .ibx-answer textarea { font-size: 16px; }
   .ibx-opt { min-height: 48px; }

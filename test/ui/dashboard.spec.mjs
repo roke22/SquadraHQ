@@ -149,7 +149,7 @@ test('an invitation: a link of one use brings someone in, with only their role',
   await expect(guest.locator('.org-card').first()).toBeVisible()
   await expect(guest.locator('[data-orgact], [data-orghandle]')).toHaveCount(0)
   await guest.locator('#settingsBtn').click()
-  await expect(guest.locator('[data-tab]')).toHaveText(['Profile and password', 'Language and theme'])
+  await expect(guest.locator('[data-tab]')).toHaveText(['Profile and password', 'Language, theme and notices'])
   await ctx.close()
 })
 
@@ -186,19 +186,66 @@ test('the shell: Ctrl+K goes anywhere, and the settings open over everything and
   await page.evaluate(() => localStorage.removeItem('squadraTheme'))
 })
 
-test('the shell on a phone: the sidebar slides in, and goes when you pick a place', async ({ browser }) => {
+test('the shell on a phone: no sidebar, the places and the settings at the bottom, and back as an arrow', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } })
   const page = await ctx.newPage()
   await signIn(page)
   await expect(page.locator('#rail')).toBeHidden()
-  await page.locator('#menuBtn').click()
-  await expect(page.locator('#rail')).toBeVisible()
-  await expect(page.locator('#menuBtn')).toHaveAttribute('aria-expanded', 'true')
-  await page.locator('#nav a[href="#/teams"]').click()
-  await expect(page.locator('#rail')).toBeHidden()
+  await expect(page.locator('#menuBtn')).toHaveCount(0)
+  // One of the main places: no back.
+  await expect(page.locator('#backBtn')).toBeHidden()
+  await page.locator('#tabbar a[href="#/teams"]').click()
   await expect(page).toHaveURL(/#\/teams/)
+  await page.locator('#teams a[href="#/s/worker1"]').first().click()
+  await expect(page).toHaveURL(/#\/s\/worker1/)
+  // The arrow alone, named for where it goes.
+  const back = page.locator('#backBtn')
+  await expect(back).toBeVisible()
+  await expect(back).toHaveAttribute('aria-label', 'Back to Teams')
+  await expect(back.locator('.head-back-to')).toBeHidden()
+  await back.click()
+  await expect(page).toHaveURL(/#\/teams$/)
+  // The settings, from the bar.
+  await page.locator('#tabbar [data-settings]').click()
+  await expect(page.locator('#settings [role=dialog]')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('#settings')).toBeHidden()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await ctx.close()
+})
+
+test('back: where the user came from, skipping the tabs of one place, and one level up with nowhere to go back to', async ({ page }) => {
+  await server.call('api/terminals/open', { host: machine.id, spec: { name: 'worker3', role: 'worker', coordinator: 'coord' } })
+  await signIn(page)
+  const back = page.locator('#backBtn')
+  await expect(back).toBeHidden()
+  // From the inbox to a session, and between its chat and its terminal.
+  await page.evaluate(() => { location.hash = '#/s/worker3/chat' })
+  await expect(back).toHaveAttribute('aria-label', 'Back to Inbox')
+  await expect(back.locator('.head-back-to')).toHaveText('Inbox')
+  await page.locator('#topTabs a', { hasText: 'Terminal' }).click()
+  await expect(page).toHaveURL(/#\/s\/worker3$/)
+  await page.locator('#topTabs a', { hasText: 'Conversation' }).click()
+  await expect(page).toHaveURL(/#\/s\/worker3\/chat$/)
+  // One press: the inbox, not the other tab.
+  await back.click()
+  await expect(page).toHaveURL(/#\/$|#\/inbox$|\/\?company=default$/)
+  await expect(back).toBeHidden()
+  // And the browser's own back agrees: the step it skipped isn't there.
+  await page.goForward()
+  await expect(page).toHaveURL(/#\/s\/worker3\/chat$/)
+  // Opened on its own (a link, a notification): up to its team, then to the teams.
+  await page.goto(`${server.url}/?company=default#/s/worker1/chat`)
+  await page.evaluate(() => sessionStorage.clear())
+  await page.reload()
+  await expect(back).toHaveAttribute('aria-label', 'Back to coord')
+  await back.click()
+  await expect(page).toHaveURL(/#\/q\/coord$/)
+  await expect(back).toHaveAttribute('aria-label', 'Back to Teams')
+  // Cancel goes back where it was too.
+  await page.evaluate(() => { location.hash = '#/new' })
+  await page.locator('#topRight [data-back]').click()
+  await expect(page).toHaveURL(/#\/q\/coord$/)
 })
 
 test('a new team: one page, and it opens its coordinator and workers on the machine, named and described', async ({ page }) => {
@@ -308,11 +355,13 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await detail.locator('textarea[name=answer]').fill('cap it at 25 %')
   await detail.locator('[data-option="0"]').click()
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id} ("Stack the discounts?"), the user answers from their inbox: Stack. cap it at 25 %`)
-  // Then the next that waits; what was answered is under Done.
+  // Then the next that waits; what was answered is in Done.
   await expect(page).toHaveURL(new RegExp(`#/inbox/i(${id2}|${id3})$`))
-  await page.locator('[data-folded] summary').click()
+  await page.locator('#topTabs [data-ibxtab=done]').click()
   await page.locator(`[data-key="i${id}"]`).click()
+  await expect(page).toHaveURL(new RegExp(`#/inbox/done/i${id}$`))
   await expect(detail).toContainText('answered: Stack. cap it at 25 %')
+  await page.locator('#topTabs [data-ibxtab=pending]').click()
   // A key picks an option: 2 is the second.
   await page.locator(`[data-key="i${id3}"]`).click()
   await expect(detail).toContainText('Which name for the release?')
@@ -335,6 +384,44 @@ test('the inbox: a question opened from the dashboard is answered there, and one
   await detail.locator('button.primary').click()
   await expect.poll(() => machine.answers.map(a => a.text).join('\n')).toContain(`Inbox #${id2} ("Drop the column? It holds data in all 1240 rows"), the user answers from their inbox: Keep it`)
   await expect(page.locator('#inbox')).toContainText('Nothing is waiting for you')
+})
+
+test('the inbox: pending and done apart; done a page at a time, by words or team; what arrives shows by itself', async ({ page }) => {
+  const a = await startSession(server, 'pagea', 'coordinator')
+  const b = await startSession(server, 'pageb', 'coordinator')
+  const ids = []
+  for (let n = 0; n < 27; n++) ids.push((await a.call('tellUser', { text: `Batch A note ${n}` })).id, (await b.call('tellUser', { text: `Batch B note ${n}` })).id)
+  await server.call('api/inbox/read-all', { ids })
+  await signIn(page, '#/inbox/done')
+  const box = page.locator('#inbox')
+  await expect(page.locator('#topTabs [data-ibxtab=done]')).toHaveAttribute('aria-current', 'page')
+  await expect(box.locator('.ibx-group-h').first()).toHaveText('Today')
+  // A page, and the next as the list ends.
+  await expect(box.locator('.ibx-item')).toHaveCount(50)
+  await box.locator('.ibx-more [data-more]').scrollIntoViewIfNeeded()
+  await expect.poll(() => box.locator('.ibx-item').count()).toBeGreaterThanOrEqual(54)
+  // By its words, then by team.
+  await box.locator('#ibxQ').fill('Batch B note 7')
+  await expect(box.locator('.ibx-item')).toHaveCount(1)
+  await expect(box.locator('#ibxQ')).toHaveValue('Batch B note 7')
+  await box.locator('#ibxQ').fill('')
+  await box.locator('[data-donefilter] select').selectOption('pagea')
+  await expect(box.locator('.ibx-item')).toHaveCount(27)
+  await expect(box.locator('.ibx-end')).toBeVisible()
+  // Pending: what arrives shows on its own, marked, and counted in the tab's title.
+  await page.locator('#topTabs [data-ibxtab=pending]').click()
+  await expect(page).toHaveURL(/#\/inbox$/)
+  await a.call('tellUser', { text: 'Fresh note one' })
+  await b.call('tellUser', { text: 'Fresh note two' })
+  await expect(box.locator('.ibx-item', { hasText: 'Fresh note one' })).toHaveClass(/new/)
+  await expect(page).toHaveTitle(/^\(\d+\) /)
+  // Everything to know, read at once; then it is done.
+  await box.locator('[data-readall]').click()
+  await expect(box.locator('.ibx-item', { hasText: 'Fresh note' })).toHaveCount(0)
+  await page.locator('#topTabs [data-ibxtab=done]').click()
+  // (The team picked there still is: one of its own.)
+  await expect(box.locator('.ibx-item', { hasText: 'Fresh note one' })).toBeVisible()
+  await expect(box.locator('.ibx-item', { hasText: 'Fresh note two' })).toHaveCount(0)
 })
 
 test('disconnecting a machine: it offers to end the sessions opened there, ticked', async ({ page }) => {
@@ -568,6 +655,69 @@ test('beside a session terminal: what it is doing, and what mattered, read from 
   // And beside its conversation, under its team and details.
   await page.goto(`${server.url}/#/s/tlw/chat`)
   await expect(page.locator('.sv-aside .tl-list')).toContainText('Round the total')
+})
+
+test('what a session is doing now: a phrase, with its command only in the tooltip', async ({ page }) => {
+  const s = await startSession(server, 'nowp', 'worker', 'tlw')
+  const long = 'cd /var/www/app && python3 manage.py shell -c "from orders.models import Order; print(Order.objects.filter(status=\'open\').count())"'
+  await s.observe([{ kind: 'prompt', ts: Date.now() - 5000, text: 'Count them' }, { kind: 'tool_start', ts: Date.now() - 2000, id: 'p1', tool: 'Bash', summary: long, what: 'Count the open orders' }])
+  await signIn(page, '#/s/nowp')
+  const row = page.locator('.rail-sess', { hasText: 'nowp' })
+  await expect(row).toHaveAttribute('title', /^Count the open orders · .*\nBash · cd \/var\/www\/app/s)
+  await expect(page.locator('#topSub')).toContainText('Count the open orders')
+  await expect(page.locator('#topSub')).not.toContainText('manage.py')
+  // A command it recognises: its own phrase, in the dashboard's language.
+  await s.observe([{ kind: 'tool_end', ts: Date.now() - 1000, id: 'p1', tool: 'Bash', ok: true }, { kind: 'tool_start', ts: Date.now(), id: 'p2', tool: 'Bash', summary: 'cd /var/www/app && npm test 2>&1 | tail -40', what: 'Run the tests' }])
+  await expect(page.locator('#topSub')).toContainText('Running the tests')
+})
+
+test('permission profiles: written in your own words, checked line by line, and a team opens with them', async ({ page }) => {
+  page.expectedErrors = [/status of 400/] // (a rule Claude Code wouldn't read, refused on purpose)
+  await signIn(page, '#/teams')
+  await page.locator('#settingsBtn').click()
+  await page.locator('.settings [data-tab=permissions]').click()
+  // The two built in, kept as they are: a copy can be changed.
+  await expect(page.locator('.perm-list tr')).toHaveCount(2)
+  await expect(page.locator('.perm-list tr[data-profile=dev] [data-edit-profile]')).toHaveCount(0)
+  await page.locator('[data-new-profile]').click()
+  const d = page.locator('.modal')
+  await d.locator('[name=name]').fill('Backend')
+  await d.locator('[name=notes]').fill('They may commit and run the tests, but never push, and never use sudo.')
+  await d.locator('[data-fill]').click()
+  await expect(d.locator('[data-filled]')).toContainText('4 lines filled in')
+  for (const [cap, st] of [['commit', 'allow'], ['tests', 'allow'], ['push', 'deny'], ['sudo', 'deny'], ['web', 'default']]) await expect(d.locator(`[name=cap-${cap}]`)).toHaveValue(st)
+  // A rule Claude Code wouldn't read: said, and nothing saved.
+  await d.locator('.perm-own summary').click()
+  await d.locator('[name=own-deny]').fill('make deploy')
+  await d.locator('[data-save]').click()
+  await expect(d.locator('.err')).toContainText('is not a Claude Code permission rule')
+  await d.locator('[name=own-deny]').fill('Bash(make deploy *)')
+  await d.locator('[data-save]').click()
+  await expect(page.locator('.modal')).toHaveCount(0)
+  const row = page.locator('.perm-list tr', { hasText: 'Backend' })
+  await expect(row).toContainText('Allowed: tests, commits')
+  await expect(row).toContainText('Forbidden: push, sudo')
+  await expect(row).toContainText('1 rule of its own')
+  await page.keyboard.press('Escape')
+  // The team follows it: shown on its page, and its sessions open with its rules.
+  await page.goto(`${server.url}/?company=default#/q/coord`)
+  await page.locator('.perm-side [data-perm-assign]').click()
+  await page.locator('.modal [name=profile]').selectOption({ label: 'Backend' })
+  await page.locator('.modal [data-ok]').click()
+  await expect(page.locator('.perm-side')).toContainText('Follows “Backend”')
+  await server.call('api/terminals/open', { host: machine.id, spec: { name: 'perm-w', role: 'worker', coordinator: 'coord', folder: '/srv/squad' } })
+  const spec = machine.opened.find(o => o.name === 'perm-w')
+  expect(spec.permissions.profile).toBe('Backend')
+  expect(spec.permissions.allow).toContain('Bash(git commit *)')
+  expect(spec.permissions.deny).toEqual(['Bash(git push *)', 'Bash(sudo *)', 'Bash(make deploy *)'])
+  expect(spec.permissions.notes).toBe('They may commit and run the tests, but never push, and never use sudo.')
+  // One session on its own: none, whatever its team's.
+  await page.goto(`${server.url}/?company=default#/s/perm-w/chat`)
+  await expect(page.locator('.sv-info .perm-side')).toContainText('Follows its team’s, “Backend”')
+  await page.locator('.sv-info .perm-side [data-perm-assign]').click()
+  await page.locator('.modal [name=profile]').selectOption('none')
+  await page.locator('.modal [data-ok]').click()
+  await expect(page.locator('.sv-info .perm-side')).toContainText('No profile')
 })
 
 test('people in all companies: a column each, the role changed in place, and one invitation for several', async ({ page }) => {

@@ -4,12 +4,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { totpCode, totpStep } from '../server/accounts/totp.js'
+import { tempDir } from './tempdirs.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'upgrade-admin-token-0123456789'
@@ -17,7 +17,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 function serverOf(tag) {
   try {
-    const dir = mkdtempSync(join(tmpdir(), 'squadra-old-'))
+    const dir = tempDir('squadra-old-')
     execFileSync('sh', ['-c', `git -C "${ROOT}" archive ${tag} server | tar -x -C "${dir}"`], { stdio: 'ignore' })
     // (Without the tag — a shallow clone, as in CI — nothing is extracted; macOS's
     // tar doesn't fail on the empty input.)
@@ -45,7 +45,7 @@ async function run(script, dataDir, port) {
 const stop = async s => { s.proc.kill('SIGTERM'); await s.exited }
 
 test('a 0.0.1 database: the new server starts and cleans every old row', { skip: !oldServerDir && 'the v0.0.1 tag is not available' }, async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'squadra-up-'))
+  const dataDir = tempDir('squadra-up-')
   mkdirSync(dataDir, { recursive: true })
   const port = 23000 + Math.floor(Math.random() * 2000)
 
@@ -85,7 +85,7 @@ test('a 0.0.1 database: the new server starts and cleans every old row', { skip:
 })
 
 test('a 0.0.7 server: machines, sessions and tokens go on working, with nothing to do on them', { skip: !lastRelease && 'the v0.0.7 tag is not available' }, async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'squadra-up7-'))
+  const dataDir = tempDir('squadra-up7-')
   const port = 23000 + Math.floor(Math.random() * 2000)
   const at = path => `http://127.0.0.1:${port}/${path}`
   const post = (path, body, auth) => fetch(at(path), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}) }, body: JSON.stringify(body ?? {}) }).then(x => x.json())
@@ -118,7 +118,7 @@ test('a 0.0.7 server: machines, sessions and tokens go on working, with nothing 
 })
 
 test('a 0.0.7 server: what it held is all there for its first owner, and its coordinators use the inbox', { skip: !lastRelease && 'the v0.0.7 tag is not available' }, async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'squadra-up7b-'))
+  const dataDir = tempDir('squadra-up7b-')
   const port = 23000 + Math.floor(Math.random() * 2000)
   const at = path => `http://127.0.0.1:${port}/${path}`
   const post = (path, body, auth, instance) => fetch(at(path), {

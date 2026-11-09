@@ -19,11 +19,13 @@ import { hideOrgTip, renderOrg } from './org.js'
 import { TermView } from './terminal.js'
 import { Timeline } from './timeline.js'
 import { icon } from './icons.js'
+import { parseRoute, dec } from './routes.js'
+import { trackNavigation } from './back.js'
 
 // views
 export let mosaicPanes = new Map() // name -> {pane, view}
 
-export const dec = v => { try { return decodeURIComponent(v) } catch { return v } }
+export { dec }
 
 // Set once the user moves around the dashboard (not on the page it opened on).
 export let navigatedInApp = false
@@ -32,40 +34,7 @@ export let navigatedInApp = false
 // (Inside the app itself: typing the token on the login page doesn't count.)
 for (const ev of ['click', 'keydown']) document.addEventListener(ev, e => { if (e.isTrusted && !$('app').hidden && e.target.closest?.('#app')) navigatedInApp = true }, true)
 
-// Names in the address are only ever session names and machine ids: any
-// other text (a crafted link) goes to the main view, never into the header.
-const ROUTE_NAME = /^[A-Za-z0-9_-]{1,32}$/
-const ROUTE_ID = /^[A-Za-z0-9_-]{1,64}$/
-export function currentRoute() {
-  // The inbox is home: what needs you comes first.
-  if (location.hash === '' || location.hash === '#' || location.hash === '#/' || location.hash === '#/inbox') return { view: 'inbox' }
-  // One entry of it picked: a question or result (i12), a permission (p<name>), a name to approve (a<name>).
-  const ib = location.hash.match(/^#\/inbox\/([ipa][A-Za-z0-9_-]{1,64})$/)
-  if (ib) return { view: 'inbox', item: ib[1] }
-  if (location.hash === '#/teams') return { view: 'teams' }
-  if (location.hash === '#/new') return { view: 'newteam' }
-  if (location.hash === '#/mosaic') return { view: 'mosaic' }
-  if (location.hash === '#/archived') return { view: 'archived' }
-  if (location.hash === '#/hosts') return { view: 'hosts' }
-  if (location.hash === '#/hosts/new') return { view: 'addmachine' }
-  if (location.hash === '#/c') return { view: 'leads' }
-  if (location.hash === '#/org') return { view: 'org' }
-  // A team: its page, or every session of it live.
-  const ql = location.hash.match(/^#\/q\/([^/]+)\/live$/)
-  if (ql) return ROUTE_NAME.test(dec(ql[1])) ? { view: 'mosaic', squad: dec(ql[1]) } : { view: 'teams' }
-  const q = location.hash.match(/^#\/q\/([^/]+)$/)
-  if (q) return ROUTE_NAME.test(dec(q[1])) ? { view: 'team', squad: dec(q[1]) } : { view: 'teams' }
-  const h = location.hash.match(/^#\/h\/(.+)$/)
-  if (h) return ROUTE_ID.test(dec(h[1])) ? { view: 'hosts', host: dec(h[1]) } : { view: 'hosts' }
-  const t = location.hash.match(/^#\/t\/([^/]+)\/(.+)$/)
-  if (t) return ROUTE_ID.test(dec(t[1])) && ROUTE_NAME.test(dec(t[2])) ? { view: 'terminal', host: dec(t[1]), term: dec(t[2]) } : { view: 'hosts' }
-  // A session: its live terminal when it has one (opened on a machine
-  // from here), else its chat; ".../chat" always the chat.
-  const sc = location.hash.match(/^#\/s\/([^/]+)\/chat$/)
-  if (sc) return ROUTE_NAME.test(dec(sc[1])) ? { view: 'session', name: dec(sc[1]), chat: true } : { view: 'mosaic' }
-  const m = location.hash.match(/^#\/s\/(.+)$/)
-  return m && ROUTE_NAME.test(dec(m[1])) ? { view: 'session', name: dec(m[1]) } : { view: 'mosaic' }
-}
+export const currentRoute = () => parseRoute(location.hash)
 
 export function clearMosaic() {
   for (const p of mosaicPanes.values()) p.view.destroy()
@@ -196,4 +165,5 @@ export function route() {
 }
 
 // (Only while signed in: a link opened on the login page doesn't load views, or ask the server with no token.)
-window.addEventListener('hashchange', () => { if (state.me && !$('app').hidden) route() })
+// (Every step counts for the back button, before the view is drawn.)
+window.addEventListener('hashchange', () => { trackNavigation(); if (state.me && !$('app').hidden) route() })

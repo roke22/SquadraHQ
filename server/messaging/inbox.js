@@ -7,7 +7,11 @@ const MAX_TEXT = 2000
 const MAX_OPTION = 200
 const MAX_OPTIONS = 6
 const MAX_REF = 500
-const MAX_KEPT = 200
+const MAX_OPEN = 500     // what waits, sent whole (more is a squad gone wrong)
+const LIVE_DONE = 50     // and the last ones done, with it: what a session's timeline shows
+const PAGE_MAX = 100     // done ones asked for at a time
+const MAX_READ_ALL = 500
+const MAX_SEARCH = 100
 const PER_HOUR = 30
 const EDITS_PER_HOUR = 60
 const MAX_ANSWER = 2000
@@ -17,7 +21,7 @@ const MAX_ANSWER = 2000
 const NUMBERED_RE = /^\s*\d{1,2}\s*[.)]\s+\S/gm
 
 export function createInbox(platform, { sessions }) {
-  const { db, broadcast, allow, rateLimit, spendStorage, ensureRoom } = platform
+  const { db, broadcast, allow, rateLimit, spendStorage, ensureRoom, quota, inTx } = platform
   const { roleOf } = sessions
 
   const view = r => ({
@@ -25,9 +29,39 @@ export function createInbox(platform, { sessions }) {
     recommended: r.recommended, ref: r.ref, created_at: r.created_at, resolved_at: r.resolved_at,
     version: r.version, updated_at: r.updated_at, answer: r.answer, answered_by: r.answered_by, closed_reason: r.closed_reason, dismissed_by: r.dismissed_by,
   })
-  // What is open, and the last ones done.
+  // What is open, and the last ones done: sent to every dashboard on each
+  // change. The rest of what is done is asked for a page at a time (done()).
   function list() {
-    return db.prepare('SELECT * FROM inbox ORDER BY resolved_at IS NOT NULL, COALESCE(resolved_at, -id) DESC, id DESC LIMIT ?').all(MAX_KEPT).map(view)
+    return [
+      ...db.prepare('SELECT * FROM inbox WHERE resolved_at IS NULL ORDER BY id DESC LIMIT ?').all(MAX_OPEN),
+      ...db.prepare('SELECT * FROM inbox WHERE resolved_at IS NOT NULL ORDER BY resolved_at DESC, id DESC LIMIT ?').all(LIVE_DONE),
+    ].map(view)
+  }
+
+  // What is done, newest first, a page at a time. The cursor is where the last
+  // page ended ("resolved_at:id"), not a page number: what is closed meanwhile
+  // goes on top without moving what comes next. Optionally only one team's
+  // (its coordinator wrote them all), or those whose text or answer has some words.
+  const CURSOR_RE = /^(\d{1,16}):(\d{1,16})$/
+  function done({ before = null, limit = 50, team = null, q = null } = {}) {
+    const n = Math.max(1, Math.min(Number(limit) || 50, PAGE_MAX))
+    const where = ['resolved_at IS NOT NULL'], args = []
+    if (before != null && before !== '') {
+      const m = CURSOR_RE.exec(String(before))
+      if (!m) throw bad('before is the next_before of the page before')
+      where.push('(resolved_at < ? OR (resolved_at = ? AND id < ?))'); args.push(Number(m[1]), Number(m[1]), Number(m[2]))
+    }
+    if (team) { where.push('session = ?'); args.push(String(team)) }
+    const words = String(q ?? '').slice(0, MAX_SEARCH).trim()
+    if (words) {
+      const like = `%${words.replace(/[\\%_]/g, c => `\\${c}`)}%`
+      where.push("(text LIKE ? ESCAPE '\\' OR answer LIKE ? ESCAPE '\\' OR closed_reason LIKE ? ESCAPE '\\')"); args.push(like, like, like)
+    }
+    const rows = db.prepare(`SELECT * FROM inbox WHERE ${where.join(' AND ')} ORDER BY resolved_at DESC, id DESC LIMIT ?`).all(...args, n + 1)
+    const more = rows.length > n
+    const page = rows.slice(0, n)
+    const last = page.at(-1)
+    return { items: page.map(view), next_before: more && last ? `${last.resolved_at}:${last.id}` : null }
   }
 
   const short = (value, max, what) => {
@@ -116,6 +150,19 @@ export function createInbox(platform, { sessions }) {
     return { id, version: row.version + 1 }
   }
 
+  // Everything to know the user has read, at once: only what they had in front
+  // of them (ids), not what arrived meanwhile.
+  function resolveTells(ids) {
+    if (!Array.isArray(ids) || !ids.length) throw bad('ids is required')
+    if (ids.length > MAX_READ_ALL) throw bad(`at most ${MAX_READ_ALL} at a time`)
+    const at = now()
+    const one = db.prepare("UPDATE inbox SET resolved_at = ? WHERE id = ? AND kind = 'tell' AND resolved_at IS NULL")
+    let changed = 0
+    inTx(() => { for (const id of ids) if (Number.isSafeInteger(id)) changed += one.run(at, id).changes })
+    if (changed) broadcast('inbox', list())
+    return { resolved: changed }
+  }
+
   function resolve(id) {
     if (!Number.isSafeInteger(id)) throw bad('id is required')
     if (!db.prepare('UPDATE inbox SET resolved_at = ? WHERE id = ? AND resolved_at IS NULL').run(now(), id).changes) throw bad('nothing open with that id')
@@ -162,8 +209,8 @@ export function createInbox(platform, { sessions }) {
 
   function cleanupInbox() {
     closeOrphans()
-    db.prepare('DELETE FROM inbox WHERE resolved_at < ?').run(now() - 30 * 24 * 3600_000)
-    db.prepare('DELETE FROM inbox WHERE resolved_at IS NOT NULL AND id <= (SELECT id FROM inbox WHERE resolved_at IS NOT NULL ORDER BY id DESC LIMIT 1 OFFSET ?)').run(MAX_KEPT)
+    // (What is done is kept as long as the company says: Settings › Company.)
+    db.prepare('DELETE FROM inbox WHERE resolved_at < ?').run(now() - quota('inbox_days', 90) * 24 * 3600_000)
   }
 
   const inboxMethods = {
@@ -171,5 +218,5 @@ export function createInbox(platform, { sessions }) {
     tellUser: (name, p) => add(name, 'tell', { text: p.text, ref: p.ref }),
     editInbox: (name, p) => edit(name, p),
   }
-  return { inboxMethods, list, resolve, dismiss, takeAnswer, giveBack, cleanupInbox, closeOrphans }
+  return { inboxMethods, list, done, resolve, resolveTells, dismiss, takeAnswer, giveBack, cleanupInbox, closeOrphans }
 }
