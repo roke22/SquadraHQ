@@ -88,9 +88,11 @@ echo "ENV: $SQUADRA_NAME/$SQUADRA_ROLE/$SQUADRA_COORDINATOR/$CLAUDE_CODE_AUTO_CO
 echo "START: $SQUADRA_LAUNCH_START"
 echo "PWD: $(pwd)"
 echo "TMUX=\${TMUX:-none}"
-# FULLSCREEN: switches on what Claude Code's full-screen view does.
+# FULLSCREEN: switches on what Claude Code's full-screen view does. RAW: reads
+# as Claude Code does, without the line limit of a terminal's line mode (1024
+# bytes on macOS).
 while IFS= read -r line; do
-  if [ "$line" = FULLSCREEN ]; then printf '\\033[?1049h\\033[?1000h\\033[?1002h\\033[?1003h\\033[?1006h\\033[?1hFULL VIEW'; elif [ "$line" = DIALOG ]; then printf ' Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n Esc to cancel\\n'; elif [ "$line" = NOECHO ]; then stty -echo; else echo "GOT:$line"; fi
+  if [ "$line" = FULLSCREEN ]; then printf '\\033[?1049h\\033[?1000h\\033[?1002h\\033[?1003h\\033[?1006h\\033[?1hFULL VIEW'; elif [ "$line" = DIALOG ]; then printf ' Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n Esc to cancel\\n'; elif [ "$line" = NOECHO ]; then stty -echo; elif [ "$line" = RAW ]; then stty -icanon min 1 time 0; echo 'RAW ON'; else echo "GOT:$line"; fi
 done
 `)
   chmodSync(fakeClaude, 0o755)
@@ -909,11 +911,16 @@ test('an answer from the inbox is typed in its coordinator\'s terminal, as the u
   await waitFor(() => screen('ia1').includes(`GOT:Inbox #${told} ("${long.replace(/\s+/g, ' ')}"), you told the user this, and they reply from their inbox: Update them with main`), { what: 'the reply typed, with the whole note' })
   const note = (await dash('inbox')).result.find(i => i.id === told)
   assert.deepEqual([!!note.resolved_at, note.answer], [true, 'Update them with main'])
-  // What it quotes gives way to what the user wrote: always one line a machine types.
+  // What it quotes gives way to what the user wrote: always one line a machine
+  // types. (Longer than a terminal's line mode takes on macOS: read as Claude
+  // Code reads, and the whole line must arrive, not only its echo.)
+  execFileSync('tmux', ['-L', SOCKET, 'send-keys', '-t', '=sq-ia1:', '-l', 'RAW'])
+  execFileSync('tmux', ['-L', SOCKET, 'send-keys', '-t', '=sq-ia1:', 'Enter'])
+  await waitFor(() => screen('ia1').includes('RAW ON'), { what: 'raw input' })
   const told2 = (await C('tellUser', { text: 'x'.repeat(1900) })).result.id
   const rt2 = await dash('inbox/answer', { id: told2, version: 1, answer: 'y'.repeat(1900) })
   assert.ok(rt2.ok, rt2.description)
-  await waitFor(() => screen('ia1').includes(`, you told the user this, and they reply from their inbox: ${'y'.repeat(40)}`), { what: 'a long reply typed' })
+  await waitFor(() => screen('ia1').split('\n').some(l => l.startsWith(`GOT:Inbox #${told2} ("x`) && l.includes(`, you told the user this, and they reply from their inbox: ${'y'.repeat(1900)}`)), { what: 'a long reply typed, whole' })
   // Dismissed without an answer: closed, and its coordinator told not to wait.
   const id0 = await ask('Rename the release?')
   const d = await dash('inbox/dismiss', { id: id0 })
