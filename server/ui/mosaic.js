@@ -159,8 +159,9 @@ $('mosaic').addEventListener('click', e => {
   if (b) location.hash = b.dataset.go
 })
 
-export function alertBox(text) {
-  confirmDialog({ title: T.couldNotComplete, text: esc(text), confirm: T.ok, run: async () => {} })
+// (Titled as a failure unless the caller says what it is.)
+export function alertBox(text, title = T.couldNotComplete) {
+  confirmDialog({ title, text: esc(text), confirm: T.ok, notice: true, run: async () => {} })
 }
 
 // archived view

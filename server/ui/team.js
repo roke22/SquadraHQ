@@ -65,7 +65,7 @@ function planCard(coord) {
       <div class="tq-body pl-sum">${planMeter(plan, true)}<div class="pl-legend">${[['done', T.planDone(count('done'), n)], ['doing', T.planDoing(count('doing'))], ['blocked', T.planBlocked(count('blocked'))], ['waiting', T.planWaiting(count('waiting'))]].filter(([s]) => count(s)).map(([s, l]) => `<span><i class="pl-key pl-${s}" aria-hidden="true"></i>${esc(l)}</span>`).join('')}</div></div>
       <div class="mc-scroll"><table class="pl-table"><thead><tr><th scope="col">${esc(T.planTask)}</th><th scope="col">${esc(T.planWho)}</th><th scope="col">${esc(T.mcState)}</th><th scope="col">${esc(T.ibxRef)}</th></tr></thead><tbody>
       ${plan.tasks.map(t => `<tr class="pl-row-${t.state}"><td><span class="pl-t">${esc(t.title)}</span>${t.note ? `<span class="pl-note">${esc(t.note)}</span>` : ''}</td>
-        <td>${t.who ? `<a class="pl-who" href="#/s/${encodeURIComponent(t.who)}"><span class="role worker" aria-hidden="true"></span>${agentMark(t.who)}${esc(t.who)}</a>` : `<span class="tq-quiet0">${esc(T.planNobody)}</span>`}</td>
+        <td>${t.who ? `<a class="pl-who" href="#/s/${encodeURIComponent(t.who)}"><span class="role ${sessions.get(t.who)?.role === 'coordinator' ? 'coord' : 'worker'}" aria-hidden="true"></span>${agentMark(t.who)}${esc(t.who)}</a>` : `<span class="tq-quiet0">${esc(T.planNobody)}</span>`}</td>
         <td><span class="mc-state"><span class="dot ${TASK_DOT[t.state]}${t.state === 'doing' ? ' pulse' : ''}" aria-hidden="true"></span>${esc(T.planState[t.state])}</span></td>
         <td>${t.ref ? refLink(t.ref) : ''}</td></tr>`).join('')}
       </tbody></table></div>

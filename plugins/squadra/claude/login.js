@@ -16,7 +16,7 @@ import { roleRules } from './instructions.js'
 import {
   briefOnPrompt, withBrief, clearedContext, recoveryContext, fetchBrief, briefKey, briefText,
 } from './context.js'
-import { tasksStarting, channelIds, stopCheck, inboxAnswered } from './tasks.js'
+import { tasksStarting, channelIds, stopCheck, inboxAnswered, orderSeen } from './tasks.js'
 import { ping } from './tools.js'
 import { pinApprovers, TOOL_INPUT_KEEP_MS, withdrawIfAmbiguous, pendingPermissions, onTypedPermission, withdrawTyped } from './permissions.js'
 import { confirmWithUser } from './mcp.js'
@@ -115,7 +115,7 @@ export async function login({ name, role, coordinator, staticAccess = false, see
     send: events => call('observe', { events }, { s }),
     log,
     contextProvider: source => (S !== s ? '' : source === 'prompt' ? briefOnPrompt(s) : withBrief(s, source === 'clear' ? clearedContext(s) : recoveryContext(s))),
-    onPrompt: prompt => { if (S === s) { s.inboxThisTurn = false; s.chatAskHinted = false; inboxAnswered(s, prompt); tasksStarting(s, channelIds(prompt)) } },
+    onPrompt: prompt => { if (S === s) { s.inboxThisTurn = false; s.chatAskHinted = false; orderSeen(s, prompt); inboxAnswered(s, prompt); tasksStarting(s, channelIds(prompt)) } },
     onChannelSeen: ids => { if (S === s) tasksStarting(s, ids) },
     // For squadra-host, to open this session again in its own conversation.
     onConversation: (id, transcript) => { if (S === s) writePrivateFile(join(s.stateDir, 'conversation.json'), JSON.stringify({ id, transcript, folder: process.cwd() }) + '\n') },
@@ -148,7 +148,7 @@ export async function login({ name, role, coordinator, staticAccess = false, see
     // Only to the coordinator this worker knows (after checking its pin).
     void checkCoordinator(s).then(ok => {
       if (!ok || S !== s) return
-      return call('sendMessage', { chat_id: coordinator, text: `👋 ${name} connected as a worker in ${where}.${s.persona ? ` Persona: ${personaLabel(s.persona)}: give it the tasks that fit.` : ''}`, squadra_hello: true }, { s })
+      return call('sendMessage', { chat_id: coordinator, text: `👋 ${name} connected as a worker in ${where}.${s.persona ? ` Persona: ${personaLabel(s.persona)}: give it the tasks that fit.` : ''} No task for it yet: only an order from the user or a linked coordinator starts work.`, squadra_hello: true }, { s })
     }).catch(err => log(`intro to ${coordinator} failed: ${err.message}`))
   }
 

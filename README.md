@@ -13,7 +13,7 @@
   <a href="https://github.com/roke22/SquadraHQ/stargazers"><img src="https://img.shields.io/github/stars/roke22/SquadraHQ?style=social" alt="GitHub stars"></a>
 </p>
 
-<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://roke22.github.io/SquadraHQ/">Website</a> · <a href="https://roke22.github.io/SquadraHQ/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a> · v0.0.9</p>
+<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://roke22.github.io/SquadraHQ/">Website</a> · <a href="https://roke22.github.io/SquadraHQ/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a> · v0.0.10</p>
 
 ---
 
@@ -66,7 +66,7 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Split a big job into parallel pieces:** a migration, a refactor or more tests, one worker per module.
 - **Leave it working unattended:** workers decide the technical details and the coordinator approves their safe actions, so the team keeps going while you are away.
 - **Keep watch from anywhere:** every team and agent live in your browser, on a phone too (add it to the home screen and it opens as an app), and everything that waits on you at the top of the inbox.
-- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong; you answer from the dashboard with a number key or in your own words, or dismiss a question and its coordinator is told not to wait.
+- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong (which you can reply to as well); you answer from the dashboard picking an option (with a detail if you want) or in your own words, also by voice with the inbox read aloud, or dismiss a question and its coordinator is told not to wait.
 - **Decide what each agent may do:** write a permission profile in your own words (edit files, run the tests, commit, but never push, say) and give it to a team or a session; it reaches Claude Code as real permission rules, as far as each machine allows.
 - **Follow each team's plan:** the coordinator keeps the list of tasks it is working through, who has each one and its state, on the team's page.
 - **See what each agent did without reading it all:** beside its terminal and its conversation, what it is doing now and a timeline of what mattered (its orders, the files it edited, tests and commits, permissions and reports), read from what it already reports, so it costs no tokens.

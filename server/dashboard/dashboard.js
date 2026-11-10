@@ -40,19 +40,23 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   bus.on('session-changed', name => broadcast('session', sessionView(name)))
 
   function sessionView(name) {
-    const row = db.prepare('SELECT name, role, coordinator, created_at, archived_at, cleared_at, host_id, opened_role, opened_persona, description, needs_approval, agent FROM identities WHERE name = ?').get(name)
+    const row = db.prepare('SELECT name, role, coordinator, created_at, archived_at, cleared_at, host_id, opened_role, opened_persona, opened_coordinator, description, needs_approval, agent FROM identities WHERE name = ?').get(name)
     if (!row) return { name, deleted: true }
     const a = activityOf(name)
+    const openedRole = row.host_id && ['coordinator', 'worker', 'solo'].includes(row.opened_role) ? row.opened_role : null
+    // Until it first logs in, it is shown as what it was opened as, in the team
+    // it was opened in; from then on, as what it says.
+    const said = row.role != null
     return {
       name,
-      role: row.role ?? null,
-      coordinator: row.coordinator ?? null,
+      role: said ? row.role : openedRole,
+      coordinator: said ? row.coordinator ?? null : openedRole === 'worker' ? row.opened_coordinator ?? null : null,
       persona: personaView(name),
       agent: AGENTS.includes(row.agent) ? row.agent : 'claude', // Claude Code, Codex CLI or Grok CLI
       archived_at: row.archived_at ?? null,
       cleared_at: row.cleared_at ?? null,
       host_id: row.host_id ?? null, // the machine that opened it from the dashboard
-      opened_role: row.host_id && ['coordinator', 'worker', 'solo'].includes(row.opened_role) ? row.opened_role : null, // and as what
+      opened_role: openedRole, // and as what
       opened_persona: row.host_id && PERSONA_ID_RE.test(String(row.opened_persona ?? '')) ? row.opened_persona : null, // and with which persona
       description: row.description || null, // what it is for (org chart)
       // Acts as a coordinator (or some worker expects it to) and nobody approved it yet.
@@ -282,9 +286,15 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   // (Said to come from the inbox: typed in the coordinator's terminal, it would
   // look as if the user were following that session now, and the next question
   // went to the chat.)
-  const fromInbox = (taken, what) => {
+  // (A reply to something it told them quotes more of it: what the reply is
+  // about may have left its context since. Never more than a machine types in
+  // one line: what is quoted gives way to what the user wrote.)
+  const TYPED_MAX = 2200
+  const fromInbox = (taken, what, max = 80) => {
     const asked = taken.text.replace(/\s+/g, ' ')
-    return `Inbox #${taken.id} ("${asked.length > 80 ? `${asked.slice(0, 80)}…` : asked}"), ${what} [They are not following this session: anything else for them goes to ask_user or tell_user. Update your plan with update_plan.]`
+    const line = quote => `Inbox #${taken.id} ("${quote}"), ${what} [They are not following this session: anything else for them goes to ask_user or tell_user. Update your plan with update_plan.]`
+    const room = Math.max(0, Math.min(max, TYPED_MAX - line('…').length))
+    return line(asked.length > room ? `${asked.slice(0, room)}…` : asked)
   }
 
   // An answer from the inbox: closed as answered, then typed in the
@@ -292,7 +302,9 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   async function answerFromInbox(p, actor) {
     const taken = inbox.takeAnswer(p, actor?.email ?? 'server token')
     try {
-      await typeAnswer(taken.session, fromInbox(taken, `the user answers from their inbox: ${taken.answer}`))
+      await typeAnswer(taken.session, taken.kind === 'tell'
+        ? fromInbox(taken, `you told the user this, and they reply from their inbox: ${taken.answer}`, 600)
+        : fromInbox(taken, `the user answers from their inbox: ${taken.answer}`))
     } catch (err) {
       inbox.giveBack(taken.id)
       throw err

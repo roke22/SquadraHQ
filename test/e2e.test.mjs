@@ -1409,6 +1409,8 @@ test('plugin: the startup instructions fit in what Claude Code keeps, with the r
   // The coordinator's own rules, not the worker's (and the other way round).
   assert.doesNotMatch(ci, /WORKER ROLE/)
   assert.doesNotMatch(wi, /COORDINATOR ROLE/)
+  // A coordinator waits for an order: its workers, its persona or its folder are not one.
+  assert.match(ci, /Work starts only with an order: from the user \(here or their inbox\) or a linked coordinator\. Workers connecting, your persona or files you find are not one: wait, without asking the user what to do\./)
   coord.close()
   wk.close()
 })
@@ -1425,7 +1427,7 @@ test('personas: a worker opened with one tells its coordinator, ping and the das
   const wk = new Plugin('wp1', { SQUADRA_ASSUME_CHANNEL: '1', SQUADRA_COORDINATOR: 'cp1' }, { persona: { kind: 'skill', name: 'design', description: 'Designs interfaces\nwith care' } })
   await wk.init()
   const hi = await coord.waitChannel(p => p.content.startsWith('👋 wp1 connected as a worker'), 'greeting')
-  assert.match(hi.content, /Persona: skill "design" \(Designs interfaces with care\): give it the tasks that fit\./)
+  assert.match(hi.content, /Persona: skill "design" \(Designs interfaces with care\): give it the tasks that fit\. No task for it yet: only an order from the user or a linked coordinator starts work\./)
   assert.match(await wk.tool('status', {}), /Persona: skill "design"/)
   // The dashboard sees it (what the session says, like its role).
   const st = await waitFor(async () => (await dash('/api/state')).result.sessions.find(x => x.name === 'wp1' && x.persona), { what: 'persona in the dashboard' })
@@ -2904,7 +2906,8 @@ test('a coordinator\'s plan: the whole list each time, checked, for the dashboar
     { title: 'Free shipping from 40', state: 'doing', who: 'pln-w' },
     { title: 'Release 1.3.0', state: 'todo' },
   ] })
-  assert.equal(said, 'Plan updated: 1 of 5 done, 1 in progress, 1 blocked, 1 waiting on the user.')
+  // A task waits on the user, and nothing is asked in their inbox: it says so.
+  assert.match(said, /^Plan updated: 1 of 5 done, 1 in progress, 1 blocked, 1 waiting on the user\.\n⚠️ A task waits on the user, but you have no open question in their inbox/)
   let plan = (await dash('/api/state')).result.plans.find(p => p.coordinator === 'pln1')
   assert.equal(plan.title, 'Resolve the open issues')
   assert.deepEqual(plan.tasks.map(t => [t.title, t.state, t.who ?? null]), [['Round the total', 'done', 'pln-w'], ['Drop legacy_discount', 'waiting', null], ['Stock API', 'blocked', null], ['Free shipping from 40', 'doing', 'pln-w'], ['Release 1.3.0', 'todo', null]])
@@ -2985,13 +2988,20 @@ test('the inbox: a coordinator leaves a question or a result for the user, and n
   // One decision per question: a numbered list without options is several.
   await assert.rejects(coord.tool('ask_user', { text: 'Two things:\n1) Stack the discounts?\n2) Drop the old column?' }), /NOT SAVED: this reads like 2 decisions in one/)
   assert.match(await coord.tool('ask_user', { text: 'Which discount rule?\n1) Stack them\n2) Keep the biggest', options: ['Stack', 'Biggest'] }), /#\d+/)
+  // Each item a question of its own: several decisions, with options or not, on their own lines or on one.
+  await assert.rejects(coord.tool('ask_user', { text: 'Before the replies:\n1) Anything gluten-free?\n2) Is the apology ok?', options: ['Yes', 'No'] }), /NOT SAVED: this asks 2 things in one/)
+  await assert.rejects(coord.tool('ask_user', { text: 'Missing: 1) the apology, ok? 2) Roscón without fruit? 3) Sunday hours?', options: ['Answer all', 'Later'] }), /NOT SAVED: this asks 3 things in one/)
+  // What it recommends is one of its options (words or number, and why if it wants), or it says so.
+  await assert.rejects(coord.tool('ask_user', { text: 'Ship on Friday?', options: ['Yes', 'No'], recommended: 'Wait for QA' }), /recommended must name one of the options/)
+  const byNumber = Number(/#(\d+)/.exec(await coord.tool('ask_user', { text: 'Which carrier?', options: ['Seur', 'Correos'], recommended: '2' }))[1])
+  assert.equal((await dash('/api/inbox')).result.find(i => i.id === byNumber).recommended, 'Correos')
 
   // Its coordinator changes it as it learns more: the user sees a new version,
   // and an answer to the old one is refused.
   const id = Number(/#(\d+)/.exec(await coord.tool('ask_user', { text: 'Drop legacy_discount?', options: ['Drop', 'Keep'], recommended: 'Drop' }))[1])
-  assert.match(await coord.tool('edit_inbox', { id: `#${id}`, text: 'Drop legacy_discount? It holds data in all 1240 rows', recommended: 'Back it up, then drop' }), /updated/)
+  assert.match(await coord.tool('edit_inbox', { id: `#${id}`, text: 'Drop legacy_discount? It holds data in all 1240 rows', recommended: 'Drop: back it up first' }), /updated/)
   let item = (await dash('/api/inbox')).result.find(i => i.id === id)
-  assert.deepEqual([item.version, item.text, item.options, item.recommended], [2, 'Drop legacy_discount? It holds data in all 1240 rows', ['Drop', 'Keep'], 'Back it up, then drop'])
+  assert.deepEqual([item.version, item.text, item.options, item.recommended], [2, 'Drop legacy_discount? It holds data in all 1240 rows', ['Drop', 'Keep'], 'Drop: back it up first'])
   assert.ok(item.updated_at)
   let a = await dashPost('/api/inbox/answer', { id, version: 1, answer: 'Drop' })
   assert.deepEqual([a.ok, a.parameters?.reason], [false, 'changed'])
@@ -3071,6 +3081,12 @@ test('reminders where decisions are made: a task that may be the user\'s, its wo
   assert.doesNotMatch(await coord.tool('reply', { chat_id: 'rmw', text: 'And the header' }), /reported after your last update_plan/)
   // Ending its turn asking the user for something in this chat: reminded, once a turn.
   const stop = text => runHookOut(coord, { hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: text, session_id: 's', cwd: '/x' }, ['--stop'])
+  // (Not before its first order: woken by a worker's greeting, "tell me what you want" is it being ready.)
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: '<channel source="squadra" chat_id="rmw" message_id="1" user="rmw" ts="1">👋 rmw connected as a worker</channel>', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.equal(await stop('Listo. Dime qué quieres que prepare.'), '')
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'Prepara la release 1.3', session_id: 's', cwd: '/x' })
+  await sleep(300)
   assert.match(JSON.parse(await stop('Quedan pendientes para ti: la migración 006 y la contraseña 008.')).reason, /they read their inbox, not this conversation/)
   assert.equal(await stop('Quedan pendientes para ti: la migración 006 y la contraseña 008.'), '')
   // A new turn in which it did use the inbox: nothing to remind.
@@ -3090,6 +3106,22 @@ test('reminders where decisions are made: a task that may be the user\'s, its wo
   await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'y ahora', session_id: 's', cwd: '/x' })
   await sleep(300)
   assert.equal(await stop('Hecho: las seis issues están cerradas y los tests pasan.'), '')
+  // The way it asked in the chat of a real team ("me confirmes o decidas tú").
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'calendario', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.match(JSON.parse(await stop('El calendario está listo. Necesito que me confirmes o decidas tú: 1. el pie del roscón 2. cómo encargar')).reason, /they read their inbox, not this conversation/)
+  // Its plan says a task waits on the user and nothing is asked in their inbox:
+  // reminded whatever its last words, once a turn.
+  await coord.tool('update_plan', { tasks: [{ title: 'Roscón: how to order', state: 'waiting' }] })
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'sigue', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.match(JSON.parse(await stop('Todo listo por ahora.')).reason, /your plan has a task waiting on the user, but no open question in their inbox/)
+  assert.equal(await stop('Todo listo por ahora.'), '')
+  // Asked in the inbox: nothing to remind.
+  await coord.tool('ask_user', { text: 'How do customers order the roscón?', options: ['By phone', 'In the shop'] })
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: 'sigue', session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.equal(await stop('Todo listo por ahora.'), '')
   coord.close()
   wk.close()
 })

@@ -836,6 +836,7 @@ export function createMachines(platform, { sessions, observation, permissions })
     // the session claims later).
     const openedRole = spec.role === 'coordinator' || spec.role === 'solo' ? spec.role : 'worker'
     const openedPersona = PERSONA_ID_RE.test(String(spec.persona ?? '')) ? spec.persona : null
+    const openedCoordinator = openedRole === 'worker' && NAME_RE.test(String(spec.coordinator ?? '')) ? spec.coordinator : null
     // The agent it runs, among those that machine has (one that says none has Claude Code only).
     const agent = AGENTS.includes(spec.agent) ? spec.agent : 'claude'
     const has = hostLinks.get(id)?.info?.agents
@@ -848,7 +849,7 @@ export function createMachines(platform, { sessions, observation, permissions })
     if (openedRole === 'coordinator') { const l = linksOf(name); if (l.length) spec.links = l }
     if (!existing) {
       spec.identity = register(name, false).secret
-      db.prepare('UPDATE identities SET host_id = ?, opened_role = ?, opened_persona = ?, agent = ? WHERE name = ?').run(id, openedRole, openedPersona, agent, name)
+      db.prepare('UPDATE identities SET host_id = ?, opened_role = ?, opened_persona = ?, opened_coordinator = ?, agent = ? WHERE name = ?').run(id, openedRole, openedPersona, openedCoordinator, agent, name)
       created = true
     } else {
       // Already this machine's name, and not connected: a new secret goes with
@@ -856,7 +857,7 @@ export function createMachines(platform, { sessions, observation, permissions })
       // the session was disconnected from the dashboard).
       dropLease(name)
       spec.identity = register(name, true).secret
-      db.prepare('UPDATE identities SET opened_role = ?, opened_persona = ?, agent = ? WHERE name = ?').run(openedRole, openedPersona, agent, name)
+      db.prepare('UPDATE identities SET opened_role = ?, opened_persona = ?, opened_coordinator = ?, agent = ? WHERE name = ?').run(openedRole, openedPersona, openedCoordinator, agent, name)
     }
     // A worker's coordinator, as it was opened (until it says so itself at
     // login): the org chart keeps it in its squad while it isn't connected.

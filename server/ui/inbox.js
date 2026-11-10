@@ -54,9 +54,11 @@ const who = name => {
 const seen = new Map()
 // What they were typing, kept across redraws.
 const drafts = new Map()
+// The option picked for each question, until it is sent (a pick alone sends nothing).
+const picks = new Map()
 
 // Why an answer can't be typed in the coordinator's terminal from here (null: it can).
-function cantAnswer(i) {
+export function cantAnswer(i) {
   const h = hosts.get(sessions.get(i.session)?.host_id)
   if (!h?.online) return T.inboxNoMachine
   if (!h.info?.answers) return T.inboxOldMachine
@@ -212,9 +214,16 @@ function detail(e) {
   const changed = open && seen.get(i.id) !== i.version
   const why = open && ask && can('operator') ? cantAnswer(i) : null
   const answering = open && ask && can('operator') && !why
-  const recIndex = i.options.findIndex(o => i.recommended && o.trim().toLowerCase() === i.recommended.trim().toLowerCase())
+  // Something it was told can be replied to as well ("update the branches with
+  // main"), when it can be typed in its coordinator's terminal; Done still closes it.
+  const replying = open && !ask && can('operator') && !cantAnswer(i)
+  // The option it recommends: its words, perhaps followed by why ("Keep it: nothing is lost").
+  const rec = String(i.recommended ?? '').trim()
+  const recIndex = rec ? i.options.findIndex(o => { const t = o.trim().toLowerCase(), r = rec.toLowerCase(); return r === t || (r.startsWith(t) && /^[\s:.,;—–-]/.test(r.slice(t.length))) }) : -1
+  const recRest = recIndex >= 0 ? rec.slice(i.options[recIndex].trim().length).replace(/^[\s:.,;—–-]+/, '') : ''
+  const recWhy = recRest.charAt(0).toUpperCase() + recRest.slice(1)
   const opts = i.options.map((o, n) => answering
-    ? `<button type="button" class="ibx-opt${n === recIndex ? ' rec' : ''}" data-option="${n}"><kbd>${n + 1}</kbd><span>${esc(o)}</span>${n === recIndex ? `<span class="tag">${esc(T.inboxRecommended)}</span>` : ''}</button>`
+    ? `<button type="button" class="ibx-opt${n === recIndex ? ' rec' : ''}" data-option="${n}" aria-pressed="${picks.get(i.id) === n}"><kbd>${n + 1}</kbd><span>${esc(o)}</span>${n === recIndex ? `<span class="tag">${esc(T.inboxRecommended)}</span>` : ''}</button>`
     : `<li>${esc(o)}${n === recIndex ? ` <span class="tag">${esc(T.inboxRecommended)}</span>` : ''}</li>`).join('')
   const kind = !open ? T.ibxClosedAt : ask ? T.ibxKindAsk : T.inboxTell
   return `<article class="ibx-card${open ? '' : ' closed'}">${head(i.session, kind, i.updated_at ?? i.created_at)}
@@ -222,11 +231,13 @@ function detail(e) {
     ${changed ? `<div class="ibx-changed" data-changed role="status">${esc(T.inboxChangedSince)}</div>` : ''}
     <h2 class="ibx-q${ask ? '' : ' tell'}">${esc(i.text)}</h2>
     ${i.options.length ? (answering ? `<div class="ibx-opts" role="group" aria-label="${esc(T.inboxOptions)}">${opts}</div>` : `<ul class="ibx-optlist">${opts}</ul>`) : ''}
-    ${i.recommended && recIndex < 0 ? `<p class="ibx-rec"><span class="tag">${esc(T.inboxRecommended)}</span> ${esc(i.recommended)}</p>` : ''}
+    ${rec && (recIndex < 0 || recWhy) ? `<p class="ibx-rec"><span class="tag">${esc(T.inboxRecommended)}</span> ${esc(recIndex < 0 ? rec : recWhy)}</p>` : ''}
     ${answering ? `<form class="ibx-answer" data-answer="${i.id}"><label class="field"><span>${esc(i.options.length ? T.ibxOwnWordsOr : T.ibxOwnWords)}</span><textarea name="answer" rows="3" maxlength="2000" placeholder="${esc(T.ibxReachesTo(i.session))}"></textarea></label>
         <div class="ibx-actions"><span class="ibx-note">${esc(i.options.length ? T.ibxOptionDetail : T.ibxGoesOn)}</span><span class="row"><button type="button" class="btn danger" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button><button class="btn primary ok">${esc(T.inboxSend)}</button></span></div></form>` : ''}
+    ${replying ? `<form class="ibx-answer" data-answer="${i.id}"><label class="field"><span>${esc(T.ibxReplyTell)}</span><textarea name="answer" rows="2" maxlength="2000" placeholder="${esc(T.ibxReachesTo(i.session))}"></textarea></label>
+        <div class="ibx-actions"><span class="ibx-note">${esc(T.ibxReplyTellNote)}</span><span class="row"><button type="button" class="btn ok" data-resolve="${i.id}">${esc(T.inboxResolve)}</button><button class="btn primary ok">${esc(T.inboxSend)}</button></span></div></form>` : ''}
     ${why ? `<p class="ibx-note">${esc(why)}</p>` : ''}
-    ${open && !answering && can('operator') ? `<div class="ibx-actions">${why ? `<a class="btn ok" href="#/s/${encodeURIComponent(i.session)}">${esc(T.inboxAnswer)}</a>` : ''}${ask ? `<button type="button" class="btn danger" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button>` : `<button type="button" class="btn ok${why ? '' : ' primary'}" data-resolve="${i.id}">${esc(T.inboxResolve)}</button>`}</div>` : ''}
+    ${open && !answering && !replying && can('operator') ? `<div class="ibx-actions">${why ? `<a class="btn ok" href="#/s/${encodeURIComponent(i.session)}">${esc(T.inboxAnswer)}</a>` : ''}${ask ? `<button type="button" class="btn danger" data-dismiss="${i.id}">${esc(T.inboxDismiss)}</button>` : `<button type="button" class="btn ok${why ? '' : ' primary'}" data-resolve="${i.id}">${esc(T.inboxResolve)}</button>`}</div>` : ''}
     ${i.answer != null ? `<p class="ibx-result">${esc(T.inboxAnswered(i.answered_by ?? '', i.answer))}</p>` : ''}
     ${i.dismissed_by ? `<p class="ibx-result">${esc(T.inboxDismissed(i.dismissed_by))}</p>` : ''}
     ${i.closed_reason ? `<p class="ibx-result">${esc(T.inboxClosed(i.closed_reason))}</p>` : ''}
@@ -343,7 +354,8 @@ export const refreshInbox = () => { if (currentRoute().view === 'inbox' && !$('i
 // With none left, back to the whole list.
 function next(id) {
   const [decide, know] = entries()
-  const wasNote = know.list.some(e => e.i?.id === id)
+  // (Known by its kind: answered, it may have left the list already.)
+  const wasNote = know.list.some(e => e.i?.id === id) || state.inbox.find(x => x.id === id)?.kind === 'tell'
   const list = [...decide.list, ...(wasNote ? know.list : [])].filter(e => e.i?.id !== id)
   if (list.length) replaceHash(`#/inbox/${list[0].key}`); else closeTo('#/inbox')
 }
@@ -354,6 +366,7 @@ async function answer(id, text) {
   try {
     await postJson('/api/inbox/answer', { id, version: seen.get(id) ?? i.version, answer: text })
     drafts.delete(id)
+    picks.delete(id)
     next(id)
   } catch (err) {
     // Changed since they read it: now they have, and it says so.
@@ -363,13 +376,23 @@ async function answer(id, text) {
   }
 }
 const pickedAsk = () => { const f = $('inbox').querySelector('[data-answer]'); return f ? Number(f.dataset.answer) : null }
-function choose(n) {
+// Picking an option only marks it: it goes with Send (or Ctrl+Enter), along
+// with whatever is typed, before or after. Picked again, it is unmarked.
+function choose(n, { toggle = true } = {}) {
   const id = pickedAsk()
   const i = state.inbox.find(x => x.id === id)
-  const choice = i?.options[n]
-  if (!choice) return
-  const detailText = drafts.get(id)?.trim()
-  return answer(id, detailText ? `${choice}. ${detailText}` : choice)
+  if (!i?.options[n]) return
+  if (toggle && picks.get(id) === n) picks.delete(id); else picks.set(id, n)
+  for (const b of $('inbox').querySelectorAll('[data-option]')) b.setAttribute('aria-pressed', String(picks.get(id) === Number(b.dataset.option)))
+}
+// What Send sends: the option picked, with the detail typed; or only what is typed.
+function send(f) {
+  const id = Number(f.dataset.answer)
+  const i = state.inbox.find(x => x.id === id)
+  const typed = f.elements.answer.value.trim()
+  const choice = i?.options[picks.get(id)]
+  if (!choice && !typed) { f.elements.answer.focus(); return }
+  return answer(id, choice ? (typed ? `${choice}. ${typed}` : choice) : typed)
 }
 
 $('inbox').addEventListener('click', async e => {
@@ -427,11 +450,14 @@ $('inbox').addEventListener('submit', e => {
   const f = e.target.closest('[data-answer]')
   if (!f) return
   e.preventDefault()
-  void answer(Number(f.dataset.answer), f.elements.answer.value)
+  void send(f)
 })
 $('inbox').addEventListener('keydown', e => {
-  // Enter with Ctrl or ⌘ sends what was typed.
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.name === 'answer') { e.preventDefault(); e.target.form.requestSubmit() }
+  // Enter with Ctrl or ⌘ sends the answer: from the text, or from an option picked.
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    const f = e.target.name === 'answer' ? e.target.form : e.target.closest('[data-option]') ? $('inbox').querySelector('[data-answer]') : null
+    if (f) { e.preventDefault(); f.requestSubmit() }
+  }
   // ↑ ↓ move along the list.
   const item = e.target.closest('.ibx-item')
   if (item && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
@@ -449,9 +475,9 @@ document.addEventListener('keydown', e => {
   if (e.target.closest?.('textarea, input') && e.target.value) return
   closeTo(listHash())
 })
-// 1–9 picks an option, from anywhere in the inbox but a text field.
+// 1–9 picks an option (without sending it), from anywhere in the inbox but a text field.
 document.addEventListener('keydown', e => {
   if ($('inbox').hidden || !/^[1-9]$/.test(e.key) || e.ctrlKey || e.metaKey || e.altKey) return
   if (e.target.closest?.('input, textarea, select, [contenteditable]') || !$('palette').hidden || !$('settings').hidden || document.querySelector('.modal-bg')) return
-  if (pickedAsk() != null) { e.preventDefault(); choose(Number(e.key) - 1) }
+  if (pickedAsk() != null) { e.preventDefault(); choose(Number(e.key) - 1, { toggle: false }) }
 })

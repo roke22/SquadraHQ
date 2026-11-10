@@ -126,13 +126,13 @@ export const TOOLS = [
   {
     name: 'ask_user',
     _meta: ALWAYS_LOAD,
-    description: 'Coordinator: the user is usually away and doesn\'t follow this conversation: they read their inbox. Use this for a decision that is theirs to take (product, visible behaviour, scope, destructive changes, security, cost) or a block only they can lift (an access, a credential). When unsure whether it is theirs, ask. ONE call per decision, with its choices in options and what you recommend, so they can answer each on its own; put two in one call only when the answer to one changes the other. Ask before handing that part to a worker, and until the answer nobody does it, not even left ready and unapplied (a migration that deletes data, a changed password). Go on with whatever doesn\'t depend on it. Their answer reaches this session typed as "Inbox #<id> (...), the user answers from their inbox: ...": that doesn\'t mean they are following it now. If what you learn later changes the question, or it no longer applies, use edit_inbox: they must never decide on what you no longer think.',
+    description: 'Coordinator: the user is usually away and doesn\'t follow this conversation: they read their inbox. Use this for a decision that is theirs to take (product, visible behaviour, scope, destructive changes, security, cost) or a block only they can lift (an access, a credential). When unsure whether it is theirs, ask. ONE call per decision, with its choices in options and the one you recommend, so they can answer each on its own (a numbered list of questions in one call is refused); put two in one call only when the answer to one changes the other. Even when the user gave you the order in this terminal, their decisions go here. Ask before handing that part to a worker, and until the answer nobody does it, not even left ready and unapplied (a migration that deletes data, a changed password). Go on with whatever doesn\'t depend on it. Their answer reaches this session typed as "Inbox #<id> (...), the user answers from their inbox: ...": that doesn\'t mean they are following it now. If what you learn later changes the question, or it no longer applies, use edit_inbox: they must never decide on what you no longer think.',
     inputSchema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'The question, understandable without having read this conversation.' },
         options: { type: 'array', items: { type: 'string' }, description: 'The concrete choices, if there are some (at most 6).' },
-        recommended: { type: 'string', description: 'What you would do, and in a few words why.' },
+        recommended: { type: 'string', description: 'With options: the one you would pick, its exact words (or its number), then if you want ": why" in a few words. Without options: what you would do, and why.' },
         ref: { type: 'string', description: 'Where it can be looked at, if anywhere: a link, a ticket, a path.' },
       },
       required: ['text'],
@@ -148,7 +148,7 @@ export const TOOLS = [
         id: { type: 'string', description: 'Its id, from ask_user or tell_user ("#<id>").' },
         text: { type: 'string', description: 'The new text, whole (not just what changed).' },
         options: { type: 'array', items: { type: 'string' }, description: 'The new choices, all of them.' },
-        recommended: { type: 'string', description: 'What you recommend now.' },
+        recommended: { type: 'string', description: 'What you recommend now: with options, one of them (its words or number), then if you want ": why".' },
         ref: { type: 'string', description: 'Where it can be looked at.' },
         close: { type: 'string', description: 'Instead of changing it: why it no longer applies (or "answered in the session").' },
       },
@@ -185,7 +185,7 @@ export const TOOLS = [
   {
     name: 'tell_user',
     _meta: ALWAYS_LOAD,
-    description: 'Coordinator: leave something in the user\'s inbox that they will want to know when they come back and that needs no answer: a piece of work finished, its outcome, or a problem they should see. Not routine progress: that stays in this conversation.',
+    description: 'Coordinator: leave something in the user\'s inbox that they will want to know when they come back and that needs no answer: a piece of work finished, its outcome, or a problem they should see. Not routine progress: that stays in this conversation. They may reply to it: their reply reaches this session typed as "Inbox #<id> (...), you told the user this, and they reply from their inbox: ...", and it is the user telling you what to do next.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -491,7 +491,10 @@ export async function callTool(name, args) {
       const r = await call('setPlan', { title: clean(args.title), tasks })
       S.planSent = true
       S.planAt = Date.now()
-      return r.tasks ? `Plan updated: ${r.done} of ${r.tasks} done, ${r.doing} in progress${r.blocked ? `, ${r.blocked} blocked` : ''}${r.waiting ? `, ${r.waiting} waiting on the user` : ''}.` : 'Plan cleared.'
+      S.planWaiting = r.waiting ?? 0
+      // (A task that waits on the user with nothing asked in their inbox: they never see it.)
+      const unasked = r.waiting && !S.openAsks.size ? `\n⚠️ ${r.waiting === 1 ? 'A task waits' : `${r.waiting} tasks wait`} on the user, but you have no open question in their inbox: they won't see it here. Ask each decision with ask_user now (if they already answered, update the plan).` : ''
+      return r.tasks ? `Plan updated: ${r.done} of ${r.tasks} done, ${r.doing} in progress${r.blocked ? `, ${r.blocked} blocked` : ''}${r.waiting ? `, ${r.waiting} waiting on the user` : ''}.${unasked}` : 'Plan cleared.'
     }
     case 'edit_inbox': {
       const clean = v => (v == null ? undefined : maskOutgoing(String(v)).text)

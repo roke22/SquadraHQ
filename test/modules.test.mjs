@@ -193,3 +193,22 @@ test('modules: nothing unknown, nothing that can not be checked, no reaching out
     'server/machines/link.js': `import { c } from './tickets.js'\nimport { createHash } from 'node:crypto'`,
   }), [])
 })
+
+test('the inbox by voice: what was said is a command, an option with its detail, or an answer in the user\'s words', async () => {
+  const { parseUtterance: p, yesNo, speakable } = await import('../server/ui/voice-parse.js')
+  const o = { options: 3, recommended: 1 }
+  assert.deepEqual(p('La dos, y que sea el lunes', o), { kind: 'option', n: 1, detail: 'que sea el lunes' })
+  assert.deepEqual(p('opción 3', o), { kind: 'option', n: 2, detail: '' })
+  assert.deepEqual(p('2', o), { kind: 'option', n: 1, detail: '' })
+  assert.deepEqual(p('the second one and cap it at 25 %', o), { kind: 'option', n: 1, detail: 'cap it at 25 %' })
+  assert.deepEqual(p('la que recomiendas pero sin prisa', o), { kind: 'option', n: 1, detail: 'sin prisa' })
+  // An article is no choice, and a number past the options is words.
+  assert.deepEqual(p('una cosa más: sin gluten', o), { kind: 'free', text: 'una cosa más: sin gluten' })
+  assert.deepEqual(p('la cuatro', o), { kind: 'free', text: 'la cuatro' })
+  // Without options, a number is words too.
+  assert.deepEqual(p('dos semanas más', { options: 0 }), { kind: 'free', text: 'dos semanas más' })
+  for (const [said, cmd] of [['Para.', 'stop'], ['siguiente', 'next'], ['¿Cómo?', 'repeat'], ['hecho', 'done'], ['descarta', 'dismiss'], ['skip', 'next']]) assert.deepEqual(p(said, o), { kind: 'command', cmd })
+  assert.deepEqual(p('   ', o), { kind: 'empty' })
+  assert.deepEqual(['Sí', 'vale, envíala', 'yes', 'no, cambia', 'quizá'].map(yesNo), [true, true, true, false, null])
+  assert.equal(speakable('Ship on **Friday**? See `/srv/app/notes.md` and https://example.com/x', { link: 'a link', path: 'a file' }), 'Ship on Friday? See a file and a link')
+})

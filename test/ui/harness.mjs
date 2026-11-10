@@ -145,6 +145,8 @@ export async function startMachine(server, name, terminal, { screens = {}, code:
         send({ t: 'info', info })
         send({ t: 'reply', req: m.req, ok: true, result: { id: m.spec.name } })
       }
+      // (Its personas: a skill only in the payments subfolder, to tell the folders apart.)
+      if (m.t === 'personas') send({ t: 'reply', req: m.req, ok: true, result: { personas: m.folder === '/srv/squad/payments' ? [{ id: 'skill:project:payments-lead', kind: 'skill', scope: 'project', name: 'payments-lead', description: 'Leads the payments team' }] : [] } })
       if (m.t === 'attach') send({ t: 'screen', term: m.term, data: b64(screens[m.term] ?? 'screen from the machine\r\n'), cols: m.cols, rows: m.rows })
       if (m.t === 'in') { typed.push(m.data); send({ t: 'out', term: m.term, data: b64(m.data) }) }
     }

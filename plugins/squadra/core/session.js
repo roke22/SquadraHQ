@@ -43,6 +43,8 @@ export function newSession({ name, role, coordinator, staticAccess, seedAllow })
     stopAsked: false, // the Stop hook already asked for that report once
     planSent: false, // a coordinator that has sent its plan (update_plan) isn't reminded to
     planAt: 0, // when it last did
+    planWaiting: 0, // how many tasks of that plan wait on the user
+    ordered: false, // a coordinator that has had an order (from the user or a linked coordinator)
     lastReportAt: 0, // when the last final report from one of its workers reached it
     planHintFor: 0, // the report it was last reminded about (once each)
     openAsks: new Set(), // coordinator: its questions in the user's inbox not answered yet (ask_user)
