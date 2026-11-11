@@ -16,6 +16,10 @@ export function parseRoute(hash) {
   const ib = hash.match(/^#\/inbox\/(done\/)?([ipa][A-Za-z0-9_-]{1,64})$/)
   if (ib) return ib[1] ? { view: 'inbox', tab: 'done', item: ib[2] } : { view: 'inbox', item: ib[2] }
   if (hash === '#/teams') return { view: 'teams' }
+  // The task boards; one of them, with a task open beside it (or a new one).
+  if (hash === '#/boards') return { view: 'boards' }
+  const bd = hash.match(/^#\/b\/(\d{1,9})(?:\/(new|[A-Za-z][A-Za-z0-9]{0,5}-\d{1,9}))?$/)
+  if (bd) return { view: 'board', board: Number(bd[1]), ...(bd[2] ? { task: bd[2] } : {}) }
   if (hash === '#/new') return { view: 'newteam' }
   if (hash === '#/mosaic') return { view: 'mosaic' }
   if (hash === '#/archived') return { view: 'archived' }

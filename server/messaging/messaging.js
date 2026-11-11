@@ -540,8 +540,12 @@ export function createMessaging(platform, { sessions }) {
     }
   }
 
+  // From a task board to a coordinator: the server's own words, signed as
+  // such, from a sender no session can be (see server/boards).
+  const boardNotice = (coordinator, text) => storeMessage('squadra:board', coordinator, { text, system: true })
+
   return {
-    messagingMethods, cleanupMessages, upload, uploadMime, canSeeFile, related, messageView, closeGroup,
+    boardNotice, messagingMethods, cleanupMessages, upload, uploadMime, canSeeFile, related, messageView, closeGroup,
     handOverGroup, fileRow,
   }
 }

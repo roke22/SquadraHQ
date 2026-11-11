@@ -18,6 +18,7 @@ import { noteLinkMessage } from './squads.js'
 import { renderOrg } from './org.js'
 import { renderInbox, refreshInbox } from './inbox.js'
 import { refreshTeams } from './teams.js'
+import { boardsArrived, taskArrived, boardDeleted } from './boards.js'
 import { refreshTeam, noteReport } from './team.js'
 import { refreshSessionAside } from './session.js'
 import { setVersion, showLogin } from './app.js'
@@ -39,6 +40,7 @@ function onStream(type, data) {
     for (const fn of linkListeners) fn()
     state.squadMeta = new Map((data.squads ?? []).map(q => [q.coordinator, q]))
     state.permissions = data.permissions ?? { profiles: [], teams: {}, sessions: {} }
+    state.boards = data.boards ?? []
     hosts.clear()
     for (const h of data.hosts ?? []) hosts.set(h.id, h)
     // After a reconnect, what happened in between isn't in the open chats:
@@ -90,6 +92,9 @@ function onStream(type, data) {
     soon(refreshTeam); soon(refreshSessionAside)
     return
   }
+  if (type === 'boards') { boardsArrived(data); return }
+  if (type === 'task') { taskArrived(data); return }
+  if (type === 'board-deleted') { boardDeleted(data); return }
   if (type === 'templates') {
     state.templates = Array.isArray(data) ? data : []
     for (const fn of templateListeners) fn()

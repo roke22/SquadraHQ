@@ -1,0 +1,179 @@
+// Task boards in the dashboard: a board for a team, tasks handed out without
+// telling anyone until the person says so, moved, commented, as a list, and on
+// a phone. (Selectors by data attributes and names, not by layout.)
+
+import { test as base, expect } from '@playwright/test'
+import { SERVER_TOKEN, startServer, startSession } from './harness.mjs'
+
+const test = base.extend({
+  page: async ({ page }, use) => {
+    const errors = []
+    page.on('pageerror', err => errors.push(err.message))
+    page.on('console', m => { if (m.type() === 'error' && !/status of 40[19]/.test(m.text())) errors.push(m.text()) })
+    await use(page)
+    expect(errors).toEqual([])
+  },
+})
+
+let server
+const shot = name => (process.env.SHOTS ? { path: `${process.env.SHOTS}/${name}.png` } : undefined)
+
+test.beforeAll(async () => {
+  server = await startServer()
+  await startSession(server, 'lead', 'coordinator')
+  await startSession(server, 'writer', 'worker', 'lead')
+  await startSession(server, 'editor', 'worker', 'lead')
+  await startSession(server, 'other', 'coordinator')
+})
+test.afterAll(async () => { await server?.stop() })
+
+async function signIn(page, hash = '') {
+  const [name, value] = (await server.ownerCookie()).split('=')
+  await page.context().addCookies([{ name, value, url: server.url }])
+  await page.goto(`${server.url}/?company=default${hash}`)
+  await expect(page.locator('#app')).toBeVisible()
+}
+// What the board told a coordinator (the server's messages to it).
+async function boardNotices(name) {
+  const r = await fetch(`${server.url}/api/messages?session=${name}`, { headers: { Authorization: `Bearer ${SERVER_TOKEN}` } }).then(x => x.json())
+  return r.result.filter(m => m.from === 'squadra:board' || m.from_name === 'squadra:board' || m.from?.id === 'squadra:board').map(m => m.text)
+}
+
+test('a board: handed out quietly, the team told when the person says so, moved, commented', async ({ page }) => {
+  await signIn(page, '#/boards')
+  await expect(page.locator('#boards .empty')).toContainText('No boards yet')
+  shot('boards-empty') && await page.screenshot(shot('boards-empty'))
+
+  // A board for one team.
+  await page.locator('#topRight [data-newboard]').click()
+  const nb = page.locator('form[data-bnew]')
+  await nb.locator('[name=name]').fill('Launch')
+  await nb.locator('[name=description]').fill('Everything for the 0.0.11 launch')
+  await nb.locator('[name=team][value=lead]').check()
+  await nb.locator('[type=submit]').click()
+  await expect(page).toHaveURL(/#\/b\/\d+$/)
+  await expect(page.locator('.bd-col')).toHaveCount(6)
+  await expect(page.locator('.bd-col h2').nth(1)).toHaveText('To do')
+
+  // A task in "To do", given to a worker: asked whether to tell its coordinator, and "Not yet" is the default.
+  await page.locator('.bd-col[data-cat=unstarted] [data-newtask]').click()
+  const f = page.locator('form[data-bform]')
+  await f.locator('[name=title]').fill('Write the launch post')
+  await f.locator('[name=assignee]').selectOption('s:writer')
+  await f.locator('[name=priority]').selectOption('3')
+  await f.locator('[type=submit]').click()
+  await expect(page.locator('.modal [data-notyet]')).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/#\/b\/\d+\/SQ-1$/)
+  const c1 = page.locator('.bd-card', { hasText: 'Write the launch post' })
+  await expect(c1.locator('.bd-pending')).toHaveText('Not told')
+  // A second one, for the coordinator itself, also not yet.
+  await page.locator('.bd-col[data-cat=unstarted] [data-newtask]').click()
+  await f.locator('[name=title]').fill('Record the demo')
+  await f.locator('[name=assignee]').selectOption('s:lead')
+  await f.locator('[type=submit]').click()
+  await page.locator('.modal [data-notyet]').click()
+  await expect(page.locator('.bd-card .bd-pending')).toHaveCount(2)
+  expect(await boardNotices('lead')).toEqual([])
+  shot('board-columns') && await page.screenshot(shot('board-columns'))
+
+  // Notify the teams: one message with both.
+  await page.locator('#topRight [data-bnotify]').click()
+  await expect(page.locator('.modal .bd-notify-list')).toContainText('SQ-1')
+  await page.locator('.modal [data-ok]').click()
+  await expect(page.locator('.bd-card .bd-pending')).toHaveCount(0)
+  await expect.poll(() => boardNotices('lead')).toHaveLength(1)
+  const [notice] = await boardNotices('lead')
+  expect(notice).toMatch(/SQ-1 «Write the launch post» → your worker writer/)
+  expect(notice).toMatch(/SQ-2 «Record the demo» → you/)
+  await expect(page.locator('#topRight [data-bnotify]')).toHaveCount(0)
+
+  // Moved to "In progress" by dragging it (the task closed, the board whole).
+  await page.locator('.bd-panel-h a.icon-btn').click()
+  await expect(page.locator('.bd-panel')).toBeHidden()
+  await c1.dragTo(page.locator('.bd-col[data-cat=started] .bd-col-body'))
+  await expect(page.locator('.bd-col[data-cat=started] .bd-card')).toContainText('Write the launch post')
+
+  // A comment, told to the coordinator only when asked.
+  await page.locator('.bd-card', { hasText: 'Write the launch post' }).locator('.bd-title').click()
+  const cf = page.locator('form[data-bcomment]')
+  await cf.locator('[name=text]').fill('Keep it under 200 words')
+  await cf.locator('[name=notify]').check()
+  await cf.locator('[type=submit]').click()
+  await expect(page.locator('.bd-com')).toContainText('Keep it under 200 words')
+  await expect(page.locator('.bd-com .tag')).toHaveText('told lead')
+  await expect.poll(() => boardNotices('lead')).toHaveLength(2)
+  shot('board-task') && await page.screenshot(shot('board-task'))
+
+  // Taken back from the worker: its coordinator hears at once.
+  await page.locator('form[data-bform] [name=assignee]').selectOption('')
+  await page.locator('form[data-bform] [type=submit]').click()
+  await expect.poll(async () => (await boardNotices('lead')).at(-1)).toMatch(/no longer your team's/)
+
+  // As a list, filtered.
+  await page.locator('#topTabs [data-bmode=list]').click()
+  await expect(page.locator('.bd-table tbody tr')).toHaveCount(2)
+  await page.locator('[data-bf=text]').fill('demo')
+  await expect(page.locator('.bd-table tbody tr')).toHaveCount(1)
+  await page.locator('[data-bf=text]').fill('')
+  shot('board-list') && await page.screenshot(shot('board-list'))
+  await page.locator('#topTabs [data-bmode=cols]').click()
+
+  // The settings: a label, used on a task.
+  await page.locator('#topRight [data-bsettings]').click()
+  const sf = page.locator('form[data-bset]')
+  await sf.locator('[data-list=labels] [data-add]').click()
+  await sf.locator('[data-list=labels] .bd-row input').fill('docs')
+  await sf.locator('[data-list=labels] .bd-row select').selectOption('green')
+  shot('board-settings') && await page.screenshot(shot('board-settings'))
+  await sf.locator('[type=submit]').click()
+  await expect(page.locator('.modal')).toHaveCount(0)
+  await page.locator('.bd-card', { hasText: 'Record the demo' }).locator('.bd-title').click()
+  await page.locator('form[data-bform] .bd-lpick', { hasText: 'docs' }).locator('input').check()
+  await page.locator('form[data-bform] [type=submit]').click()
+  await expect(page.locator('.bd-card', { hasText: 'Record the demo' }).locator('.lbl[data-color=green]')).toHaveText('docs')
+})
+
+test('on a phone: one column at a time, the task over the whole screen, nothing wider than the page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await signIn(page, '#/boards')
+  await page.locator('.bl-card').first().click()
+  await expect(page.locator('.bd-col').first()).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  shot('board-phone') && await page.screenshot(shot('board-phone'))
+  await page.locator('.bd-card .bd-title').first().click()
+  await expect(page.locator('.bd-panel')).toBeVisible()
+  const box = await page.locator('.bd-panel').boundingBox()
+  expect(box.width).toBeGreaterThanOrEqual(389)
+  shot('board-phone-task') && await page.screenshot(shot('board-phone-task'))
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+})
+
+test('a column as a step: who handles it, where next; a task moved there is theirs, asked before telling', async ({ page }) => {
+  await signIn(page, '#/boards')
+  await page.locator('.bl-card', { hasText: 'Launch' }).click()
+  await page.locator('.bd-col[data-cat=review] [data-colflow]').click()
+  const f = page.locator('form[data-bflow]')
+  await f.locator('[name=handler]').selectOption('s:editor')
+  await f.locator('[name=instructions]').fill('Check the post against the brief')
+  await f.locator('[name=next]').selectOption({ label: 'Done' })
+  await f.locator('[name=back]').selectOption({ label: 'In progress' })
+  shot('board-step') && await page.screenshot(shot('board-step'))
+  await f.locator('[type=submit]').click()
+  await expect(page.locator('.modal')).toHaveCount(0)
+  await expect(page.locator('.bd-col[data-cat=review] .bd-step')).toHaveText('→ editor · then Done')
+
+  // Moved there by a person: the step shows its handler as who will have it, and asks first ("Not yet" the default).
+  await page.locator('.bd-card', { hasText: 'Record the demo' }).locator('.bd-title').click()
+  const tf = page.locator('form[data-bform]')
+  await tf.locator('[name=status]').selectOption({ label: 'In review' })
+  await expect(tf.locator('[name=assignee]')).toHaveValue('s:editor')
+  await expect(tf.locator('.bd-step')).toHaveText('→ editor · then Done')
+  await tf.locator('[type=submit]').click()
+  await expect(page.locator('.modal [data-notyet]')).toBeFocused()
+  await expect(page.locator('.modal')).toContainText('Record the demo')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.bd-col[data-cat=review] .bd-card', { hasText: 'Record the demo' }).locator('.bd-who')).toHaveText('editor')
+  await expect(page.locator('.bd-col[data-cat=review] .bd-card', { hasText: 'Record the demo' }).locator('.bd-pending')).toHaveText('Not told')
+  await expect(tf.locator('.bd-step')).toHaveText('→ editor · then Done')
+})

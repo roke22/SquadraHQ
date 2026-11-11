@@ -16,6 +16,8 @@ export const state = {
   templates: [], // squad templates [{name, host, coordinator, workers}]
   links: [], // linked coordinators of two squads [{a, b}]
   inbox: [], // what coordinators left for the user
+  boards: [], // the company's task boards (their tasks are loaded when one is opened)
+  boardPrefix: 'SQ', // what task ids start with
   plans: new Map(), // coordinator -> { title, tasks, updated_at }: the tasks it says it is working through
   serverSkew: 0,
   streamAbort: null,

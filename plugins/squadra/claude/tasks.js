@@ -82,7 +82,7 @@ const CHANNEL_BLOCK_RE = /<channel\b[^>]*>[\s\S]*?<\/channel>/g
 export function orderSeen(s, prompt) {
   if (s.role !== 'coordinator' || s.ordered) return
   const text = String(prompt ?? '')
-  if (text.replace(CHANNEL_BLOCK_RE, '').trim() || /<channel\b[^>]*\blinked="true"/.test(text)) s.ordered = true
+  if (text.replace(CHANNEL_BLOCK_RE, '').trim() || /<channel\b[^>]*\b(?:linked="true"|kind="squadra_board")/.test(text)) s.ordered = true
 }
 
 // The user's answer from the inbox is typed in as a prompt ("Inbox #12 (…), the

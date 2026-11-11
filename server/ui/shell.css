@@ -111,7 +111,7 @@
 .tabbar { display: none; }
 @media (max-width: 900px) {
   #main { padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
-  .tabbar { position: fixed; inset: auto 0 0 0; z-index: 40; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); }
+  .tabbar { position: fixed; inset: auto 0 0 0; z-index: 40; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding-bottom: env(safe-area-inset-bottom); background: var(--panel); border-top: 1px solid var(--line); }
   .tabbar > * { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 58px; padding: 6px 4px; border: 0; border-radius: 0; background: none; color: var(--muted); font-size: var(--fs-xs); text-decoration: none; }
   .tabbar > .on { color: var(--text); font-weight: 600; background: none; }
   .tabbar .ic { width: 20px; height: 20px; }

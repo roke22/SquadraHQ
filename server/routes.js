@@ -53,7 +53,7 @@ export function createRoutes(server, companies, accounts) {
     // never its content. (Not what only moves things around on the screen.)
     const written = (action, params) => {
       if (action === 'org/positions' || action === 'terminal/ticket' || action === 'hosts/personas') return
-      const target = params.session ?? params.term ?? params.name ?? params.host ?? params.coordinator ?? params.email ?? params.user ?? null
+      const target = params.session ?? params.term ?? params.name ?? params.host ?? params.coordinator ?? params.email ?? params.user ?? params.id ?? params.board ?? null
       company.platform.audit(actor, action, target == null ? null : cleanText(String(target).slice(0, 400)).slice(0, 200), clientIp(req))
     }
 

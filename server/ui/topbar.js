@@ -12,6 +12,7 @@ import { reopenable, reopen, addWorkerTo, saveTemplateDialog } from './squads.js
 import { orgSquads, orgZoom, linksDialog } from './org.js'
 import { renderBack } from './back.js'
 import { voiceButton } from './voice.js'
+import { boardsHead, boardsTopClick } from './boards.js'
 
 // The terminal a session view shows (null: its chat).
 // (An observer has no terminals: its chat instead.)
@@ -60,6 +61,12 @@ function renderHead() {
     setHtml($('topTitle'), esc(T.inbox))
     // (Hands-free: what waits on you, read aloud and answered by voice.)
     setHtml($('topRight'), voiceButton())
+    return
+  }
+  if (r.view === 'boards' || r.view === 'board') {
+    // (Its subtitle, how many boards or tasks, is the board's own: see renderBoards.)
+    const h = boardsHead(r)
+    setHtml($('topTitle'), h.title); setHtml($('topTabs'), h.tabs); setHtml($('topRight'), h.right)
     return
   }
   if (r.view === 'teams') {
@@ -166,6 +173,7 @@ function renderHead() {
 }
 
 $('topRight').addEventListener('click', e => {
+  if (boardsTopClick(e)) return
   const c = e.target.closest('[data-c]')
   if (c) { state.cols = c.dataset.c; store.set('squadraCols', state.cols); applyCols(); renderTop() }
   const ro = e.target.closest('[data-reopen]')

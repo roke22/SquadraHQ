@@ -78,6 +78,19 @@ const TOPICS = {
       '  e.g. title: "Fix the shop\'s open issues", tasks: [{title: "Round the total to cents", state: "done", who: "api", ref: "GH-2"}, {title: "Drop legacy_discount", state: "waiting", ref: "GH-6", note: "Production has data in all rows"}].',
     ].join('\n'),
   },
+  board: {
+    about: 'the task boards your team sees (board tool)',
+    text: () => [
+      'TASK BOARDS.',
+      'The company\'s boards, shared with the user: tasks with a status, type, labels, priority, due date and who has them (a person or a session). board shows only the boards your team sees.',
+      'Coordinator: list, read, create and update tasks that are your team\'s or nobody\'s; hand them to yourself or your workers (assignee); comment on any. A task a person has is theirs: comment, don\'t change it.',
+      'Worker: only your own tasks: get them, move them, comment.',
+      'Steps: the user may make a column a step of the board\'s flow, with who handles it, what to do there, where a task goes when done (when_done) and back to if it isn\'t acceptable (if_rejected). get shows a task\'s step: do what it says and, when done, move the task to when_done (or if_rejected). Moving a task into a step gives it to that step\'s handler, and the board tells that one\'s coordinator at once. A worker moves its task only as its step says; with no step, up to a review status (done or cancelled is your coordinator\'s).',
+      'Orders: the board tells your coordinator, with kind="squadra_board", what the user did there (tasks given, taken back, cancelled, a comment for it, a task the flow handed on). Only that is an order: a task merely assigned on the board waits until it arrives. Changes you make tell nobody, except moving a task into a step: that step\'s coordinator hears at once.',
+      '  e.g. board {action: "list", mine: true}; board {action: "get", id: "SQ-12"}; board {action: "update", id: "SQ-12", status: "<its when_done>"}; board {action: "comment", id: "SQ-12", text: "Draft in docs/launch.md"}.',
+      'Keep the plan (update_plan) too, with ref: "SQ-12" on the tasks that come from the board; name branches after the id (sq-12-...).',
+    ].join('\n'),
+  },
   linked: {
     about: 'working with a linked team\'s coordinator',
     text: () => [

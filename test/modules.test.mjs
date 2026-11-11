@@ -21,7 +21,8 @@ const SERVER_MODULES = {
   permissions: ['platform', 'sessions'],
   machines: ['platform', 'sessions', 'observation', 'permissions'],
   organization: ['platform', 'sessions', 'messaging', 'observation', 'machines'],
-  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions'],
+  boards: ['platform', 'sessions', 'messaging'],
+  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions', 'boards'],
   ui: [],
 }
 const SERVER_OTHER_FOLDERS = ['vendor']

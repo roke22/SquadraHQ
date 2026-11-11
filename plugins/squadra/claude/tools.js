@@ -183,6 +183,30 @@ export const TOOLS = [
     },
   },
   {
+    name: 'board',
+    _meta: ALWAYS_LOAD,
+    description: 'The task boards your team sees (the company\'s, shared with the user). Coordinator: list, read, create, update and hand out tasks to yourself or your workers, and comment. Worker: your own tasks only: read them, move them, comment. A task\'s step (get) says what to do and where it goes when done: move it there (with no step, to a review status at most). A task given to you on the board is only an order once its notice reaches you; when you hand one to a worker, tell the worker yourself. Name branches after the task (sq-12-...).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['boards', 'list', 'get', 'create', 'update', 'comment'], description: 'boards: the boards and their statuses, labels, types. list: tasks (not done or cancelled unless status says so). get: one task with its description, comments and step (who handles its column, what to do there, when_done, if_rejected).' },
+        board: { type: 'string', description: 'The board, by name or id (needed only if your team sees several).' },
+        id: { type: 'string', description: 'The task, such as SQ-12 (get, update, comment).' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        status: { type: 'string', description: 'A status of the board, by name.' },
+        type: { type: 'string' },
+        labels: { type: 'array', items: { type: 'string' }, description: 'The whole list of labels, by name.' },
+        priority: { type: 'integer', minimum: 0, maximum: 4, description: '0 none … 4 urgent.' },
+        due: { type: 'string', description: 'YYYY-MM-DD, or empty to clear.' },
+        assignee: { type: 'string', description: 'Coordinator: yourself or one of your workers, or empty for nobody. list: whose tasks.' },
+        mine: { type: 'boolean', description: 'list: only yours.' },
+        text: { type: 'string', description: 'comment: what you say. list: words to look for.' },
+      },
+      required: ['action'],
+    },
+  },
+  {
     name: 'tell_user',
     _meta: ALWAYS_LOAD,
     description: 'Coordinator: leave something in the user\'s inbox that they will want to know when they come back and that needs no answer: a piece of work finished, its outcome, or a problem they should see. Not routine progress: that stays in this conversation. They may reply to it: their reply reaches this session typed as "Inbox #<id> (...), you told the user this, and they reply from their inbox: ...", and it is the user telling you what to do next.',
@@ -495,6 +519,18 @@ export async function callTool(name, args) {
       // (A task that waits on the user with nothing asked in their inbox: they never see it.)
       const unasked = r.waiting && !S.openAsks.size ? `\n⚠️ ${r.waiting === 1 ? 'A task waits' : `${r.waiting} tasks wait`} on the user, but you have no open question in their inbox: they won't see it here. Ask each decision with ask_user now (if they already answered, update the plan).` : ''
       return r.tasks ? `Plan updated: ${r.done} of ${r.tasks} done, ${r.doing} in progress${r.blocked ? `, ${r.blocked} blocked` : ''}${r.waiting ? `, ${r.waiting} waiting on the user` : ''}.${unasked}` : 'Plan cleared.'
+    }
+    case 'board': {
+      const clean = v => (v == null ? undefined : maskOutgoing(String(v)).text)
+      const p = { action: args.action }
+      for (const k of ['board', 'id', 'status', 'type', 'due', 'assignee']) if (args[k] !== undefined) p[k] = args[k] === null ? null : String(args[k])
+      for (const k of ['title', 'description', 'text']) if (args[k] !== undefined) p[k] = clean(args[k])
+      if (args.labels !== undefined) p.labels = Array.isArray(args.labels) ? args.labels.map(String) : args.labels
+      if (args.priority !== undefined) p.priority = args.priority
+      if (args.mine !== undefined) p.mine = args.mine === true
+      // (A comment is the text; in a list, the words looked for.)
+      if (p.action === 'comment' && p.text === undefined) throw new Error('comment needs text')
+      return JSON.stringify(await call('board', p), null, 1)
     }
     case 'edit_inbox': {
       const clean = v => (v == null ? undefined : maskOutgoing(String(v)).text)

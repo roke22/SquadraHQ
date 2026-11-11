@@ -10,6 +10,9 @@ import {
 } from './access.js'
 import { call, ApiError, downloadFile } from './client.js'
 import { noticeAccepted, signatureAccepted } from './signed.js'
+
+// The server's own sender of what a task board says (see server/boards).
+const BOARD_SENDER = 'squadra:board'
 import { decisionHit } from './risk.js'
 
 // Names and titles are sender-controlled. They land inside the <channel>
@@ -193,6 +196,16 @@ export async function handleInbound(s, msg, { edited = false } = {}) {
     // signed, so nothing else may arrive this way.)
     if (s.role !== 'coordinator') return
     if (!noticeAccepted(s, msg)) return
+    // A task board: what a person did there, said by the server itself (no
+    // session can be this sender). The user's order, like their own words.
+    if (String(msg.from?.id) === BOARD_SENDER) {
+      if (msg.chat?.type !== 'private' || !active(s)) return
+      agent.deliver({
+        content: safeContent(visibleText(text)),
+        meta: { kind: 'squadra_board', user: BOARD_SENDER, ts: new Date((msg.date ?? 0) * 1000).toISOString() },
+      })
+      return
+    }
     const acc = loadAccess(s)
     if (acc.dmPolicy === 'disabled' || msg.chat?.type !== 'private' || String(msg.chat.id) !== String(msg.from?.id) || !acc.allowFrom.includes(String(msg.from?.id))) return
     if (!pinAllowed(s, String(msg.from.id), msg.from.squadra_identity)) return

@@ -323,7 +323,11 @@ test('plugin: idle until login', async () => {
   // Claude Code keeps 4096 characters of a tool's description: the rules in each fit.
   for (const t of listed) assert.ok(t.description.length <= 4096, `${t.name}: ${t.description.length}`)
   const tools = listed.map(t => t.name).sort()
-  assert.deepEqual(tools, ['ask_user', 'download_attachment', 'edit_inbox', 'edit_message', 'help', 'login', 'logout', 'ping', 'react', 'reply', 'status', 'tell_user', 'update_plan'])
+  assert.deepEqual(tools, ['ask_user', 'board', 'download_attachment', 'edit_inbox', 'edit_message', 'help', 'login', 'logout', 'ping', 'react', 'reply', 'status', 'tell_user', 'update_plan'])
+  // The tools the rules send it to are always in its prompt, never behind the tool search
+  // (a worker that never looked for board did its board task without it).
+  const always = listed.filter(t => t._meta?.['anthropic/alwaysLoad']).map(t => t.name).sort()
+  assert.deepEqual(always, ['ask_user', 'board', 'edit_inbox', 'help', 'reply', 'tell_user', 'update_plan'])
   assert.match(await p.tool('status', {}), /not connected/)
   await assert.rejects(p.tool('reply', { chat_id: 'x', text: 'y' }), /\/squadra:login/)
   await sleep(300)
@@ -3183,4 +3187,30 @@ test('a dashboard approval is for the registration opened: the name deleted and 
   assert.equal(coord.channel(p => p.content.startsWith('👋 diw connected')).length, 0)
   coord.close()
   other.close()
+})
+
+test('a task board: its notice reaches the coordinator as the user\'s order, and the board tool works through the plugin', async () => {
+  const coord = new Plugin(null, { SQUADRA_ASSUME_CHANNEL: '1' })
+  await coord.init()
+  await coord.tool('login', { role: 'coordinator', name: 'tbc' })
+  const board = (await dashPost('/api/boards/create', { name: 'Launch', teams: ['tbc'] })).result
+  // Through the tool, as it reads it: names, not ids.
+  assert.match(await coord.tool('board', { action: 'boards' }), /"Launch"[\s\S]*"To do \(unstarted\)"/)
+  const made = JSON.parse(await coord.tool('board', { action: 'create', title: 'Write the post', status: 'To do' }))
+  assert.equal(made.created.id, 'SQ-1')
+  assert.equal(made.created.status, 'To do')
+  await assert.rejects(coord.tool('board', { action: 'get', id: 'SQ-999' }), /no task SQ-999 on your boards/)
+  // Created by the agent, given by a person and only told when the person says so.
+  const t = (await dashPost('/api/tasks/create', { board: board.id, title: 'Record the demo', assignee: { kind: 'session', id: 'tbc' } })).result
+  await sleep(300)
+  assert.equal(coord.channel(p => p.meta.kind === 'squadra_board').length, 0)
+  await dashPost('/api/tasks/notify', { board: board.id })
+  const notice = await coord.waitChannel(p => p.meta.kind === 'squadra_board', 'board notice')
+  assert.match(notice.content, new RegExp(`${t.id} «Record the demo» → you`))
+  // An order: once it has arrived, asking the user in the chat is reminded.
+  const stop = text => runHookOut(coord, { hook_event_name: 'Stop', stop_hook_active: false, last_assistant_message: text, session_id: 's', cwd: '/x' }, ['--stop'])
+  await runHook(coord, { hook_event_name: 'UserPromptSubmit', prompt: `<channel source="squadra" kind="squadra_board" user="squadra:board" ts="1">${notice.content}</channel>`, session_id: 's', cwd: '/x' })
+  await sleep(300)
+  assert.match(JSON.parse(await stop('Necesito que me confirmes el guion antes de grabar.')).reason, /they read their inbox, not this conversation/)
+  coord.close()
 })
