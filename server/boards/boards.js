@@ -18,6 +18,9 @@ import { now, cleanText, bad, ApiError } from '../platform/index.js'
 // and where a task goes once done there, or back to if it isn't acceptable.
 // A task moved into it is that one's: told at once when an agent moved it
 // (the flow is the people's word), asked first when a person did.
+//
+// A task can have subtasks, as GitHub's sub-issues: each a task of its own on
+// the same board (its card, status and who has it), up to 8 levels deep.
 
 // Sent by the server itself: no session can have this name (see NAME_RE).
 export const BOARD_SENDER = 'squadra:board'
@@ -32,6 +35,7 @@ const DUE_RE = /^\d{4}-\d{2}-\d{2}$/
 const MAX = {
   boards: 100, statuses: 20, labels: 60, types: 20, teams: 50, tasks: 5000, name: 60, boardDescription: 1000,
   title: 200, description: 20_000, comment: 8000, instructions: 4000, comments: 500, events: 200, labelsPerTask: 20,
+  subtasks: 100, depth: 8, // (as GitHub: 100 sub-issues on an issue, 8 levels)
 }
 const AGENT_CHANGES_PER_HOUR = 300
 
@@ -60,7 +64,8 @@ export function createBoards(platform, { sessions, messaging, members }) {
       assignee_kind TEXT, assignee TEXT,
       notify_state TEXT NOT NULL DEFAULT 'none', notified_to TEXT,
       created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_by TEXT NOT NULL, updated_at INTEGER NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1
+      version INTEGER NOT NULL DEFAULT 1,
+      parent_seq INTEGER REFERENCES tasks(seq) ON DELETE SET NULL
     );
     CREATE INDEX IF NOT EXISTS tasks_board ON tasks(board_id, rank);
     CREATE INDEX IF NOT EXISTS tasks_assignee ON tasks(assignee_kind, assignee);
@@ -70,6 +75,10 @@ export function createBoards(platform, { sessions, messaging, members }) {
     CREATE TABLE IF NOT EXISTS task_events (id INTEGER PRIMARY KEY AUTOINCREMENT, task_seq INTEGER NOT NULL REFERENCES tasks(seq) ON DELETE CASCADE, at INTEGER NOT NULL, who TEXT NOT NULL, what TEXT NOT NULL, data TEXT);
     CREATE INDEX IF NOT EXISTS task_events_task ON task_events(task_seq, id);
   `)
+  // (Columns added since the first boards.)
+  const addColumn = (table, column, type) => { if (!db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`) }
+  addColumn('tasks', 'parent_seq', 'INTEGER REFERENCES tasks(seq) ON DELETE SET NULL')
+  db.exec('CREATE INDEX IF NOT EXISTS tasks_parent ON tasks(parent_seq)')
 
   // --- who is who ---------------------------------------------------------------
   // Someone is kept as JSON {kind, id, name}: a person (kind user, by their id)
@@ -164,6 +173,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
       priority: t.priority, due: t.due ?? null, rank: t.rank, assignee, notify: t.notify_state, notified_to: t.notified_to ?? null,
       created_by: who(t.created_by), created_at: t.created_at, updated_by: who(t.updated_by), updated_at: t.updated_at, version: t.version,
       comments: db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ?').get(t.seq).n,
+      parent: t.parent_seq ?? null, subtasks: progressOf(t.seq),
     }
     if (!full) return view
     return {
@@ -173,8 +183,31 @@ export function createBoards(platform, { sessions, messaging, members }) {
         .map(c => ({ id: c.id, author: who(c.author), text: c.text, notified: c.notified ?? null, created_at: c.created_at })),
       events: db.prepare('SELECT at, who, what, data FROM task_events WHERE task_seq = ? ORDER BY id DESC LIMIT 100').all(t.seq).reverse()
         .map(e => ({ at: e.at, who: who(e.who), what: e.what, data: e.data ? JSON.parse(e.data) : null })),
+      parent_title: t.parent_seq ? taskRow(t.parent_seq)?.title ?? null : null,
+      children: childrenOf(t.seq).map(c => ({ seq: c.seq, id: taskId(c.seq), title: c.title, status: c.status_id, assignee: c.assignee_kind ? { kind: c.assignee_kind, id: c.assignee, name: c.assignee_kind === 'user' ? memberName(c.assignee) ?? '?' : c.assignee } : null, subtasks: progressOf(c.seq) })),
     }
   }
+  // --- subtasks -------------------------------------------------------------------
+  const childrenOf = seq => db.prepare('SELECT * FROM tasks WHERE parent_seq = ? ORDER BY rank, seq').all(seq)
+  // How many it has, and how many of those are finished (done or cancelled, as GitHub counts closed ones).
+  function progressOf(seq) {
+    const r = db.prepare("SELECT COUNT(*) total, COALESCE(SUM(s.category IN ('done', 'closed')), 0) done FROM tasks c JOIN board_statuses s ON s.id = c.status_id WHERE c.parent_seq = ?").get(seq)
+    return r.total ? { done: r.done, total: r.total } : null
+  }
+  // Levels above a task (0: it has no parent), and levels from it down (1: no subtasks).
+  const above = seq => { let n = 0; for (let t = taskRow(seq); t?.parent_seq && n <= MAX.depth; t = taskRow(t.parent_seq)) n++; return n }
+  const below = (seq, n = 1) => (n > MAX.depth ? n : Math.max(n, ...childrenOf(seq).map(c => below(c.seq, n + 1))))
+  // A parent for a task (seq, or null for a new one), checked: same board, no loop, not too deep.
+  function checkParent(board, value, seq) {
+    if (value === null || value === '') return null
+    const parent = taskRow(seqOf(value))
+    if (!parent || parent.board_id !== board.id) throw bad(`no task ${String(value).slice(0, 40)} on this board to be its parent`)
+    if (seq != null) for (let t = parent; t; t = t.parent_seq ? taskRow(t.parent_seq) : null) if (t.seq === seq) throw bad('a task can\'t be a subtask of itself or of its own subtasks')
+    if (parent.seq !== taskRow(seq ?? -1)?.parent_seq && childrenOf(parent.seq).length >= MAX.subtasks) throw bad(`at most ${MAX.subtasks} subtasks on a task`)
+    if (above(parent.seq) + 1 + (seq != null ? below(seq) : 1) > MAX.depth) throw bad(`subtasks go ${MAX.depth} levels deep at most`)
+    return parent.seq
+  }
+
   const taskRow = seq => db.prepare('SELECT * FROM tasks WHERE seq = ?').get(seq)
   const statusRow = id => db.prepare('SELECT * FROM board_statuses WHERE id = ?').get(id)
   const categoryOf = t => statusRow(t.status_id)?.category ?? 'unstarted'
@@ -192,7 +225,13 @@ export function createBoards(platform, { sessions, messaging, members }) {
     db.prepare('DELETE FROM task_events WHERE task_seq = ? AND id <= (SELECT id FROM task_events WHERE task_seq = ? ORDER BY id DESC LIMIT 1 OFFSET ?)').run(seq, seq, MAX.events)
   }
   const changedBoard = boardId => broadcast('boards', boardList()) // (counts and what waits to be told)
-  const changedTask = seq => { const t = taskRow(seq); if (t) { broadcast('task', taskView(t)); changedBoard(t.board_id) } }
+  // (A parent's progress changes with its subtasks: it is sent too, and the one it had before.)
+  const changedTask = (seq, ...more) => {
+    const t = taskRow(seq)
+    if (!t) return
+    for (const s of new Set([seq, t.parent_seq, ...more].filter(Boolean))) { const x = taskRow(s); if (x) broadcast('task', taskView(x)) }
+    changedBoard(t.board_id)
+  }
 
   // A message from the board to a coordinator: the server's, signed as such,
   // and taken by the plugin as an order (only what a person did sends one).
@@ -269,7 +308,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
 
   // --- changing a task ----------------------------------------------------------
   // What can be set on a task, checked against its board.
-  function fields(board, p, { creating }) {
+  function fields(board, p, { creating, seq = null }) {
     const out = {}
     if (creating || p.title !== undefined) {
       out.title = short(p.title, MAX.title, 'title')
@@ -301,6 +340,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
       else if (!DUE_RE.test(String(p.due)) || Number.isNaN(Date.parse(String(p.due)))) throw bad('due is a date: YYYY-MM-DD')
       else out.due = String(p.due)
     }
+    if (p.parent !== undefined) out.parent_seq = checkParent(board, p.parent, seq)
     if (p.rank !== undefined) {
       const r = Number(p.rank)
       if (!Number.isFinite(r)) throw bad('rank must be a number')
@@ -348,12 +388,12 @@ export function createBoards(platform, { sessions, messaging, members }) {
     const at = now(), json = JSON.stringify(by)
     // (Given by its own coordinator: that coordinator knows already.)
     const state = assignee?.kind === 'session' ? (byAgentTeam && !viaFlow ? 'sent' : 'pending') : 'none'
-    const info = db.prepare(`INSERT INTO tasks (board_id, title, description, status_id, type_id, priority, due, rank, assignee_kind, assignee, notify_state, notified_to, created_by, created_at, updated_by, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(board.id, f.title, f.description ?? null, f.status_id, f.type_id ?? null, f.priority ?? 0, f.due ?? null, rank,
-      assignee?.kind ?? null, assignee?.id ?? null, state, state === 'sent' ? byAgentTeam : null, json, at, json, at)
+    const info = db.prepare(`INSERT INTO tasks (board_id, title, description, status_id, type_id, priority, due, rank, assignee_kind, assignee, notify_state, notified_to, created_by, created_at, updated_by, updated_at, parent_seq)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(board.id, f.title, f.description ?? null, f.status_id, f.type_id ?? null, f.priority ?? 0, f.due ?? null, rank,
+      assignee?.kind ?? null, assignee?.id ?? null, state, state === 'sent' ? byAgentTeam : null, json, at, json, at, f.parent_seq ?? null)
     const seq = Number(info.lastInsertRowid)
     for (const l of f.labels ?? []) db.prepare('INSERT INTO task_labels (task_seq, label_id) VALUES (?, ?)').run(seq, l)
-    event(seq, by, 'created', assignee ? { assignee } : null)
+    event(seq, by, 'created', assignee || f.parent_seq ? { ...(assignee ? { assignee } : {}), ...(f.parent_seq ? { parent: taskId(f.parent_seq) } : {}) } : null)
     if (viaFlow && by.kind === 'session' && assignee.kind === 'session') handOn(taskRow(seq), by)
     if (notifyNow) notifyIfDue(seq, by)
     return seq
@@ -371,7 +411,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     const before = taskRow(seq)
     const board = boardRow(before.board_id)
     if (board.archived_at) throw bad('this board is archived')
-    const f = fields(board, p, { creating: false })
+    const f = fields(board, p, { creating: false, seq })
     const sameAs = a => (a?.kind ?? null) === (before.assignee_kind ?? null) && (a?.id ?? null) === (before.assignee ?? null)
     // Moved into a column someone handles, with nobody else said: theirs now.
     let viaFlow = false
@@ -390,6 +430,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     const diff = changes(before, f)
     // (Who has it, said once: as the history reads it.)
     if ('assignee' in diff || 'assignee_kind' in diff) { delete diff.assignee_kind; diff.assignee = assignee ?? null }
+    if ('parent_seq' in diff) { diff.parent = diff.parent_seq ? taskId(diff.parent_seq) : null; delete diff.parent_seq }
     if (!Object.keys(diff).length && (f.rank === undefined || f.rank === before.rank)) return false
     writeTask(seq, f, by)
     if (Object.keys(diff).length) event(seq, by, 'changed', diff)
@@ -600,17 +641,22 @@ export function createBoards(platform, { sessions, messaging, members }) {
         updateTask(t.seq, p, by, { assignee, human: true })
         if (p.notify === true) notifyIfDue(t.seq, by)
       })
-      changedTask(t.seq)
+      changedTask(t.seq, t.parent_seq)
       return taskView(taskRow(t.seq), { full: true })
     },
     'tasks/delete'(p, actor) {
       const t = humanTask(p.id)
       const by = person(actor)
+      const loose = childrenOf(t.seq).map(c => c.seq)
       inTx(() => {
         correct(t, null, by)
+        // (Its subtasks stay, with no parent: as GitHub does.)
+        for (const c of loose) { db.prepare('UPDATE tasks SET parent_seq = NULL, version = version + 1 WHERE seq = ?').run(c); event(c, by, 'changed', { parent: null }) }
         db.prepare('DELETE FROM tasks WHERE seq = ?').run(t.seq)
       })
       broadcast('task', { id: taskId(t.seq), seq: t.seq, board: t.board_id, deleted: true })
+      for (const c of loose) changedTask(c)
+      if (t.parent_seq) changedTask(t.parent_seq)
       changedBoard()
       return { id: taskId(t.seq), deleted: true }
     },
@@ -701,6 +747,8 @@ export function createBoards(platform, { sessions, messaging, members }) {
       assignee: v.assignee ? (v.assignee.kind === 'user' ? `${v.assignee.name} (a person)` : v.assignee.id) : null,
       board: boardRow(t.board_id)?.name,
       when_done: nameOf(status?.next_id) ?? undefined,
+      parent: t.parent_seq ? quoted(taskRow(t.parent_seq)) : undefined,
+      subtasks: v.subtasks ? `${v.subtasks.done} of ${v.subtasks.total} finished` : undefined,
     }
     if (!full) return out
     const handler = status && handlerOf(status, t.board_id)
@@ -710,6 +758,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
         instructions: status.instructions || undefined, when_done: nameOf(status.next_id) ?? undefined, if_rejected: nameOf(status.back_id) ?? undefined,
       }
     }
+    if (v.children.length) out.subtasks = v.children.map(c => `${c.id} «${c.title}»: ${statusRow(c.status)?.name ?? '?'}${c.assignee ? `, ${c.assignee.kind === 'user' ? `${c.assignee.name} (a person)` : c.assignee.id}` : ''}`)
     return {
       ...out, description: v.description || undefined,
       comments: v.comments.map(c => `${c.author?.name ?? '?'}${c.author?.kind === 'user' ? ' (a person)' : ''}, ${new Date(c.created_at).toISOString().slice(0, 16).replace('T', ' ')}: ${c.text}`),
@@ -752,6 +801,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
           rateLimit(name)
           const boards = p.board == null || p.board === '' ? agentBoards(me) : [agentBoard(me, p.board)]
           const text = p.text == null ? '' : String(p.text).toLowerCase().slice(0, 100)
+          const parentWanted = p.parent == null || p.parent === '' ? null : seqOf(p.parent)
           const out = []
           for (const b of boards) {
             const statuses = statusesOf(b.id)
@@ -759,9 +809,10 @@ export function createBoards(platform, { sessions, messaging, members }) {
             // (Done and cancelled ones only when asked for.)
             const shown = new Set(statuses.filter(s => want ? s.id === want : !['done', 'closed'].includes(s.category)).map(s => s.id))
             for (const t of db.prepare('SELECT * FROM tasks WHERE board_id = ? ORDER BY rank, seq').all(b.id)) {
-              if (!shown.has(t.status_id)) continue
+              if (!shown.has(t.status_id) && (parentWanted == null || want != null)) continue
               if (me.role === 'worker' || p.mine === true ? !mine(me, t) : false) continue
               if (p.assignee != null && p.assignee !== '' && t.assignee !== String(p.assignee)) continue
+              if (parentWanted != null && t.parent_seq !== parentWanted) continue
               if (text && !`${t.title}\n${t.description ?? ''}`.toLowerCase().includes(text)) continue
               out.push(agentView(t))
               if (out.length >= 200) return { tasks: out, more: 'only the first 200: narrow it with status, assignee or text' }
@@ -790,7 +841,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
           const b = boardRow(t.board_id)
           let assignee
           if (me.role === 'worker') {
-            const extra = ['title', 'description', 'type', 'labels', 'priority', 'due', 'assignee'].filter(k => p[k] !== undefined)
+            const extra = ['title', 'description', 'type', 'labels', 'priority', 'due', 'assignee', 'parent'].filter(k => p[k] !== undefined)
             if (extra.length) throw new ApiError(403, `Forbidden: a worker only moves its tasks (status) and comments on them; ${extra.join(', ')} is your coordinator's to change`)
             if (p.status != null) {
               const to = findIn(statusesOf(b.id), p.status, 'status')
@@ -808,7 +859,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
           spendStorage('text', name, String(p.title ?? '').length + String(p.description ?? '').length)
           const { version, rank, ...rest } = p
           const changed = inTx(() => updateTask(t.seq, rest, by, { assignee, human: false }))
-          if (changed) changedTask(t.seq)
+          if (changed) changedTask(t.seq, t.parent_seq)
           const out = { [changed ? 'updated' : 'unchanged']: agentView(taskRow(t.seq)) }
           if (changed === 'flow') out.handed_on = handedOn(me, taskRow(t.seq))
           return out

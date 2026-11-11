@@ -306,3 +306,57 @@ test('boards: a flow hands a task on as the people set it, told at once when an 
   assert.equal(r.result.statuses.find(s => s.name === 'In review').next, null)
   assert.equal(r.result.statuses.find(s => s.name === 'In review').back, st('To do'))
 })
+
+test('boards: subtasks, as GitHub\'s sub-issues: tasks of their own, with the parent\'s progress', async () => {
+  const coord = await session('sc1', 'coordinator')
+  const dev = await session('sdev', 'worker', 'sc1')
+  const board = (await post('boards/create', { name: 'Subtasks', teams: ['sc1'] })).result
+  const other = (await post('boards/create', { name: 'Other board' })).result
+  const st = name => board.statuses.find(s => s.name === name).id
+
+  // A person makes a task and a subtask of it.
+  const parent = (await post('tasks/create', { board: board.id, title: 'Launch page' })).result
+  let r = await post('tasks/create', { board: board.id, title: 'Hero image', parent: parent.seq })
+  assert.ok(r.ok, r.description)
+  const child = r.result
+  assert.equal(child.parent, parent.seq)
+  assert.equal(child.parent_title, 'Launch page')
+  assert.deepEqual(child.events[0].data, { parent: parent.id })
+  let p = (await get(`c/default/boards/task?id=${parent.seq}`)).result
+  assert.deepEqual(p.subtasks, { done: 0, total: 1 })
+  assert.deepEqual(p.children.map(c => c.title), ['Hero image'])
+
+  // Finished subtasks count (done or cancelled); the list shows it too.
+  await post('tasks/update', { id: child.seq, status: st('Done') })
+  const second = (await post('tasks/create', { board: board.id, title: 'Copy', parent: parent.id })).result
+  const list = (await get(`c/default/boards/tasks?board=${board.id}`)).result
+  assert.deepEqual(list.find(t => t.seq === parent.seq).subtasks, { done: 1, total: 2 })
+
+  // No loops, no other board's parent, not deeper than 8 levels.
+  assert.match((await post('tasks/update', { id: parent.seq, parent: child.seq })).description, /subtask of itself or of its own subtasks/)
+  assert.match((await post('tasks/update', { id: parent.seq, parent: parent.seq })).description, /subtask of itself/)
+  const elsewhere = (await post('tasks/create', { board: other.id, title: 'Elsewhere' })).result
+  assert.match((await post('tasks/update', { id: second.seq, parent: elsewhere.seq })).description, /no task .* on this board/)
+  let deepest = parent
+  for (let i = 0; i < 7; i++) deepest = (await post('tasks/create', { board: board.id, title: `Level ${i + 2}`, parent: deepest.seq })).result
+  assert.match((await post('tasks/create', { board: board.id, title: 'Level 9', parent: deepest.seq })).description, /8 levels deep at most/)
+
+  // The coordinator splits a task into subtasks for its workers; get and list show them.
+  const big = (await coord.board({ action: 'create', title: 'Settings screen' })).result.created
+  r = await coord.board({ action: 'create', title: 'Settings: the form', parent: big.id, assignee: 'sdev' })
+  assert.ok(r.ok, r.description)
+  assert.equal(r.result.created.parent, `${big.id} «Settings screen»`)
+  r = await coord.board({ action: 'get', id: big.id })
+  assert.deepEqual(r.result.subtasks, [`${r.result.id.split('-')[0]}-${Number(big.id.split('-')[1]) + 1} «Settings: the form»: To do, sdev`])
+  assert.deepEqual((await coord.board({ action: 'list', parent: big.id })).result.tasks.map(t => t.title), ['Settings: the form'])
+  assert.equal((await coord.board({ action: 'list' })).result.tasks.find(t => t.id === big.id).subtasks, '0 of 1 finished')
+  // (A worker doesn't change what a task belongs to.)
+  const mineId = (await dev.board({ action: 'list' })).result.tasks[0].id
+  assert.match((await dev.board({ action: 'update', id: mineId, parent: '' })).description, /parent is your coordinator's/)
+
+  // Deleting the parent leaves its subtasks, with no parent.
+  assert.ok((await post('tasks/delete', { id: parent.seq })).ok)
+  const loose = (await get(`c/default/boards/task?id=${second.seq}`)).result
+  assert.equal(loose.parent, null)
+  assert.deepEqual(loose.events.at(-1).data, { parent: null })
+})

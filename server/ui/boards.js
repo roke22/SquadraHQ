@@ -18,6 +18,8 @@ import { renderTop } from './topbar.js'
 // A column can be a step of the board's flow: who handles it, what to do
 // there, where a task goes once done. A task moved there is that one's (asked
 // before telling, as any other, when a person moved it).
+// A task can have subtasks (as GitHub's sub-issues): tasks of their own, each
+// with its card; the parent shows them and how many are finished.
 
 const CATEGORIES = ['backlog', 'unstarted', 'started', 'review', 'done', 'closed']
 const COLORS = ['gray', 'blue', 'green', 'yellow', 'orange', 'red', 'purple', 'pink']
@@ -110,11 +112,19 @@ function whoTag(a) {
 const untold = (b, t) => t.notify === 'pending' && t.assignee?.kind === 'session' && ACTIVE.has(statusOf(b, t.status)?.category)
 const pendingTag = (b, t) => (untold(b, t) ? `<span class="bd-pending" title="${esc(T.pendingTitle)}">${esc(T.pendingTag)}</span>` : '')
 
+// Subtasks: the one it belongs to, and how many of its own are finished.
+function parentTag(b, t) {
+  if (!t.parent) return ''
+  const p = tasksOf.get(b.id)?.get(t.parent)
+  return `<span class="bd-parent" title="${esc(T.bSubOf(prefixed(t.parent), p?.title ?? ''))}">↑ ${esc(prefixed(t.parent))}</span>`
+}
+const progressTag = t => (t.subtasks ? `<span class="bd-subs-n${t.subtasks.done === t.subtasks.total ? ' all' : ''}" title="${esc(T.bSubProgress(t.subtasks.done, t.subtasks.total))}">☑ ${t.subtasks.done}/${t.subtasks.total}</span>` : '')
+
 function card(b, t) {
   return `<article class="bd-card${detail?.seq === t.seq ? ' on' : ''}" data-task="${t.seq}"${can('operator') ? ' draggable="true"' : ''}>
-      <div class="bd-card-top"><span class="bd-id">${esc(prefixed(t.seq))}</span>${typeChip(b, t)}${prioTag(t.priority)}${pendingTag(b, t)}</div>
+      <div class="bd-card-top"><span class="bd-id">${esc(prefixed(t.seq))}</span>${parentTag(b, t)}${typeChip(b, t)}${prioTag(t.priority)}${pendingTag(b, t)}</div>
       <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(t.seq))}">${esc(t.title)}</a>
-      ${t.labels.length || t.due || t.assignee || t.comments ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}</div>` : ''}
+      ${t.labels.length || t.due || t.assignee || t.comments || t.subtasks ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${progressTag(t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}</div>` : ''}
     </article>`
 }
 
@@ -163,6 +173,14 @@ function assigneeOptions(b, value) {
   const groups = [...teams].map(([team, names]) => `<optgroup label="${esc(T.bTeamOf(state.squadMeta.get(team)?.title || team))}">${names.sort((x, y) => (x === team ? -1 : y === team ? 1 : COLLATOR.compare(x, y))).map(n => opt(`s:${n}`, n === team ? `${n} (${T.roleCoordinator})` : n)).join('')}</optgroup>`)
   return `${opt('', T.nobody)}${people.members.length ? `<optgroup label="${esc(T.bPeople)}">${people.members.map(m => opt(`u:${m.id}`, m.name)).join('')}</optgroup>` : ''}${groups.join('')}`
 }
+// What a task can be a subtask of: any other task of the board but its own subtasks.
+function parentOptions(b, t) {
+  const map = tasksOf.get(b.id) ?? new Map()
+  const under = seq => { for (let x = map.get(seq), n = 0; x?.parent && n < 20; x = map.get(x.parent), n++) if (x.parent === t.seq) return true; return false }
+  const list = [...map.values()].filter(x => x.seq !== t.seq && !(t.seq && under(x.seq))).sort((x, y) => x.seq - y.seq)
+  const opt = (v, label) => `<option value="${v}"${String(v) === String(t.parent ?? '') ? ' selected' : ''}>${esc(label)}</option>`
+  return opt('', T.noParent) + list.map(x => opt(x.seq, `${prefixed(x.seq)} · ${x.title}`)).join('')
+}
 const assigneeValue = a => (a ? `${a.kind === 'user' ? 'u' : 's'}:${a.id}` : '')
 const assigneeFrom = v => (!v ? null : { kind: v.startsWith('u:') ? 'user' : 'session', id: v.slice(2) })
 
@@ -207,7 +225,7 @@ function table(b, list) {
       <thead><tr><th>${esc('ID')}</th><th>${esc(T.taskTitle)}</th><th>${esc(T.taskStatus)}</th><th>${esc(T.taskType)}</th><th>${esc(T.taskLabels)}</th><th>${esc(T.taskAssignee)}</th><th>${esc(T.taskPriority)}</th><th>${esc(T.taskDue)}</th></tr></thead>
       <tbody>${rows.map(t => `<tr data-task="${t.seq}"${detail?.seq === t.seq ? ' class="on"' : ''}>
         <td class="bd-id">${esc(prefixed(t.seq))}</td>
-        <td><a class="bd-title" href="#/b/${b.id}/${esc(prefixed(t.seq))}">${esc(t.title)}</a> ${pendingTag(b, t)}</td>
+        <td>${parentTag(b, t)} <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(t.seq))}">${esc(t.title)}</a> ${progressTag(t)} ${pendingTag(b, t)}</td>
         <td><span class="bd-dot" data-cat="${categoryOf(b, t)}" aria-hidden="true"></span>${esc(statusOf(b, t.status)?.name ?? '')}</td>
         <td>${typeChip(b, t)}</td><td>${labelChips(b, t)}</td><td>${whoTag(t.assignee)}</td><td>${prioTag(t.priority)}</td><td>${dueTag(b, t)}</td>
       </tr>`).join('')}</tbody></table></div>`
@@ -293,6 +311,7 @@ function form(b, t) {
       <label class="field"><span>${esc(T.taskAssignee)}</span><select name="assignee"${dis}>${assigneeOptions(b, assigneeValue(t.assignee))}</select>
         ${!(people.sessions[b.id] ?? []).length ? `<span class="hint">${esc(T.noAssignable)}</span>` : ''}
         ${untold(b, t) && coordinator ? `<span class="hint bd-pending-hint">${esc(T.pendingTitle)}</span>` : ''}</label>
+      <label class="field"><span>${esc(T.taskParent)}</span><select name="parent"${dis}>${parentOptions(b, t)}</select></label>
       ${b.labels.length ? `<fieldset class="bd-labels"><legend>${esc(T.taskLabels)}</legend>${b.labels.map(l => `<label class="bd-lpick"><input type="checkbox" name="label" value="${l.id}"${(t.labels ?? []).includes(l.id) ? ' checked' : ''}${dis}>${chip(l.name, l.color)}</label>`).join('')}</fieldset>` : ''}
       <label class="field"><span>${esc(T.taskDescription)}</span><textarea name="description" rows="7" maxlength="20000"${dis}>${esc(t.description ?? '')}</textarea></label>
       <div class="err" role="alert"></div>
@@ -313,6 +332,13 @@ function comments(b, t) {
       <div class="err" role="alert"></div>
       <div class="actions"><button type="submit" class="btn">${esc(T.bComment)}</button></div></form>` : ''}`
 }
+function subtasks(b, t) {
+  const rows = t.children.map(c => `<li data-task="${c.seq}"><span class="bd-dot" data-cat="${statusOf(b, c.status)?.category ?? 'unstarted'}" title="${esc(statusOf(b, c.status)?.name ?? '')}" aria-hidden="true"></span><span class="bd-id">${esc(prefixed(c.seq))}</span>
+      <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(c.seq))}">${esc(c.title)}</a>${progressTag(c)}<span class="grow"></span>${whoTag(c.assignee)}</li>`).join('')
+  return `<h3>${esc(T.bSubtasks)}${t.subtasks ? ` <span class="badge soft">${t.subtasks.done}/${t.subtasks.total}</span>` : ''}</h3>
+    ${rows ? `<ul class="bd-subs">${rows}</ul>` : ''}
+    ${can('operator') && !b.archived_at ? `<button type="button" class="btn quiet" data-addsub>${icon('plus')} ${esc(T.bAddSubtask)}</button>` : ''}`
+}
 function history(t) {
   const what = e => (e.what === 'created' ? T.bCreatedIt : e.what === 'notified' ? T.bToldIt(e.data?.to ?? '?') : T.bChangedIt)
   return `<details class="bd-hist"><summary>${esc(T.bHistory)}</summary><ul>${t.events.map(e => `<li><b>${esc(whoName(e.who))}</b> ${esc(what(e))} <span>${esc(WHEN_FMT.format(new Date(e.at)))}</span></li>`).join('')}</ul></details>`
@@ -321,15 +347,16 @@ function history(t) {
 function panelHtml(b, t) {
   return `<header class="bd-panel-h"><span class="bd-id">${esc(t.seq ? prefixed(t.seq) : T.newTask)}</span>${t.seq ? pendingTag(b, t) : ''}
       <a class="icon-btn" href="#/b/${b.id}" title="${esc(T.bClosePanel)}" aria-label="${esc(T.bClosePanel)}">${icon('close')}</a></header>
-    <div class="bd-panel-body">${form(b, t)}${t.seq ? `<section class="bd-comsec">${comments(b, t)}</section>${history(t)}` : ''}</div>`
+    <div class="bd-panel-body">${t.parent ? `<a class="bd-up" href="#/b/${b.id}/${esc(prefixed(t.parent))}">↑ ${esc(T.bSubOf(prefixed(t.parent), t.parent_title ?? ''))}</a>` : ''}${form(b, t)}${t.seq ? `<section class="bd-subsec">${subtasks(b, t)}</section><section class="bd-comsec">${comments(b, t)}</section>${history(t)}` : ''}</div>`
 }
 
 let newStatus = null
+let newParent = null // (a subtask being added: the task it is of)
 function drawNew(b) {
   const panel = $('boards').querySelector('.bd-panel')
   const status = newStatus ?? (b.statuses.find(s => s.category === 'unstarted') ?? b.statuses[0])?.id
   // (In a column someone handles: theirs, as the server will make it.)
-  detail = { seq: 'new', task: { title: '', status, labels: [], priority: 0, assignee: statusOf(b, status)?.handler ?? null }, dirty: false }
+  detail = { seq: 'new', task: { title: '', status, labels: [], priority: 0, assignee: statusOf(b, status)?.handler ?? null, parent: newParent }, dirty: false }
   panel.innerHTML = panelHtml(b, detail.task)
   panel.querySelector('[name=title]')?.focus()
   void loadPeople().then(() => { if (detail?.seq === 'new' && !detail.dirty) { panel.innerHTML = panelHtml(b, detail.task); panel.querySelector('[name=title]')?.focus() } })
@@ -367,6 +394,7 @@ function fromForm(f) {
     title: v('title').trim(), status: Number(v('status')), type: v('type') ? Number(v('type')) : null, priority: Number(v('priority')),
     due: v('due') || null, assignee: assigneeFrom(v('assignee')), description: v('description'),
     labels: [...f.querySelectorAll('[name=label]:checked')].map(x => Number(x.value)),
+    parent: v('parent') ? Number(v('parent')) : null,
   }
 }
 
@@ -411,7 +439,7 @@ async function save(f) {
     const t = before
       ? await postJson('/api/tasks/update', { id: before.seq, version: before.version, ...body })
       : await postJson('/api/tasks/create', { board: b.id, ...body })
-    if (!before) { newStatus = null; location.hash = `#/b/${b.id}/${prefixed(t.seq)}` }
+    if (!before) { newStatus = null; newParent = null; location.hash = `#/b/${b.id}/${prefixed(t.seq)}` }
     shown(t)
     // (Asked once the server says who has it: a column's step may have given it on.)
     const coordinator = wouldNotify(b, before, t)
@@ -657,14 +685,20 @@ $('boards').addEventListener('click', e => {
   const step = e.target.closest('[data-colflow]')
   if (step) { const b = boardOf(currentRoute().board); const s = statusOf(b, Number(step.dataset.colflow)); if (s) void loadPeople().then(() => flowDialog(b, s)); return }
   const add = e.target.closest('[data-newtask]')
-  if (add) { newStatus = Number(add.dataset.newtask); detail = null; const id = currentRoute().board; if (currentRoute().task === 'new') drawNew(boardOf(id)); else location.hash = `#/b/${id}/new`; return }
+  if (add) { newStatus = Number(add.dataset.newtask); newParent = null; detail = null; const id = currentRoute().board; if (currentRoute().task === 'new') drawNew(boardOf(id)); else location.hash = `#/b/${id}/new`; return }
   if (e.target.closest('[data-bdelete]') && detail?.task?.seq) {
     const t = detail.task
     const b = boardOf(currentRoute().board)
     return confirmDialog({ title: T.deleteTaskTitle(prefixed(t.seq)), text: esc(T.deleteTaskText(prefixed(t.seq))), confirm: T.deleteTask, danger: true, run: async () => { await postJson('/api/tasks/delete', { id: t.seq }); tasksOf.get(b.id)?.delete(t.seq); detail = null; location.hash = `#/b/${b.id}` } })
   }
-  // A card or a row: open it (its title is the link; the rest of it too).
-  const row = e.target.closest('.bd-card, .bd-table tr[data-task]')
+  if (e.target.closest('[data-addsub]') && detail?.task?.seq) {
+    const parent = detail.task
+    newStatus = null; newParent = parent.seq; detail = null
+    location.hash = `#/b/${currentRoute().board}/new`
+    return
+  }
+  // A card, a row or a subtask: open it (its title is the link; the rest of it too).
+  const row = e.target.closest('.bd-card, .bd-table tr[data-task], .bd-subs li[data-task]')
   if (row && !e.target.closest('a, button, input, select, textarea')) {
     location.hash = `#/b/${currentRoute().board}/${prefixed(Number(row.dataset.task))}`
   }

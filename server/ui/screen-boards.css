@@ -36,6 +36,9 @@
 .bd-due { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
 .bd-due.late { color: var(--err); font-weight: 600; }
 .bd-ncom { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+.bd-parent { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+.bd-subs-n { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bd-subs-n.all { color: var(--ok); }
 .bd-who { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: var(--fs-xs); color: var(--text); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .bd-who.bd-agent { font-family: var(--mono); }
 .bd-who .ic { width: 13px; height: 13px; }
@@ -118,6 +121,17 @@
 .bd-form .err:empty, .bd-cform .err:empty { display: none; }
 .bd-pending-hint { color: var(--warn); }
 
+.bd-up { display: block; margin: 0 0 12px; font-size: var(--fs-sm); color: var(--muted); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-up:hover { color: var(--text); }
+.bd-subsec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.bd-subsec h3 { margin: 0 0 10px; font-size: var(--fs-md); font-weight: 600; }
+.bd-subs { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.bd-subs li { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; cursor: pointer; font-size: var(--fs-sm); }
+.bd-subs li + li { border-top: 1px solid var(--line); }
+.bd-subs li:hover { background: var(--panel-2); }
+.bd-subs .bd-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-subs .grow { flex: 1; }
+.bd-subs .bd-who { margin-left: 0; }
 .bd-comsec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .bd-comsec h3 { margin: 0 0 10px; font-size: var(--fs-md); font-weight: 600; }
 .bd-coms { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }

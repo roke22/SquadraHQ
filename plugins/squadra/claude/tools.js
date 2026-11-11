@@ -189,7 +189,7 @@ export const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['boards', 'list', 'get', 'create', 'update', 'comment'], description: 'boards: the boards and their statuses, labels, types. list: tasks (not done or cancelled unless status says so). get: one task with its description, comments and step (who handles its column, what to do there, when_done, if_rejected).' },
+        action: { type: 'string', enum: ['boards', 'list', 'get', 'create', 'update', 'comment'], description: 'boards: the boards and their statuses, labels, types. list: tasks (not done or cancelled unless status says so). get: one task with its description, comments, subtasks and step (who handles its column, what to do there, when_done, if_rejected).' },
         board: { type: 'string', description: 'The board, by name or id (needed only if your team sees several).' },
         id: { type: 'string', description: 'The task, such as SQ-12 (get, update, comment).' },
         title: { type: 'string' },
@@ -201,6 +201,7 @@ export const TOOLS = [
         due: { type: 'string', description: 'YYYY-MM-DD, or empty to clear.' },
         assignee: { type: 'string', description: 'Coordinator: yourself or one of your workers, or empty for nobody. list: whose tasks.' },
         mine: { type: 'boolean', description: 'list: only yours.' },
+        parent: { type: 'string', description: 'Coordinator, create or update: the task this one is a subtask of (such as SQ-12; empty to clear). list: the subtasks of that task.' },
         text: { type: 'string', description: 'comment: what you say. list: words to look for.' },
       },
       required: ['action'],
@@ -523,7 +524,7 @@ export async function callTool(name, args) {
     case 'board': {
       const clean = v => (v == null ? undefined : maskOutgoing(String(v)).text)
       const p = { action: args.action }
-      for (const k of ['board', 'id', 'status', 'type', 'due', 'assignee']) if (args[k] !== undefined) p[k] = args[k] === null ? null : String(args[k])
+      for (const k of ['board', 'id', 'status', 'type', 'due', 'assignee', 'parent']) if (args[k] !== undefined) p[k] = args[k] === null ? null : String(args[k])
       for (const k of ['title', 'description', 'text']) if (args[k] !== undefined) p[k] = clean(args[k])
       if (args.labels !== undefined) p.labels = Array.isArray(args.labels) ? args.labels.map(String) : args.labels
       if (args.priority !== undefined) p.priority = args.priority
