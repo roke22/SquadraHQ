@@ -1,7 +1,7 @@
 import { $, store } from './dom.js'
 import { T, LOCALE, COLLATOR } from './i18n.js'
 import { state, sessions, can, companyPref } from './state.js'
-import { esc } from './format.js'
+import { esc, ago } from './format.js'
 import { api } from './api.js'
 import { postJson } from './machines.js'
 import { setHtml, soon, renderNav } from './nav.js'
@@ -61,6 +61,33 @@ async function loadTasks(id) {
   loading.set(id, p)
   return p
 }
+
+// --- GitHub, while the board is in use ----------------------------------------
+// The server asks GitHub only while someone looks: when a board connected to
+// it is opened (or a task of it), and every few minutes while it stays open
+// and the browser tab is in sight. What changes comes back by the stream.
+const WATCH_EVERY = 180_000
+let watching = null // { board, task, timer }
+function stopWatching() { if (watching) clearInterval(watching.timer); watching = null }
+function stillShown() {
+  const r = currentRoute()
+  return !!watching && r.view === 'board' && Number(r.board) === watching.board && !$('boards').hidden && !!boardOf(watching.board)?.github
+}
+function watchPing(extra = {}) {
+  if (!stillShown()) { stopWatching(); return }
+  if (document.visibilityState !== 'visible') return
+  void postJson('/api/boards/github-watch', { board: watching.board, ...(watching.task ? { task: watching.task } : {}), ...extra }).catch(() => {})
+}
+function watchGithub(b, task) {
+  if (!b?.github) { stopWatching(); return }
+  if (watching?.board === b.id && watching.task === task) return
+  const opened = watching?.board !== b.id
+  const taskOpened = !!task && (opened || watching.task !== task)
+  stopWatching()
+  watching = { board: b.id, task, timer: setInterval(() => watchPing(), WATCH_EVERY) }
+  watchPing({ ...(opened ? { opened: true } : {}), ...(taskOpened ? { taskOpened: true } : {}) })
+}
+document.addEventListener('visibilitychange', () => { if (watching && document.visibilityState === 'visible') watchPing() })
 
 // --- from the stream ------------------------------------------------------------
 export function boardsArrived(list) {
@@ -126,6 +153,14 @@ function card(b, t) {
       <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(t.seq))}">${esc(t.title)}</a>
       ${t.labels.length || t.due || t.assignee || t.comments || t.subtasks ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${progressTag(t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}</div>` : ''}
     </article>`
+}
+
+// How the board stands with GitHub, in a few words.
+function ghLine(b) {
+  const g = b.github
+  if (!g) return ''
+  if (g.error) return T.ghError
+  return g.synced_at ? `GitHub · ${T.ghSynced(ago(g.synced_at))}` : T.ghSyncing
 }
 
 // --- the list of boards -------------------------------------------------------
@@ -234,7 +269,7 @@ function table(b, list) {
 export function renderBoard() {
   const r = currentRoute()
   const b = boardOf(r.board)
-  if (!b) { shownKey = null; setHtml($('boards'), `<div class="empty"><b>${esc(T.boardGone)}</b></div>`); return }
+  if (!b) { shownKey = null; stopWatching(); setHtml($('boards'), `<div class="empty"><b>${esc(T.boardGone)}</b></div>`); return }
   if (!tasksOf.has(b.id)) {
     void loadTasks(b.id).then(() => soon(renderBoard), err => alertBox(err.message))
     void loadPeople().then(() => soon(renderBoard))
@@ -258,9 +293,11 @@ export function renderBoard() {
     const first = $('boards').querySelector('.bd-col[data-cat=unstarted], .bd-col[data-cat=started]')
     if (first && matchMedia('(max-width: 900px)').matches) $('boards').querySelector('.bd-view').scrollLeft = first.offsetLeft - 12
   }
-  $('topSub').textContent = tasksOf.has(b.id) ? T.bTasks(all.length) : ''
+  $('topSub').textContent = tasksOf.has(b.id) ? [T.bTasks(all.length), ghLine(b)].filter(Boolean).join(' · ') : ''
   // The task open beside it.
   const want = r.task ?? null
+  const wantSeq = want && want !== 'new' ? Number(/(\d+)$/.exec(want)?.[1]) || null : null
+  watchGithub(b, wantSeq)
   const panel = $('boards').querySelector('.bd-panel')
   if (!want) { if (detail) { detail = null } panel.hidden = true; $('boards').querySelector('.bd').classList.remove('with-panel'); return }
   $('boards').querySelector('.bd').classList.add('with-panel')
@@ -273,7 +310,7 @@ export function renderBoard() {
 
 export function renderBoards() {
   const r = currentRoute()
-  if (r.view === 'boards') { detail = null; renderList(); void loadPeople() } else renderBoard()
+  if (r.view === 'boards') { detail = null; stopWatching(); renderList(); void loadPeople() } else renderBoard()
 }
 export const refreshBoards = () => { const r = currentRoute(); if ((r.view === 'boards' || r.view === 'board') && !$('boards').hidden) renderBoards() }
 
@@ -289,6 +326,7 @@ export function boardsHead(r) {
   const right = [
     can('operator') && b.pending ? `<button class="btn ok" data-bnotify>${esc(T.notifyTeams(b.pending))}</button>` : '',
     can('operator') && !b.archived_at ? `<a class="btn primary" href="#/b/${b.id}/new">${esc(T.newTask)}</a>` : '',
+    can('manager') && b.trash ? `<button class="icon-btn" data-btrash title="${esc(T.bTrash(b.trash))}" aria-label="${esc(T.bTrash(b.trash))}">${icon('trash')}</button>` : '',
     can('manager') ? `<button class="icon-btn" data-bsettings title="${esc(T.boardSettings)}" aria-label="${esc(T.boardSettings)}">${icon('settings')}</button>` : '',
   ].join('')
   return { title: `${esc(b.name)}${b.archived_at ? ` <span class="tag">${esc(T.archivedTag)}</span>` : ''}`, tabs, right }
@@ -340,12 +378,13 @@ function subtasks(b, t) {
     ${can('operator') && !b.archived_at ? `<button type="button" class="btn quiet" data-addsub>${icon('plus')} ${esc(T.bAddSubtask)}</button>` : ''}`
 }
 function history(t) {
-  const what = e => (e.what === 'created' ? T.bCreatedIt : e.what === 'notified' ? T.bToldIt(e.data?.to ?? '?') : T.bChangedIt)
+  const what = e => (e.what === 'created' ? T.bCreatedIt : e.what === 'notified' ? T.bToldIt(e.data?.to ?? '?') : e.what === 'deleted' ? T.bDeletedIt : e.what === 'restored' ? T.bRestoredIt : T.bChangedIt)
   return `<details class="bd-hist"><summary>${esc(T.bHistory)}</summary><ul>${t.events.map(e => `<li><b>${esc(whoName(e.who))}</b> ${esc(what(e))} <span>${esc(WHEN_FMT.format(new Date(e.at)))}</span></li>`).join('')}</ul></details>`
 }
 
 function panelHtml(b, t) {
-  return `<header class="bd-panel-h"><span class="bd-id">${esc(t.seq ? prefixed(t.seq) : T.newTask)}</span>${t.seq ? pendingTag(b, t) : ''}
+  const gh = t.github?.url ? `<a class="bd-gh" href="${esc(t.github.url)}" target="_blank" rel="noopener noreferrer">${esc(T.ghIssue(t.github.number))}</a>` : t.github?.draft ? `<span class="bd-gh">${esc(T.ghDraft)}</span>` : ''
+  return `<header class="bd-panel-h"><span class="bd-id">${esc(t.seq ? prefixed(t.seq) : T.newTask)}</span>${t.seq ? pendingTag(b, t) : ''}${gh}<span class="grow"></span>
       <a class="icon-btn" href="#/b/${b.id}" title="${esc(T.bClosePanel)}" aria-label="${esc(T.bClosePanel)}">${icon('close')}</a></header>
     <div class="bd-panel-body">${t.parent ? `<a class="bd-up" href="#/b/${b.id}/${esc(prefixed(t.parent))}">↑ ${esc(T.bSubOf(prefixed(t.parent), t.parent_title ?? ''))}</a>` : ''}${form(b, t)}${t.seq ? `<section class="bd-subsec">${subtasks(b, t)}</section><section class="bd-comsec">${comments(b, t)}</section>${history(t)}` : ''}</div>`
 }
@@ -580,6 +619,7 @@ function settingsDialog(b) {
       <section class="bd-edit" data-list="statuses"><h4>${esc(T.bStatuses)}</h4><p class="dim-note">${esc(T.bStatusesHint)}</p><div></div></section>
       <section class="bd-edit" data-list="labels"><h4>${esc(T.bLabels)}</h4><div></div></section>
       <section class="bd-edit" data-list="types"><h4>${esc(T.bTypes)}</h4><div></div></section>
+      <section class="bd-edit bd-ghsec"><h4>${esc(T.ghSection)}</h4>${ghSummary(b)}</section>
       <label class="field bd-prefix"><span>${esc(T.taskPrefix)}</span><input type="text" name="prefix" maxlength="6" value="${esc(state.boardPrefix)}" autocapitalize="characters"></label>
       <div class="err" role="alert"></div>
       <div class="actions bd-set-actions">
@@ -624,12 +664,55 @@ function settingsDialog(b) {
       d.close()
     } catch (err) { f.querySelector('.err').textContent = err.message }
   })
+  d.el.querySelector('[data-ghconnect]')?.addEventListener('click', () => { d.close(); githubDialog(b) })
+  d.el.querySelector('[data-ghsync]')?.addEventListener('click', async e => {
+    e.target.disabled = true
+    try { const nb = await postJson('/api/boards/github-sync', { board: b.id }); state.boards = state.boards.map(x => (x.id === nb.id ? nb : x)); d.el.querySelector('.bd-ghsec').innerHTML = `<h4>${esc(T.ghSection)}</h4>${ghSummary(nb)}`; void loadTasks(b.id).then(() => soon(renderBoard)) } catch (err) { f.querySelector('.err').textContent = err.message; e.target.disabled = false }
+  })
+  d.el.querySelector('[data-ghoff]')?.addEventListener('click', () => {
+    d.close()
+    confirmDialog({ title: T.ghDisconnectTitle, text: T.ghDisconnectText(esc(b.github.title ?? '')), confirm: T.ghDisconnect, danger: true, run: async () => { const nb = await postJson('/api/boards/github-off', { board: b.id }); state.boards = state.boards.map(x => (x.id === nb.id ? nb : x)); soon(renderBoard); soon(renderTop) } })
+  })
   d.el.querySelector('[data-barchive]').addEventListener('click', async () => {
     try { await postJson('/api/boards/update', { id: b.id, archived: !b.archived_at }); d.close() } catch (err) { f.querySelector('.err').textContent = err.message }
   })
   d.el.querySelector('[data-bdel]')?.addEventListener('click', () => {
     d.close()
     confirmDialog({ title: T.deleteBoardTitle(b.name), text: esc(T.deleteBoardText(b.name)), confirm: T.deleteBoard, danger: true, run: async () => { await postJson('/api/boards/delete', { id: b.id }); location.hash = '#/boards' } })
+  })
+}
+
+// The board's GitHub connection, in the settings: what it follows and how it went.
+function ghSummary(b) {
+  const g = b.github
+  if (!g) return `<p class="dim-note">${esc(T.ghNone)}</p><button type="button" class="btn" data-ghconnect>${esc(T.ghConnect)}</button>`
+  return `<p class="bd-ghstate"><a href="${esc(g.url ?? '#')}" target="_blank" rel="noopener noreferrer">${esc(T.ghStatus(g.title ?? '', g.repo))}</a></p>
+    <p class="dim-note">${esc([g.synced_at ? T.ghSynced(ago(g.synced_at)) : T.ghSyncing, T.ghLinked(g.linked)].join(' · '))}</p>
+    ${g.error ? `<p class="err" role="alert">${esc(g.error)}</p>` : ''}
+    <div class="bd-ghacts"><button type="button" class="btn" data-ghsync>${esc(T.ghSyncNow)}</button><button type="button" class="btn" data-ghconnect>${esc(T.ghChange)}</button><button type="button" class="btn danger" data-ghoff>${esc(T.ghDisconnect)}</button></div>`
+}
+
+function githubDialog(b) {
+  const g = b.github
+  const d = dialog(`<h3>${esc(T.ghTitle)}</h3><form data-bgh autocomplete="off">
+      <label class="field"><span>${esc(T.ghUrl)}</span><input type="url" name="url" required placeholder="${esc(T.ghUrlPh)}" value="${esc(g ? `https://github.com/${g.owner_kind === 'org' ? 'orgs' : 'users'}/${g.owner}/projects/${g.number}` : '')}"></label>
+      <label class="field"><span>${esc(T.ghRepo)}</span><input type="text" name="repo" required placeholder="${esc(T.ghRepoPh)}" value="${esc(g?.repo ?? '')}" autocapitalize="off" spellcheck="false"><span class="hint">${esc(T.ghRepoHint)}</span></label>
+      <label class="field"><span>${esc(T.ghToken)}</span><input type="password" name="token" ${g ? `placeholder="${esc(T.ghTokenKeep)}"` : 'required'} autocomplete="new-password" spellcheck="false"><span class="hint">${esc(T.ghTokenHint)}</span></label>
+      <p class="dim-note">${esc(T.ghColumnsNote)}</p>
+      <div class="err" role="alert"></div>
+      <div class="actions"><button type="button" class="btn plain" data-cancel>${esc(T.cancel)}</button><button type="submit" class="btn primary">${esc(T.ghConnectBtn)}</button></div></form>`, { wide: true })
+  const f = d.el.querySelector('form')
+  f.elements.url.focus()
+  f.addEventListener('submit', async e => {
+    e.preventDefault()
+    const button = f.querySelector('[type=submit]')
+    button.disabled = true
+    try {
+      await postJson('/api/boards/github', { board: b.id, url: f.elements.url.value, repo: f.elements.repo.value, token: f.elements.token.value })
+      f.elements.token.value = ''
+      d.close()
+      void loadPeople(true).then(() => { soon(renderBoard); soon(renderTop) })
+    } catch (err) { f.querySelector('.err').textContent = err.message; button.disabled = false }
   })
 }
 
@@ -689,7 +772,12 @@ $('boards').addEventListener('click', e => {
   if (e.target.closest('[data-bdelete]') && detail?.task?.seq) {
     const t = detail.task
     const b = boardOf(currentRoute().board)
-    return confirmDialog({ title: T.deleteTaskTitle(prefixed(t.seq)), text: esc(T.deleteTaskText(prefixed(t.seq))), confirm: T.deleteTask, danger: true, run: async () => { await postJson('/api/tasks/delete', { id: t.seq }); tasksOf.get(b.id)?.delete(t.seq); detail = null; location.hash = `#/b/${b.id}` } })
+    const subs = t.children?.length ?? 0
+    return confirmDialog({
+      title: T.deleteTaskTitle(prefixed(t.seq)), text: esc(T.deleteTaskText(prefixed(t.seq))), confirm: T.deleteTask, danger: true,
+      option: subs ? T.deleteWithSubtasks(subs) : null, optionChecked: false,
+      run: async withSubs => { await postJson('/api/tasks/delete', { id: t.seq, subtasks: !!withSubs }); tasksOf.get(b.id)?.delete(t.seq); detail = null; location.hash = `#/b/${b.id}` },
+    })
   }
   if (e.target.closest('[data-addsub]') && detail?.task?.seq) {
     const parent = detail.task
@@ -761,7 +849,41 @@ export function boardsTopClick(e) {
   if (!b) return false
   if (e.target.closest('[data-bnotify]')) { void loadTasks(b.id).then(() => notifyDialog(b)); return true }
   if (e.target.closest('[data-bsettings]')) { void loadPeople().then(() => settingsDialog(b)); return true }
+  if (e.target.closest('[data-btrash]')) { void trashDialog(b); return true }
   return false
+}
+
+// --- the trash: deleted tasks, to be restored ----------------------------------------
+function trashRows(list) {
+  if (!list.length) return `<p class="dim-note">${esc(T.bTrashEmpty)}</p>`
+  return `<ul class="bd-trash">${list.map(t => `<li>
+    <div class="grow"><div class="bd-trash-t"><span class="bd-id">${esc(t.id)}</span> ${esc(t.title)}</div>
+      <div class="dim-note">${esc([T.bTrashBy(whoName(t.deleted_by), ago(t.deleted_at)), t.parent ? T.bTrashSubOf(t.parent.id, t.parent.trashed) : '', t.subtasks ? T.bTrashWith(t.subtasks) : ''].filter(Boolean).join(' · '))}</div></div>
+    <button type="button" class="btn ok" data-restore="${t.seq}">${esc(T.restoreTask)}</button></li>`).join('')}</ul>`
+}
+async function trashDialog(b) {
+  let list
+  try { list = await api(`/api/boards/trash?board=${b.id}`) } catch (err) { alertBox(err.message); return }
+  const d = dialog(`<h3>${esc(T.bTrashTitle(b.name))}</h3><div class="bd-trash-body">${trashRows(list)}</div><div class="err"></div><div class="actions"><button type="button" class="btn plain" data-cancel>${esc(T.close)}</button></div>`, { wide: true })
+  const redraw = async () => { list = await api(`/api/boards/trash?board=${b.id}`); d.el.querySelector('.bd-trash-body').innerHTML = trashRows(list) }
+  const restore = async (t, withSubs) => {
+    const r = await postJson('/api/tasks/restore', { id: t.seq, subtasks: !!withSubs })
+    if (r.without_parent && !t.parent?.trashed) alertBox(T.restoredNoParent(t.id, r.without_parent))
+    await redraw()
+  }
+  d.el.addEventListener('click', e => {
+    const btn = e.target.closest('[data-restore]')
+    if (!btn) return
+    const t = list.find(x => x.seq === Number(btn.dataset.restore))
+    if (!t) return
+    const orphan = t.parent?.trashed
+    // (Nothing to ask: back at once.)
+    if (!orphan && !t.subtasks) { btn.disabled = true; restore(t, false).catch(err => { d.el.querySelector('.err').textContent = err.message; btn.disabled = false }); return }
+    confirmDialog({
+      title: T.restoreTitle(t.id), text: esc(orphan ? T.restoreNoParent(t.id, t.parent.id) : T.restoreText(t.id)), confirm: T.restoreTask, settles: true,
+      option: t.subtasks ? T.restoreWithSubtasks(t.subtasks) : null, run: withSubs => restore(t, withSubs),
+    })
+  })
 }
 // (The view switch sits in the header's tabs.)
 $('topTabs').addEventListener('click', e => { if (e.target.closest('[data-bmode]')) boardsTopClick(e) })

@@ -4,6 +4,12 @@ import { state, sessions } from './state.js'
 // helpers
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 export const now = () => Date.now() + state.serverSkew
+// "3 min ago", "now": in the reader's language, from the browser.
+const RTF = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto', style: 'short' })
+export function ago(t) {
+  const s = Math.round((t - now()) / 1000), a = Math.abs(s)
+  return a < 45 ? RTF.format(0, 'second') : a < 3600 ? RTF.format(Math.round(s / 60), 'minute') : a < 86400 ? RTF.format(Math.round(s / 3600), 'hour') : RTF.format(Math.round(s / 86400), 'day')
+}
 
 // (One formatter for all: building one per call costs more than the rest of a redraw.)
 const TIME_FMT = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false })

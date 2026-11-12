@@ -165,6 +165,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     boards: () => boards.boardReads.boards(),
     'boards/tasks': q => boards.boardReads.tasks(q),
     'boards/task': q => boards.boardReads.task(q),
+    'boards/trash': q => boards.boardReads.trash(q),
     events(q) {
       const limit = Math.max(1, Math.min(Number(q.get('limit') ?? 300) || 300, 1000))
       const before = Number(q.get('before') ?? Number.MAX_SAFE_INTEGER)
@@ -372,7 +373,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   // Who may do each thing, at least. Whatever isn't here nobody may do, and the
   // server refuses to start (see the end): every new action says who it is for.
   const dashboardRoles = {
-    reads: { inbox: 'observer', 'inbox/done': 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer', boards: 'observer', 'boards/tasks': 'observer', 'boards/task': 'observer' },
+    reads: { inbox: 'observer', 'inbox/done': 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer', boards: 'observer', 'boards/tasks': 'observer', 'boards/task': 'observer', 'boards/trash': 'manager' },
     actions: {
       'inbox/resolve': 'operator', 'inbox/read-all': 'operator', 'inbox/answer': 'operator', 'inbox/dismiss': 'operator', kick: 'operator', clear: 'operator', archive: 'operator', unarchive: 'operator',
       'terminals/open': 'operator', 'terminals/kill': 'operator', 'terminal/ticket': 'operator', 'hosts/personas': 'operator',
@@ -382,7 +383,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
       'org/squad': 'manager', 'org/positions': 'manager', 'org/describe': 'manager',
       'permissions/save': 'manager', 'permissions/delete': 'manager', 'permissions/assign': 'manager',
       'tasks/create': 'operator', 'tasks/update': 'operator', 'tasks/comment': 'operator', 'tasks/notify': 'operator',
-      'tasks/delete': 'manager', 'boards/create': 'manager', 'boards/update': 'manager', 'boards/delete': 'manager', 'boards/prefix': 'manager', 'boards/flow': 'manager',
+      'tasks/delete': 'manager', 'tasks/restore': 'manager', 'boards/create': 'manager', 'boards/update': 'manager', 'boards/delete': 'manager', 'boards/prefix': 'manager', 'boards/flow': 'manager', 'boards/github': 'manager', 'boards/github-off': 'manager', 'boards/github-sync': 'operator', 'boards/github-watch': 'observer',
     },
   }
   for (const [table, roles] of [[dashboardActions, dashboardRoles.actions], [{ ...dashboardReads, stream: true }, dashboardRoles.reads]]) {

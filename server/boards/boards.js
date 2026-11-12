@@ -1,4 +1,5 @@
 import { now, cleanText, bad, ApiError } from '../platform/index.js'
+import { createGithubSync } from './sync.js'
 
 // Task boards: the company's, each seen by one or more teams. People and
 // agents work on the same tasks; a task is someone's, a person's or a
@@ -41,6 +42,7 @@ const AGENT_CHANGES_PER_HOUR = 300
 
 export function createBoards(platform, { sessions, messaging, members }) {
   const { db, broadcast, allow, rateLimit, spendStorage, inTx, log } = platform
+  let sync = null // (a board kept in step with GitHub: see sync.js)
   const { NAME_RE, identityExists } = sessions
 
   db.exec(`
@@ -79,6 +81,10 @@ export function createBoards(platform, { sessions, messaging, members }) {
   const addColumn = (table, column, type) => { if (!db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`) }
   addColumn('tasks', 'parent_seq', 'INTEGER REFERENCES tasks(seq) ON DELETE SET NULL')
   db.exec('CREATE INDEX IF NOT EXISTS tasks_parent ON tasks(parent_seq)')
+  // (Deleting a task puts it in the board's trash: it can be restored, it is never gone for good.)
+  addColumn('tasks', 'deleted_at', 'INTEGER')
+  addColumn('tasks', 'deleted_by', 'TEXT')
+  addColumn('tasks', 'trash_batch', 'INTEGER') // (the task whose deletion took it: its subtasks go back with it)
 
   // --- who is who ---------------------------------------------------------------
   // Someone is kept as JSON {kind, id, name}: a person (kind user, by their id)
@@ -156,11 +162,12 @@ export function createBoards(platform, { sessions, messaging, members }) {
   const boardRow = id => db.prepare('SELECT * FROM boards WHERE id = ?').get(Number(id))
 
   function boardView(b) {
-    const counts = Object.fromEntries(db.prepare('SELECT status_id, COUNT(*) n FROM tasks WHERE board_id = ? GROUP BY status_id').all(b.id).map(r => [r.status_id, r.n]))
+    const counts = Object.fromEntries(db.prepare('SELECT status_id, COUNT(*) n FROM tasks WHERE board_id = ? AND deleted_at IS NULL GROUP BY status_id').all(b.id).map(r => [r.status_id, r.n]))
     return {
       id: b.id, name: b.name, description: b.description ?? '', created_at: b.created_at, updated_at: b.updated_at, archived_at: b.archived_at ?? null,
       teams: teamsOf(b.id), statuses: statusesOf(b.id).map(s => ({ ...s, tasks: counts[s.id] ?? 0 })), labels: labelsOf(b.id), types: typesOf(b.id),
-      pending: pendingOf(b.id).length,
+      pending: pendingOf(b.id).length, github: sync?.view(b.id) ?? null,
+      trash: db.prepare('SELECT COUNT(*) n FROM tasks WHERE board_id = ? AND deleted_at IS NOT NULL').get(b.id).n,
     }
   }
   const boardList = () => db.prepare('SELECT * FROM boards ORDER BY archived_at IS NOT NULL, name COLLATE NOCASE, id').all().map(boardView)
@@ -184,14 +191,15 @@ export function createBoards(platform, { sessions, messaging, members }) {
       events: db.prepare('SELECT at, who, what, data FROM task_events WHERE task_seq = ? ORDER BY id DESC LIMIT 100').all(t.seq).reverse()
         .map(e => ({ at: e.at, who: who(e.who), what: e.what, data: e.data ? JSON.parse(e.data) : null })),
       parent_title: t.parent_seq ? taskRow(t.parent_seq)?.title ?? null : null,
+      github: (l => (l?.url ? { url: l.url, number: l.number, repo: l.repo } : l ? { draft: true } : null))(sync?.linkOf(t.seq)),
       children: childrenOf(t.seq).map(c => ({ seq: c.seq, id: taskId(c.seq), title: c.title, status: c.status_id, assignee: c.assignee_kind ? { kind: c.assignee_kind, id: c.assignee, name: c.assignee_kind === 'user' ? memberName(c.assignee) ?? '?' : c.assignee } : null, subtasks: progressOf(c.seq) })),
     }
   }
   // --- subtasks -------------------------------------------------------------------
-  const childrenOf = seq => db.prepare('SELECT * FROM tasks WHERE parent_seq = ? ORDER BY rank, seq').all(seq)
+  const childrenOf = seq => db.prepare('SELECT * FROM tasks WHERE parent_seq = ? AND deleted_at IS NULL ORDER BY rank, seq').all(seq)
   // How many it has, and how many of those are finished (done or cancelled, as GitHub counts closed ones).
   function progressOf(seq) {
-    const r = db.prepare("SELECT COUNT(*) total, COALESCE(SUM(s.category IN ('done', 'closed')), 0) done FROM tasks c JOIN board_statuses s ON s.id = c.status_id WHERE c.parent_seq = ?").get(seq)
+    const r = db.prepare("SELECT COUNT(*) total, COALESCE(SUM(s.category IN ('done', 'closed')), 0) done FROM tasks c JOIN board_statuses s ON s.id = c.status_id WHERE c.parent_seq = ? AND c.deleted_at IS NULL").get(seq)
     return r.total ? { done: r.done, total: r.total } : null
   }
   // Levels above a task (0: it has no parent), and levels from it down (1: no subtasks).
@@ -208,7 +216,8 @@ export function createBoards(platform, { sessions, messaging, members }) {
     return parent.seq
   }
 
-  const taskRow = seq => db.prepare('SELECT * FROM tasks WHERE seq = ?').get(seq)
+  const taskRow = seq => db.prepare('SELECT * FROM tasks WHERE seq = ? AND deleted_at IS NULL').get(seq) // (not one in the trash)
+  const anyTask = seq => db.prepare('SELECT * FROM tasks WHERE seq = ?').get(seq)
   const statusRow = id => db.prepare('SELECT * FROM board_statuses WHERE id = ?').get(id)
   const categoryOf = t => statusRow(t.status_id)?.category ?? 'unstarted'
 
@@ -216,7 +225,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
   // they wait to be worked on.
   function pendingOf(boardId) {
     return db.prepare(`SELECT t.* FROM tasks t JOIN board_statuses s ON s.id = t.status_id
-      WHERE t.board_id = ? AND t.notify_state = 'pending' AND t.assignee_kind = 'session' AND s.category IN ('unstarted', 'started', 'review') ORDER BY t.rank, t.seq`).all(boardId)
+      WHERE t.board_id = ? AND t.deleted_at IS NULL AND t.notify_state = 'pending' AND t.assignee_kind = 'session' AND s.category IN ('unstarted', 'started', 'review') ORDER BY t.rank, t.seq`).all(boardId)
   }
 
   // --- what changed, and who is told --------------------------------------------
@@ -231,6 +240,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     if (!t) return
     for (const s of new Set([seq, t.parent_seq, ...more].filter(Boolean))) { const x = taskRow(s); if (x) broadcast('task', taskView(x)) }
     changedBoard(t.board_id)
+    sync?.touch(t.board_id, seq)
   }
 
   // A message from the board to a coordinator: the server's, signed as such,
@@ -379,7 +389,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
 
   function createTask(board, p, by, { assignee = null, notifyNow = false, byAgentTeam = null } = {}) {
     if (board.archived_at) throw bad('this board is archived')
-    if (db.prepare('SELECT COUNT(*) n FROM tasks WHERE board_id = ?').get(board.id).n >= MAX.tasks) throw bad(`at most ${MAX.tasks} tasks on a board: archive this one and start another`)
+    if (liveCount(board.id) >= MAX.tasks) throw bad(`at most ${MAX.tasks} tasks on a board: archive this one and start another`)
     const f = fields(board, p, { creating: true })
     // (Nobody given, in a column someone handles: theirs.)
     let viaFlow = false
@@ -495,7 +505,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     for (const x of list) if (x.id != null && !old.some(o => o.id === x.id)) throw bad(`there is no ${table.replace('board_', '').slice(0, -1)} ${x.id} on this board`)
     if (table !== 'board_statuses') return
     for (const o of old.filter(o => !kept.has(o.id))) {
-      const n = db.prepare('SELECT COUNT(*) n FROM tasks WHERE status_id = ?').get(o.id).n
+      const n = db.prepare('SELECT COUNT(*) n FROM tasks WHERE status_id = ? AND deleted_at IS NULL').get(o.id).n // (one in the trash goes back to another column)
       if (n) throw bad(`the status "${o.name}" has ${n} task${n === 1 ? '' : 's'}: move ${n === 1 ? 'it' : 'them'} first`)
     }
   }
@@ -519,7 +529,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     const before = teamsOf(boardId)
     // (A team no longer on the board: its tasks there stay, but nobody of it has them.)
     for (const gone of before.filter(c => !teams.includes(c))) {
-      for (const t of db.prepare("SELECT * FROM tasks WHERE board_id = ? AND assignee_kind = 'session'").all(boardId)) {
+      for (const t of db.prepare("SELECT * FROM tasks WHERE board_id = ? AND deleted_at IS NULL AND assignee_kind = 'session'").all(boardId)) {
         if (teamOf(t.assignee) === gone) {
           const by = { kind: 'user', id: 'server', name: 'board settings' }
           updateTask(t.seq, {}, by, { assignee: null, human: true })
@@ -549,13 +559,94 @@ export function createBoards(platform, { sessions, messaging, members }) {
       throw new ApiError(409, `Conflict: ${taskId(t.seq)} changed meanwhile`, { parameters: { reason: 'changed', task: taskView(t, { full: true }) } })
     }
   }
+  // --- the trash -------------------------------------------------------------------
+  const liveCount = boardId => db.prepare('SELECT COUNT(*) n FROM tasks WHERE board_id = ? AND deleted_at IS NULL').get(boardId).n
+  // Its subtasks, all levels down, parents first.
+  function subtasksOf(seq) {
+    const out = []
+    for (let level = childrenOf(seq), n = 0; level.length && n < MAX.depth; n++) { out.push(...level); level = level.flatMap(c => childrenOf(c.seq)) }
+    return out
+  }
+  // The subtasks in the trash that were deleted with it, all levels down, parents first.
+  function trashedWith(t) {
+    const out = []
+    const under = seq => db.prepare('SELECT * FROM tasks WHERE parent_seq = ? AND deleted_at IS NOT NULL AND trash_batch = ? ORDER BY rank, seq').all(seq, t.trash_batch)
+    for (let level = under(t.seq), n = 0; level.length && n < MAX.depth; n++) { out.push(...level); level = level.flatMap(c => under(c.seq)) }
+    return out
+  }
+  // (github: removed from the project there; nothing to do there about it.)
+  function trashTasks(t, { subtasks = false, by, data = null, github = false }) {
+    const gone = [t, ...(subtasks ? subtasksOf(t.seq) : [])]
+    const loose = subtasks ? [] : childrenOf(t.seq).map(c => c.seq)
+    const at = now()
+    inTx(() => {
+      for (const x of gone) {
+        correct(x, null, by)
+        if (!github) sync.taskDeleted(x)
+        db.prepare('UPDATE tasks SET deleted_at = ?, deleted_by = ?, trash_batch = ?, version = version + 1 WHERE seq = ?').run(at, JSON.stringify(by), t.seq, x.seq)
+        event(x.seq, by, 'deleted', x.seq === t.seq ? data : { with: taskId(t.seq) })
+      }
+      // (Its subtasks left on the board stay, with no parent: as GitHub does.)
+      for (const c of loose) { db.prepare('UPDATE tasks SET parent_seq = NULL, version = version + 1 WHERE seq = ?').run(c); event(c, by, 'changed', { parent: null }) }
+    })
+    for (const x of gone) broadcast('task', { id: taskId(x.seq), seq: x.seq, board: x.board_id, deleted: true })
+    for (const c of loose) changedTask(c)
+    if (t.parent_seq) changedTask(t.parent_seq)
+    changedBoard()
+    return gone.map(x => x.seq)
+  }
+  function restoreTasks(t, { subtasks = false, by, github = false }) {
+    const b = humanBoard(t.board_id)
+    if (b.archived_at) throw bad('this board is archived')
+    const back = [t, ...(subtasks ? trashedWith(t) : [])]
+    if (liveCount(b.id) + back.length > MAX.tasks) throw bad(`at most ${MAX.tasks} tasks on a board`)
+    const statuses = statusesOf(b.id)
+    const home = statuses.find(s => ACTIVE.has(s.category))?.id ?? statuses[0]?.id
+    let withoutParent = null
+    inTx(() => {
+      for (const x of back) {
+        let parent = x.parent_seq
+        if (x.seq === t.seq && parent) {
+          // (Its parent on the board, and room under it: back under it. Otherwise with no parent.)
+          let ok = !!taskRow(parent)
+          if (ok) { try { checkParent(b, parent, null) } catch { ok = false } }
+          if (!ok) { withoutParent = taskId(parent); parent = null }
+        }
+        // (Its column gone: the first where work waits. Who had it can't any more: nobody.)
+        const status = statuses.some(s => s.id === x.status_id) ? x.status_id : home
+        let assignee = x.assignee_kind ? { kind: x.assignee_kind, id: x.assignee } : null
+        if (assignee) { try { assignee = checkAssignee(b.id, assignee) } catch { assignee = null } }
+        db.prepare(`UPDATE tasks SET deleted_at = NULL, deleted_by = NULL, trash_batch = NULL, parent_seq = ?, status_id = ?, assignee_kind = ?, assignee = ?,
+          notify_state = ?, notified_to = NULL, version = version + 1, updated_by = ?, updated_at = ? WHERE seq = ?`)
+          .run(parent ?? null, status, assignee?.kind ?? null, assignee?.id ?? null, assignee?.kind === 'session' ? 'pending' : 'none', JSON.stringify(by), now(), x.seq)
+        event(x.seq, by, 'restored', x.seq === t.seq ? (withoutParent ? { without_parent: withoutParent } : null) : { with: taskId(t.seq) })
+        if (!github) sync.taskRestored(x.seq)
+      }
+    })
+    for (const x of back) changedTask(x.seq)
+    changedBoard()
+    return { restored: back.map(x => taskId(x.seq)), without_parent: withoutParent }
+  }
+
   const assigneeParam = (board, p) => (p.assignee === undefined ? undefined : checkAssignee(board.id, p.assignee))
 
   const boardReads = {
     boards: () => ({ prefix: prefix(), boards: boardList(), members: memberList().map(m => ({ id: m.id, name: m.name })), sessions: Object.fromEntries(db.prepare('SELECT id FROM boards').all().map(b => [b.id, assignableSessions(b.id)])) }),
     tasks(q) {
       const b = humanBoard(q.get('board'))
-      return db.prepare('SELECT * FROM tasks WHERE board_id = ? ORDER BY rank, seq').all(b.id).map(t => taskView(t))
+      return db.prepare('SELECT * FROM tasks WHERE board_id = ? AND deleted_at IS NULL ORDER BY rank, seq').all(b.id).map(t => taskView(t))
+    },
+    // The board's trash: the latest deleted first, each with its parent (on the board or in the trash too) and the subtasks deleted with it.
+    trash(q) {
+      const b = humanBoard(q.get('board'))
+      return db.prepare('SELECT * FROM tasks WHERE board_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, seq LIMIT 500').all(b.id).map(t => {
+        const parent = t.parent_seq ? anyTask(t.parent_seq) : null
+        return {
+          id: taskId(t.seq), seq: t.seq, title: t.title, deleted_at: t.deleted_at, deleted_by: who(t.deleted_by),
+          parent: parent ? { id: taskId(parent.seq), seq: parent.seq, title: parent.title, trashed: !!parent.deleted_at } : null,
+          subtasks: trashedWith(t).length,
+        }
+      })
     },
     task: q => taskView(humanTask(q.get('id')), { full: true }),
   }
@@ -581,7 +672,11 @@ export function createBoards(platform, { sessions, messaging, members }) {
       const c = boardConfig(b.id, p, { creating: false })
       inTx(() => {
         if (c.name !== undefined || c.description !== undefined) db.prepare('UPDATE boards SET name = COALESCE(?, name), description = CASE WHEN ? THEN ? ELSE description END WHERE id = ?').run(c.name ?? null, c.description !== undefined ? 1 : 0, c.description ?? null, b.id)
-        if (c.statuses) saveList(b.id, 'board_statuses', c.statuses, true)
+        if (c.statuses) {
+          const was = statusesOf(b.id).map(s => `${s.id}:${s.name}`).join()
+          saveList(b.id, 'board_statuses', c.statuses, true)
+          if (statusesOf(b.id).map(s => `${s.id}:${s.name}`).join() !== was) sync.columnsChanged(b.id)
+        }
         if (c.labels) saveList(b.id, 'board_labels', c.labels, false)
         if (c.types) saveList(b.id, 'board_types', c.types, false)
         if (c.teams) saveTeams(b.id, c.teams)
@@ -589,6 +684,30 @@ export function createBoards(platform, { sessions, messaging, members }) {
         db.prepare('UPDATE boards SET updated_at = ? WHERE id = ?').run(now(), b.id)
       })
       changedBoard()
+      sync.touch(b.id)
+      return boardView(boardRow(b.id))
+    },
+    // Kept in step with a GitHub project: its address, a repository for new issues, a token.
+    async 'boards/github'(p, actor) {
+      const b = humanBoard(p.board)
+      if (b.archived_at) throw bad('this board is archived')
+      return sync.connect(b, p, person(actor))
+    },
+    'boards/github-off'(p) {
+      const b = humanBoard(p.board)
+      sync.disconnect(b.id)
+      return boardView(boardRow(b.id))
+    },
+    // Someone has the board open (and maybe a task): GitHub is read if it isn't fresh.
+    async 'boards/github-watch'(p) {
+      const b = humanBoard(p.board)
+      await sync.watch(b.id, { task: p.task == null ? null : Number(p.task), opened: p.opened === true, taskOpened: p.taskOpened === true })
+      return true
+    },
+    async 'boards/github-sync'(p) {
+      const b = humanBoard(p.board)
+      if (!sync.view(b.id)) throw bad('this board is not connected to GitHub')
+      await sync.syncBoard(b.id)
       return boardView(boardRow(b.id))
     },
     'boards/delete'(p) {
@@ -644,21 +763,18 @@ export function createBoards(platform, { sessions, messaging, members }) {
       changedTask(t.seq, t.parent_seq)
       return taskView(taskRow(t.seq), { full: true })
     },
+    // Into the trash, with its subtasks if asked; if not, they stay on the board with no parent.
     'tasks/delete'(p, actor) {
       const t = humanTask(p.id)
-      const by = person(actor)
-      const loose = childrenOf(t.seq).map(c => c.seq)
-      inTx(() => {
-        correct(t, null, by)
-        // (Its subtasks stay, with no parent: as GitHub does.)
-        for (const c of loose) { db.prepare('UPDATE tasks SET parent_seq = NULL, version = version + 1 WHERE seq = ?').run(c); event(c, by, 'changed', { parent: null }) }
-        db.prepare('DELETE FROM tasks WHERE seq = ?').run(t.seq)
-      })
-      broadcast('task', { id: taskId(t.seq), seq: t.seq, board: t.board_id, deleted: true })
-      for (const c of loose) changedTask(c)
-      if (t.parent_seq) changedTask(t.parent_seq)
-      changedBoard()
-      return { id: taskId(t.seq), deleted: true }
+      const gone = trashTasks(t, { subtasks: p.subtasks === true, by: person(actor) })
+      return { id: taskId(t.seq), deleted: true, trashed: gone.map(taskId) }
+    },
+    // Out of the trash, with the subtasks deleted with it if asked. Its parent
+    // still in the trash (or gone): restored with no parent, and said so.
+    'tasks/restore'(p, actor) {
+      const t = anyTask(seqOf(p.id))
+      if (!t?.deleted_at) throw new ApiError(404, `Not Found: no task ${String(p.id).slice(0, 40)} in the trash`)
+      return restoreTasks(t, { subtasks: p.subtasks === true, by: person(actor) })
     },
     'tasks/comment'(p, actor) {
       const t = humanTask(p.id)
@@ -789,7 +905,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
   }
 
   const boardMethods = {
-    board(name, p) {
+    async board(name, p) {
       const me = agentOf(name)
       const action = String(p.action ?? '')
       const by = agent(name)
@@ -800,6 +916,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
         case 'list': {
           rateLimit(name)
           const boards = p.board == null || p.board === '' ? agentBoards(me) : [agentBoard(me, p.board)]
+          await Promise.all(boards.map(b => sync.fresh(b.id))) // (GitHub's changes first, if it wasn't read lately)
           const text = p.text == null ? '' : String(p.text).toLowerCase().slice(0, 100)
           const parentWanted = p.parent == null || p.parent === '' ? null : seqOf(p.parent)
           const out = []
@@ -808,7 +925,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
             const want = p.status == null || p.status === '' ? null : findIn(statuses, p.status, 'status').id
             // (Done and cancelled ones only when asked for.)
             const shown = new Set(statuses.filter(s => want ? s.id === want : !['done', 'closed'].includes(s.category)).map(s => s.id))
-            for (const t of db.prepare('SELECT * FROM tasks WHERE board_id = ? ORDER BY rank, seq').all(b.id)) {
+            for (const t of db.prepare('SELECT * FROM tasks WHERE board_id = ? AND deleted_at IS NULL ORDER BY rank, seq').all(b.id)) {
               if (!shown.has(t.status_id) && (parentWanted == null || want != null)) continue
               if (me.role === 'worker' || p.mine === true ? !mine(me, t) : false) continue
               if (p.assignee != null && p.assignee !== '' && t.assignee !== String(p.assignee)) continue
@@ -822,7 +939,9 @@ export function createBoards(platform, { sessions, messaging, members }) {
         }
         case 'get': {
           rateLimit(name)
-          return agentView(agentTask(me, p.id), { full: true })
+          const t = agentTask(me, p.id)
+          await sync.freshTask(t) // (with GitHub's comments)
+          return agentView(taskRow(t.seq) ?? t, { full: true })
         }
         case 'create': {
           if (me.role !== 'coordinator') throw new ApiError(403, 'Forbidden: workers don\'t create tasks: ask your coordinator')
@@ -892,6 +1011,17 @@ export function createBoards(platform, { sessions, messaging, members }) {
     const steps = db.prepare("UPDATE board_statuses SET handler_kind = NULL, handler = NULL WHERE handler_kind = 'session' AND handler = ?").run(name).changes
     if (db.prepare('DELETE FROM board_teams WHERE coordinator = ?').run(name).changes || steps) changedBoard()
   }
+
+  const FROM_GITHUB = () => sync.FROM
+  sync = createGithubSync({
+    db, inTx, log, MAX, cleanText, bad, addColumn, dataDir: platform.dataDir,
+    statusRows: boardId => db.prepare('SELECT * FROM board_statuses WHERE board_id = ? ORDER BY position, id').all(boardId),
+    statusRow, taskRow, boardRow, typeRows: typesOf, labelRows: labelsOf,
+    labelNames: seq => db.prepare('SELECT l.name FROM task_labels x JOIN board_labels l ON l.id = x.label_id WHERE x.task_seq = ?').all(seq).map(r => r.name),
+    createTask, updateTask, checkAssignee, assignableSessions, event, changedTask, changedBoard, childrenOf, anyTask,
+    trash: (t, data) => trashTasks(t, { by: FROM_GITHUB(), data, github: true }),
+    restore: t => restoreTasks(t, { by: FROM_GITHUB(), github: true }),
+  })
 
   return { boardReads, boardActions, boardMethods, boardList, forget, BOARD_SENDER }
 }

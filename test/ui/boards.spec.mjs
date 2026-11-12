@@ -4,6 +4,7 @@
 
 import { test as base, expect } from '@playwright/test'
 import { SERVER_TOKEN, startServer, startSession } from './harness.mjs'
+import { startFakeGithub } from '../fake-github.mjs'
 
 const test = base.extend({
   page: async ({ page }, use) => {
@@ -15,17 +16,18 @@ const test = base.extend({
   },
 })
 
-let server
+let server, gh
 const shot = name => (process.env.SHOTS ? { path: `${process.env.SHOTS}/${name}.png` } : undefined)
 
 test.beforeAll(async () => {
-  server = await startServer()
+  gh = await startFakeGithub()
+  server = await startServer({ env: { SQUADRA_GITHUB_API: gh.url } })
   await startSession(server, 'lead', 'coordinator')
   await startSession(server, 'writer', 'worker', 'lead')
   await startSession(server, 'editor', 'worker', 'lead')
   await startSession(server, 'other', 'coordinator')
 })
-test.afterAll(async () => { await server?.stop() })
+test.afterAll(async () => { await server?.stop(); await gh?.stop() })
 
 async function signIn(page, hash = '') {
   const [name, value] = (await server.ownerCookie()).split('=')
@@ -203,4 +205,67 @@ test('subtasks: added from the task, shown on its card and listed in it, each a 
   await page.locator('form[data-bform] [name=status]').selectOption({ label: 'Done' })
   await page.locator('form[data-bform] [type=submit]').click()
   await expect(parentCard.locator('.bd-subs-n')).toHaveText('☑ 1/1')
+})
+
+test('the trash: a task deleted with its subtasks, and brought back with them', async ({ page }) => {
+  await signIn(page, '#/boards')
+  await page.locator('.bl-card', { hasText: 'Launch' }).click()
+  const parentCard = page.locator('.bd-card', { hasText: 'Record the demo' })
+  await expect(parentCard.locator('.bd-subs-n')).toBeVisible() // (it has its subtask, from the test before)
+  await parentCard.locator('.bd-title').click()
+  await page.locator('[data-bdelete]').click()
+  // Asked about its subtasks: not ticked, unless the person ticks it.
+  const option = page.locator('.modal [data-option]')
+  await expect(option).not.toBeChecked()
+  await option.check()
+  await page.locator('.modal .btn.danger').click()
+  await expect(parentCard).toHaveCount(0)
+  await expect(page.locator('.bd-card', { hasText: 'Write the script' })).toHaveCount(0)
+
+  // From the trash: back, with its subtask (ticked: it is asked).
+  await page.locator('[data-btrash]').click()
+  const row = page.locator('.bd-trash li', { hasText: 'Record the demo' })
+  await expect(row).toContainText(/subtask/)
+  shot('board-trash') && await page.screenshot(shot('board-trash'))
+  await row.locator('[data-restore]').click()
+  await expect(page.locator('.modal [data-option]')).toBeChecked()
+  await page.locator('.modal .btn.ok').last().click()
+  await expect(page.locator('.bd-trash')).toHaveCount(0)
+  await expect(page.locator('.modal .dim-note')).toBeVisible()
+  await page.locator('.modal [data-cancel]').click()
+  await expect(parentCard.locator('.bd-subs-n')).toHaveText('☑ 1/1')
+  await expect(page.locator('[data-btrash]')).toHaveCount(0)
+})
+
+test('GitHub: a board connected from its settings, its project\'s cards as tasks, each with its issue', async ({ page }) => {
+  const footer = gh.person.addIssue({ title: 'From GitHub: fix the footer', status: 'Todo' })
+  gh.person.comment(footer.id, 'Only on mobile')
+  await signIn(page, '#/boards')
+  await page.locator('[data-newboard]').first().click()
+  await page.locator('form[data-bnew] [name=name]').fill('Synced')
+  await page.locator('form[data-bnew] [type=submit]').click()
+  await expect(page.locator('.bd-cols')).toBeVisible()
+  await page.locator('[data-bsettings]').click()
+  await page.locator('[data-ghconnect]').click()
+  const f = page.locator('form[data-bgh]')
+  await f.locator('[name=url]').fill('https://github.com/orgs/acme/projects/3')
+  await f.locator('[name=repo]').fill('acme/web')
+  await f.locator('[name=token]').fill(gh.token)
+  shot('board-github') && await page.screenshot(shot('board-github'))
+  await f.locator('[type=submit]').click()
+  await expect(page.locator('.modal')).toHaveCount(0)
+  // The project's columns and card, here; the header says how it went.
+  await expect(page.locator('.bd-col h2').first()).toHaveText('Todo')
+  await expect(page.locator('.bd-card', { hasText: 'fix the footer' })).toBeVisible()
+  await expect(page.locator('#topSub')).toContainText('GitHub')
+  await page.locator('.bd-card', { hasText: 'fix the footer' }).locator('.bd-title').click()
+  await expect(page.locator('.bd-panel-h .bd-gh')).toHaveText(/^#\d+ on GitHub$/)
+  // (Its comments come from GitHub once it is opened.)
+  await expect(page.locator('.bd-comsec')).toContainText('Only on mobile')
+  // The settings show the connection, and it can be undone.
+  await page.locator('[data-bsettings]').click()
+  await expect(page.locator('.bd-ghstate')).toContainText('Web launch')
+  await page.locator('[data-ghoff]').click()
+  await page.locator('.modal .btn.danger').click()
+  await expect(page.locator('#topSub')).not.toContainText('GitHub')
 })

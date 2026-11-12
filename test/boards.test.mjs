@@ -360,3 +360,67 @@ test('boards: subtasks, as GitHub\'s sub-issues: tasks of their own, with the pa
   assert.equal(loose.parent, null)
   assert.deepEqual(loose.events.at(-1).data, { parent: null })
 })
+
+test('boards: deleting puts tasks in the trash, with their subtasks if asked; they come back from there', async () => {
+  const board = (await post('boards/create', { name: 'Trash' })).result
+  const mk = async (title, parent) => (await post('tasks/create', { board: board.id, title, ...(parent ? { parent } : {}) })).result
+  const task = async seq => (await get(`c/default/boards/task?id=${seq}`))
+  const live = async () => (await get(`c/default/boards/tasks?board=${board.id}`)).result.map(t => t.title).sort()
+  const trash = async () => (await get(`c/default/boards/trash?board=${board.id}`)).result
+  const epic = await mk('Epic')
+  const one = await mk('Part 1', epic.seq)
+  const oneOne = await mk('Part 1.1', one.seq)
+  const two = await mk('Part 2', epic.seq)
+
+  // With its subtasks: all of them in the trash, out of the board and of its parent's count.
+  let r = await post('tasks/delete', { id: one.seq, subtasks: true })
+  assert.deepEqual(r.result.trashed, [one.id, oneOne.id])
+  assert.deepEqual(await live(), ['Epic', 'Part 2'])
+  assert.equal((await task(oneOne.seq)).ok, false)
+  assert.deepEqual((await task(epic.seq)).result.subtasks, { done: 0, total: 1 })
+  assert.equal((await get('boards')).result.boards.find(b => b.id === board.id).trash, 2)
+  let tr = await trash()
+  assert.deepEqual(tr.map(t => [t.title, t.parent?.id ?? null, t.parent?.trashed ?? null, t.subtasks]), [['Part 1', epic.id, false, 1], ['Part 1.1', one.id, true, 0]])
+  assert.equal(tr[0].deleted_by.kind, 'user')
+
+  // Restored alone: back under its parent; its subtask stays in the trash.
+  r = await post('tasks/restore', { id: one.seq })
+  assert.deepEqual(r.result, { restored: [one.id], without_parent: null })
+  assert.equal((await task(one.seq)).result.parent, epic.seq)
+  assert.equal((await task(one.seq)).result.events.at(-1).what, 'restored')
+  assert.deepEqual((await trash()).map(t => t.title), ['Part 1.1'])
+  // (Its parent on the board again: back under it.)
+  r = await post('tasks/restore', { id: oneOne.seq })
+  assert.equal(r.result.without_parent, null)
+  assert.equal((await task(oneOne.seq)).result.parent, one.seq)
+
+  // Its parent in the trash: restored with no parent, and said so.
+  await post('tasks/delete', { id: one.seq, subtasks: true })
+  r = await post('tasks/restore', { id: oneOne.seq })
+  assert.equal(r.result.without_parent, one.id)
+  assert.equal((await task(oneOne.seq)).result.parent, null)
+
+  // Without its subtasks: they stay on the board, with no parent.
+  r = await post('tasks/delete', { id: epic.seq })
+  assert.deepEqual(r.result.trashed, [epic.id])
+  assert.equal((await task(two.seq)).result.parent, null)
+
+  // With its subtasks: all back, as they were.
+  const three = await mk('Part 3', two.seq)
+  await post('tasks/delete', { id: two.seq, subtasks: true })
+  r = await post('tasks/restore', { id: two.seq, subtasks: true })
+  assert.deepEqual(r.result.restored, [two.id, three.id])
+  assert.equal((await task(three.seq)).result.parent, two.seq)
+
+  // Its column gone meanwhile: back in the first where work waits.
+  const st = (await get('boards')).result.boards.find(b => b.id === board.id).statuses
+  const doing = st.find(s => s.category === 'started')
+  await post('tasks/update', { id: three.seq, status: doing.id })
+  await post('tasks/delete', { id: three.seq })
+  assert.ok((await post('boards/update', { id: board.id, statuses: st.filter(s => s.id !== doing.id).map(({ id, name, category }) => ({ id, name, category })) })).ok)
+  await post('tasks/restore', { id: three.seq })
+  assert.equal((await task(three.seq)).result.status, st.find(s => s.category === 'unstarted').id)
+
+  // Only what is in the trash comes back.
+  assert.match((await post('tasks/restore', { id: two.seq })).description, /in the trash/)
+})

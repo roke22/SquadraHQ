@@ -2,7 +2,7 @@ import { $ } from './dom.js'
 import { T, LOCALE } from './i18n.js'
 import { state, sessions, hosts, can, linksOf } from './state.js'
 import { api } from './api.js'
-import { esc, now } from './format.js'
+import { esc, now, ago } from './format.js'
 import { sortedSessions, status, agentMark } from './content.js'
 import { setHtml } from './nav.js'
 import { currentRoute } from './router.js'
@@ -11,11 +11,6 @@ import { permissionsSection } from './permissions.js'
 // One team: what it is for, what its workers last reported, who is in it and
 // where each runs, the teams it is linked with, and saving it as a template.
 
-const RTF = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto', style: 'short' })
-function ago(t) {
-  const s = Math.round((t - now()) / 1000), a = Math.abs(s)
-  return a < 45 ? RTF.format(0, 'second') : a < 3600 ? RTF.format(Math.round(s / 60), 'minute') : a < 86400 ? RTF.format(Math.round(s / 3600), 'hour') : RTF.format(Math.round(s / 86400), 'day')
-}
 const titleOf = c => state.squadMeta.get(c)?.title || c
 const REPORT_TAG = { done: 'ok', blocked: 'err', failed: 'err', question: 'warn' }
 

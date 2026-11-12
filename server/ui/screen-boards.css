@@ -107,7 +107,12 @@
 .bd-panel[hidden] { display: none; }
 .bd-panel { width: min(460px, 42vw); flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); background: var(--panel); min-height: 0; }
 .bd-panel-h { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); }
-.bd-panel-h .icon-btn { margin-left: auto; }
+.bd-panel-h .grow { flex: 1; }
+.bd-gh { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+a.bd-gh:hover { color: var(--text); }
+.bd-ghsec p { margin: 0 0 6px; }
+.bd-ghstate a { color: var(--text); font-weight: 600; }
+.bd-ghacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .bd-panel-h .bd-id { font-size: var(--fs-sm); }
 .bd-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; }
 .bd-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
@@ -182,3 +187,13 @@
   .bd-row { grid-template-columns: minmax(0, 1fr) minmax(0, 120px) auto auto; }
   .bd-card { min-height: 44px; }
 }
+
+/* The trash: deleted tasks, each with its restore button. */
+.bd-trash { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.bd-trash li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.bd-trash li + li { border-top: 1px solid var(--line); }
+.bd-trash .grow { flex: 1; min-width: 0; }
+.bd-trash-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+.bd-trash .dim-note { margin-top: 2px; font-size: var(--fs-xs); }
+.bd-trash .btn { flex: none; }
+.bd-trash-body { max-height: 60vh; overflow-y: auto; }

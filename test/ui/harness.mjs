@@ -22,14 +22,14 @@ const freePort = () => new Promise((resolve, reject) => {
 
 export const OWNER = { email: 'owner@example.com', name: 'The Owner', password: 'a long enough password' }
 
-export async function startServer({ tokenApi = true } = {}) {
+export async function startServer({ tokenApi = true, env = {} } = {}) {
   const port = await freePort()
   const url = `http://127.0.0.1:${port}`
   const dataDir = tempDir('squadra-ui-')
   let log = ''
   const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
     // (The token keeps working on /api: what these tests set up isn't the page.)
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: SERVER_TOKEN, SQUADRA_ALLOW_TOKEN_API: tokenApi ? '1' : '' },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: SERVER_TOKEN, SQUADRA_ALLOW_TOKEN_API: tokenApi ? '1' : '', ...env },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   proc.stderr.on('data', d => { log += d })
