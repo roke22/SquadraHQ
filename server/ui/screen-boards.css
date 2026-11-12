@@ -197,3 +197,15 @@ a.bd-gh:hover { color: var(--text); }
 .bd-trash .dim-note { margin-top: 2px; font-size: var(--fs-xs); }
 .bd-trash .btn { flex: none; }
 .bd-trash-body { max-height: 60vh; overflow-y: auto; }
+
+/* The board's state with GitHub, in its header. */
+.bd-ghstat { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+.bd-ghstat .bd-ghtext { overflow: hidden; text-overflow: ellipsis; }
+.bd-ghstat.err .bd-ghtext { color: var(--err); }
+.bd-gherr { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.bd-ghnow { width: 28px; height: 28px; }
+.bd-ghnow .ic { width: 16px; height: 16px; }
+.bd-ghstat.busy .bd-ghnow .ic { animation: bd-spin 1s linear infinite; }
+@keyframes bd-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .bd-ghstat.busy .bd-ghnow .ic { animation: none; } }
+@media (max-width: 900px) { .bd-ghstat .long { display: none; } }

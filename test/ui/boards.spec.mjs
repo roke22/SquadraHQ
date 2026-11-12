@@ -257,7 +257,13 @@ test('GitHub: a board connected from its settings, its project\'s cards as tasks
   // The project's columns and card, here; the header says how it went.
   await expect(page.locator('.bd-col h2').first()).toHaveText('Todo')
   await expect(page.locator('.bd-card', { hasText: 'fix the footer' })).toBeVisible()
-  await expect(page.locator('#topSub')).toContainText('GitHub')
+  // The header says it is synced, when (on hover), and syncs now on a click.
+  const ghState = page.locator('[data-ghstat]')
+  await expect(ghState).toContainText(/GitHub · synced/)
+  await expect(ghState).toHaveAttribute('title', /^Last sync: today at \d\d:\d\d$/)
+  await ghState.locator('[data-ghnow]').click()
+  await expect(ghState).toContainText(/synced/)
+  await expect(ghState.locator('[data-ghnow]')).toBeEnabled()
   await page.locator('.bd-card', { hasText: 'fix the footer' }).locator('.bd-title').click()
   await expect(page.locator('.bd-panel-h .bd-gh')).toHaveText(/^#\d+ on GitHub$/)
   // (Its comments come from GitHub once it is opened.)
@@ -267,5 +273,5 @@ test('GitHub: a board connected from its settings, its project\'s cards as tasks
   await expect(page.locator('.bd-ghstate')).toContainText('Web launch')
   await page.locator('[data-ghoff]').click()
   await page.locator('.modal .btn.danger').click()
-  await expect(page.locator('#topSub')).not.toContainText('GitHub')
+  await expect(page.locator('[data-ghstat]')).toHaveCount(0)
 })

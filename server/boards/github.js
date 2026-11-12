@@ -122,9 +122,18 @@ export function githubClient(token) {
         { input: { repositoryId, title, body, labelIds, ...(parentIssueId ? { parentIssueId } : {}) } })
       return d.createIssue.issue
     },
+    // (Already in it, as GitHub puts a sub-issue in its parent's project by itself: the item it has.)
     async addItem(projectId, contentId) {
-      const d = await gql('AddItem', `mutation AddItem($input: AddProjectV2ItemByIdInput!) { addProjectV2ItemById(input: $input) { item { id } } }`, { input: { projectId, contentId } })
-      return d.addProjectV2ItemById.item.id
+      try {
+        const d = await gql('AddItem', `mutation AddItem($input: AddProjectV2ItemByIdInput!) { addProjectV2ItemById(input: $input) { item { id } } }`, { input: { projectId, contentId } })
+        return d.addProjectV2ItemById.item.id
+      } catch (err) {
+        if (!/already exists/i.test(err.message)) throw err
+        const d = await gql('ItemOf', `query ItemOf($id: ID!) { node(id: $id) { ... on Issue { projectItems(first: 50) { nodes { id project { id } } } } } }`, { id: contentId })
+        const item = d.node?.projectItems?.nodes?.find(n => n?.project?.id === projectId)
+        if (!item) throw err
+        return item.id
+      }
     },
     async removeItem(projectId, itemId) {
       await gql('RemoveItem', `mutation RemoveItem($input: DeleteProjectV2ItemInput!) { deleteProjectV2Item(input: $input) { deletedItemId } }`, { input: { projectId, itemId } })

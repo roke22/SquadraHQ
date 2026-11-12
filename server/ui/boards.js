@@ -156,12 +156,29 @@ function card(b, t) {
 }
 
 // How the board stands with GitHub, in a few words.
-function ghLine(b) {
+// The board's state with GitHub, in its header: when it was last synced (the
+// exact time on hover), what is on its way, whether it failed (and why, on a
+// click), and a button to sync now. It follows the server as it changes.
+const TIME_FMT_GH = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false })
+function lastSync(t) {
+  const d = new Date(t)
+  return d.toDateString() === new Date().toDateString() ? T.ghStLastToday(TIME_FMT_GH.format(d)) : T.ghStLastOn(WHEN_FMT.format(d))
+}
+function ghStatus(b) {
   const g = b.github
   if (!g) return ''
-  if (g.error) return T.ghError
-  return g.synced_at ? `GitHub · ${T.ghSynced(ago(g.synced_at))}` : T.ghSyncing
+  const busy = g.syncing
+  let text
+  if (g.error) text = `<button type="button" class="bd-gherr" data-gherr>${esc(T.ghStFailed)}</button>${g.pending ? ` · ${esc(T.ghStUnsent(g.pending))}` : ''}`
+  else if (busy) text = esc(T.ghStSyncing)
+  else if (g.pending) text = esc(T.ghStSending(g.pending))
+  else text = esc(g.synced_at ? T.ghStSynced(ago(g.synced_at)) : T.ghStNever)
+  const title = g.synced_at ? lastSync(g.synced_at) : ''
+  const now = can('operator') ? `<button type="button" class="icon-btn bd-ghnow" data-ghnow title="${esc(T.ghStNow)}" aria-label="${esc(T.ghStNow)}"${busy ? ' disabled' : ''}>${icon('refresh')}</button>` : ''
+  return `<span class="bd-ghstat${g.error ? ' err' : ''}${busy ? ' busy' : ''}" data-ghstat title="${esc(title)}"><span class="long">GitHub · </span><span class="bd-ghtext" aria-live="polite">${text}</span>${now}</span>`
 }
+// («5 minutes ago» stays true while the board is shown.)
+setInterval(() => { const r = currentRoute(); if (r.view === 'board' && boardOf(r.board)?.github) renderTop() }, 30_000)
 
 // --- the list of boards -------------------------------------------------------
 function boardCard(b) {
@@ -293,7 +310,7 @@ export function renderBoard() {
     const first = $('boards').querySelector('.bd-col[data-cat=unstarted], .bd-col[data-cat=started]')
     if (first && matchMedia('(max-width: 900px)').matches) $('boards').querySelector('.bd-view').scrollLeft = first.offsetLeft - 12
   }
-  $('topSub').textContent = tasksOf.has(b.id) ? [T.bTasks(all.length), ghLine(b)].filter(Boolean).join(' · ') : ''
+  $('topSub').textContent = tasksOf.has(b.id) ? T.bTasks(all.length) : ''
   // The task open beside it.
   const want = r.task ?? null
   const wantSeq = want && want !== 'new' ? Number(/(\d+)$/.exec(want)?.[1]) || null : null
@@ -324,6 +341,7 @@ export function boardsHead(r) {
   const m = mode()
   const tabs = `<nav class="seg" aria-label="${esc(b.name)}"><button type="button" data-bmode="cols"${m === 'cols' ? ' aria-pressed="true"' : ''}>${esc(T.bColumns)}</button><button type="button" data-bmode="list"${m === 'list' ? ' aria-pressed="true"' : ''}>${esc(T.bList)}</button></nav>`
   const right = [
+    ghStatus(b),
     can('operator') && b.pending ? `<button class="btn ok" data-bnotify>${esc(T.notifyTeams(b.pending))}</button>` : '',
     can('operator') && !b.archived_at ? `<a class="btn primary" href="#/b/${b.id}/new">${esc(T.newTask)}</a>` : '',
     can('manager') && b.trash ? `<button class="icon-btn" data-btrash title="${esc(T.bTrash(b.trash))}" aria-label="${esc(T.bTrash(b.trash))}">${icon('trash')}</button>` : '',
@@ -850,6 +868,17 @@ export function boardsTopClick(e) {
   if (e.target.closest('[data-bnotify]')) { void loadTasks(b.id).then(() => notifyDialog(b)); return true }
   if (e.target.closest('[data-bsettings]')) { void loadPeople().then(() => settingsDialog(b)); return true }
   if (e.target.closest('[data-btrash]')) { void trashDialog(b); return true }
+  if (e.target.closest('[data-gherr]') && b.github?.error) { alertBox(T.ghStFailedText(b.github.error, b.github.pending), T.ghStFailedTitle); return true }
+  const now = e.target.closest('[data-ghnow]')
+  if (now) {
+    now.disabled = true
+    // (The board, and the task open beside it with its comments.)
+    const seq = typeof detail?.seq === 'number' ? detail.seq : null
+    const work = [postJson('/api/boards/github-sync', { board: b.id })]
+    if (seq) work.push(postJson('/api/boards/github-watch', { board: b.id, task: seq, taskOpened: true }))
+    Promise.all(work).catch(err => alertBox(err.message)).finally(() => { now.disabled = false; soon(renderTop) })
+    return true
+  }
   return false
 }
 

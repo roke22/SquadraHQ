@@ -239,8 +239,8 @@ export function createBoards(platform, { sessions, messaging, members }) {
     const t = taskRow(seq)
     if (!t) return
     for (const s of new Set([seq, t.parent_seq, ...more].filter(Boolean))) { const x = taskRow(s); if (x) broadcast('task', taskView(x)) }
+    sync?.touch(t.board_id, seq) // (first: the board sent below counts it as on its way to GitHub)
     changedBoard(t.board_id)
-    sync?.touch(t.board_id, seq)
   }
 
   // A message from the board to a coordinator: the server's, signed as such,
@@ -683,8 +683,8 @@ export function createBoards(platform, { sessions, messaging, members }) {
         if (p.archived !== undefined) db.prepare('UPDATE boards SET archived_at = ? WHERE id = ?').run(p.archived ? now() : null, b.id)
         db.prepare('UPDATE boards SET updated_at = ? WHERE id = ?').run(now(), b.id)
       })
-      changedBoard()
       sync.touch(b.id)
+      changedBoard()
       return boardView(boardRow(b.id))
     },
     // Kept in step with a GitHub project: its address, a repository for new issues, a token.

@@ -32,7 +32,8 @@ const FROM = { kind: 'github', id: 'github', name: 'GitHub' }
 const ACTIVE = ['unstarted', 'started', 'review']
 const OPTION_COLOR = { backlog: 'GRAY', unstarted: 'BLUE', started: 'YELLOW', review: 'PURPLE', done: 'GREEN', closed: 'RED' }
 const LABEL_HEX = { gray: '8c959f', blue: '0969da', green: '1a7f37', yellow: 'bf8700', orange: 'bc4c00', red: 'cf222e', purple: '8250df', pink: 'bf3989' }
-const AGENT_FIELD = ['Agent', 'Agente'], TYPE_FIELD = ['Type', 'Tipo', 'Task type']
+// (Found by any of these names; made with the first GitHub takes: it keeps «Type» for its own issue types.)
+const AGENT_FIELD = ['Agent', 'Agente', 'Squadra agent'], TYPE_FIELD = ['Task type', 'Tipo de tarea', 'Tipo', 'Squadra type']
 
 // What a column of GitHub's is, by its name, until a person says otherwise.
 export function guessCategory(name) {
@@ -99,11 +100,25 @@ export function createGithubSync(ctx) {
   const links = boardId => db.prepare('SELECT g.* FROM task_github g JOIN tasks t ON t.seq = g.task_seq WHERE g.board_id = ? AND t.deleted_at IS NULL').all(boardId)
   const linkOf = seq => db.prepare('SELECT * FROM task_github WHERE task_seq = ?').get(seq)
 
-  // What the dashboard shows of the connection (never the token).
+  // What the dashboard shows of the connection (never the token): when it was
+  // last read whole, whether it is being read now, and how many changes made
+  // here haven't reached GitHub yet.
   function view(boardId) {
     const c = conn(boardId)
     if (!c) return null
-    return { owner_kind: c.owner_kind, owner: c.owner, number: c.number, title: c.title, url: c.url, repo: c.repo, synced_at: c.synced_at ?? null, error: c.error ?? null, linked: links(boardId).length }
+    return {
+      owner_kind: c.owner_kind, owner: c.owner, number: c.number, title: c.title, url: c.url, repo: c.repo, synced_at: c.synced_at ?? null, error: c.error ?? null, linked: links(boardId).length,
+      syncing: busy.has(boardId) || queued.has(boardId), pending: notSent(boardId),
+    }
+  }
+  function notSent(boardId) {
+    const seqs = new Set([...(soonTimers.get(boardId)?.seqs ?? []), ...(sending.get(boardId) ?? [])])
+    const board = seqs.delete(null) ? 1 : 0 // (a change to the board itself: its columns)
+    const rows = db.prepare(`SELECT t.seq FROM tasks t LEFT JOIN task_github g ON g.task_seq = t.seq WHERE t.board_id = @b AND t.deleted_at IS NULL AND (g.task_seq IS NULL OR g.item_id LIKE 'pending:%')
+      UNION SELECT c.task_seq FROM task_comments c JOIN task_github g ON g.task_seq = c.task_seq JOIN tasks t ON t.seq = c.task_seq
+        WHERE g.board_id = @b AND g.issue_id IS NOT NULL AND t.deleted_at IS NULL AND c.gh_id IS NULL AND c.author NOT LIKE '{"kind":"github"%'`).all({ b: boardId })
+    for (const r of rows) seqs.add(r.seq)
+    return seqs.size + board + db.prepare('SELECT COUNT(*) n FROM github_outbox WHERE board_id = ?').get(boardId).n
   }
 
   // --- connecting -------------------------------------------------------------------
@@ -233,6 +248,8 @@ export function createGithubSync(ctx) {
   const lastBoard = new Map()  // board id -> when it was last read whole
   const lastTask = new Map()   // task seq -> when it was last read
   const soonTimers = new Map() // board id -> the changes waiting to go: { timer, seqs } (null: the whole board)
+  const busy = new Map()       // board id -> whole syncs running
+  const sending = new Map()    // board id -> Set of the tasks whose changes are on their way
   let applying = 0 // (changes made here from GitHub don't ask for another sync)
 
   function serial(boardId, fn) {
@@ -253,24 +270,41 @@ export function createGithubSync(ctx) {
       w.timer = setTimeout(() => {
         soonTimers.delete(boardId)
         if (w.seqs.has(null)) void syncBoard(boardId)
-        else void syncTasks(boardId, [...w.seqs])
+        else void syncTasks(boardId, [...w.seqs], { sending: true })
       }, SOON)
       w.timer.unref?.()
       soonTimers.set(boardId, w)
     }
     w.seqs.add(seq)
   }
+  // (The dashboard sees it start and end: «syncing», «sending n changes».)
+  async function tracked(boardId, mark, fn) {
+    const undo = mark()
+    ctx.changedBoard()
+    try { return await fn() } finally { undo(); ctx.changedBoard() }
+  }
   // The whole board (with the one already waiting its turn, if there is one).
   function syncBoard(boardId) {
     if (queued.has(boardId)) return queued.get(boardId)
     lastBoard.set(boardId, Date.now())
-    const p = serial(boardId, () => { queued.delete(boardId); return attempt(boardId, run) })
+    const p = serial(boardId, () => {
+      queued.delete(boardId)
+      return tracked(boardId, () => { busy.set(boardId, (busy.get(boardId) ?? 0) + 1); return () => { const n = busy.get(boardId) - 1; if (n > 0) busy.set(boardId, n); else busy.delete(boardId) } }, () => attempt(boardId, run))
+    })
     queued.set(boardId, p)
     return p
   }
   // These tasks only: what changed here goes there, and each comes back with its comments.
-  function syncTasks(boardId, seqs) {
+  function syncTasks(boardId, seqs, { sending: changes = false } = {}) {
     for (const seq of seqs) lastTask.set(seq, Date.now())
+    const mark = () => {
+      if (!changes) return () => {}
+      const set = sending.get(boardId) ?? new Set()
+      sending.set(boardId, set)
+      for (const s of seqs) set.add(s)
+      return () => { for (const s of seqs) set.delete(s); if (!set.size) sending.delete(boardId) }
+    }
+    if (changes) { const undo = mark(); const p = serial(boardId, () => tracked(boardId, () => undo, () => attempt(boardId, (c, board) => runTasks(c, board, seqs)))); return p }
     return serial(boardId, () => attempt(boardId, (c, board) => runTasks(c, board, seqs)))
   }
   async function attempt(boardId, fn) {
@@ -279,7 +313,8 @@ export function createGithubSync(ctx) {
     if (!c || !board || board.archived_at) return
     try {
       const whole = (await fn(c, board)) !== 'part'
-      db.prepare(`UPDATE board_github SET ${whole ? 'synced_at = @now, ' : ''}error = NULL WHERE board_id = @id`).run({ now: Date.now(), id: boardId })
+      if (whole) db.prepare('UPDATE board_github SET synced_at = ?, error = NULL WHERE board_id = ?').run(Date.now(), boardId)
+      else db.prepare('UPDATE board_github SET error = NULL WHERE board_id = ?').run(boardId)
     } catch (err) {
       log(`GitHub sync of board ${boardId}: ${err.message}`)
       db.prepare('UPDATE board_github SET error = ? WHERE board_id = ?').run(String(err.message).slice(0, 500), boardId)
@@ -338,7 +373,7 @@ export function createGithubSync(ctx) {
     for (const item of items) {
       if (item.isArchived || !item.content || !['Issue', 'DraftIssue'].includes(item.content.__typename) || leaving.has(item.id)) continue
       seen.add(item.id)
-      const link = db.prepare('SELECT * FROM task_github WHERE item_id = ?').get(item.id) ?? backFromTrash(item)
+      const link = db.prepare('SELECT * FROM task_github WHERE item_id = ?').get(item.id) ?? itemOfPending(item) ?? backFromTrash(item)
       try {
         if (!link) { const seq = importItem(board, item, fields); if (seq) { imported.push([seq, item]); if (item.content.__typename === 'Issue') byIssue.set(item.content.id, seq) } } else await reconcile(gh, c, board, link, item, fields, byIssue)
       } catch (err) { log(`GitHub item ${item.id} of board ${board.id}: ${err.message}`) }
@@ -395,6 +430,8 @@ export function createGithubSync(ctx) {
       if (!t || t.board_id !== board.id) continue
       try {
         let link = linkOf(seq)
+        if (link?.item_id.startsWith('pending:')) { await intoProject(gh, project, link); link = linkOf(seq) }
+        if (link?.item_id.startsWith('pending:')) continue // (not in the project yet: next time)
         if (!link) {
           repoLabels ??= (await gh.repository(parseRepo(c.repo))).labels
           await publish(gh, c, project, fields, t, repoLabels)
@@ -402,7 +439,6 @@ export function createGithubSync(ctx) {
           if (made && unsent(seq).length) await comments(gh, made, NO_COMMENTS)
           continue
         }
-        if (link.item_id.startsWith('pending:')) { await intoProject(gh, project, link); link = linkOf(seq) }
         const item = await gh.item(link.item_id)
         if (!item || item.isArchived || !item.content) { removedThere(link); continue }
         if (item.content.__typename === 'Issue' && item.content.id) byIssue.set(item.content.id, seq)
@@ -427,8 +463,13 @@ export function createGithubSync(ctx) {
     }
     return out
   }
+  // Its issue into the project. The issue gone (deleted on GitHub): no longer linked, so the task is published again, as a new issue.
   async function intoProject(gh, project, l) {
-    try { db.prepare('UPDATE task_github SET item_id = ? WHERE task_seq = ?').run(await gh.addItem(project.id, l.issue_id), l.task_seq) } catch (err) { log(`GitHub: adding issue of task ${l.task_seq} to the project: ${err.message}`) }
+    try { db.prepare('UPDATE task_github SET item_id = ? WHERE task_seq = ?').run(await gh.addItem(project.id, l.issue_id), l.task_seq) } catch (err) {
+      if (err.auth) throw err
+      if (err.notFound) { db.prepare('DELETE FROM task_github WHERE task_seq = ?').run(l.task_seq); return }
+      log(`GitHub: adding issue of task ${l.task_seq} to the project: ${err.message}`)
+    }
   }
   // Taken out of the project there: into the trash here (its subtasks stay, with
   // no parent, as when deleted here). Its issue stays as it was.
@@ -443,6 +484,14 @@ export function createGithubSync(ctx) {
     else db.prepare('DELETE FROM task_github WHERE task_seq = ?').run(t.seq) // (a draft: gone there)
     applying++
     try { ctx.trash(t, { github: 'taken out of the project' }) } finally { applying-- }
+  }
+  // An item of an issue made here that wasn't in the project yet (GitHub put it there by itself): its task's.
+  function itemOfPending(item) {
+    if (item.content.__typename !== 'Issue') return null
+    const l = db.prepare('SELECT * FROM task_github WHERE item_id = ?').get(`pending:${item.content.id}`)
+    if (!l) return null
+    db.prepare('UPDATE task_github SET item_id = ? WHERE task_seq = ?').run(item.id, l.task_seq)
+    return linkOf(l.task_seq)
   }
   // An item of an issue whose task is in the trash: put in the project again there, so back here (GitHub's, as it is there).
   function backFromTrash(item) {
@@ -477,8 +526,10 @@ export function createGithubSync(ctx) {
     if (!field) {
       if (!wanted.length) return { field: null, changed: false }
       for (const name of names) {
-        if (project.fields.some(f => f.name === name)) continue
-        field = await gh.createField(project.id, name, wanted.map(n => ({ name: n, color: 'GRAY', description: '' })))
+        if (project.fields.some(f => f.name.toLowerCase() === name.toLowerCase())) continue
+        try {
+          field = await gh.createField(project.id, name, wanted.map(n => ({ name: n, color: 'GRAY', description: '' })))
+        } catch (err) { if (/reserved|already been taken/i.test(err.message)) continue; throw err }
         return { field, changed: true }
       }
       return { field: null, changed: false }

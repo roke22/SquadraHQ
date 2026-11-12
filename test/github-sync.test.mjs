@@ -109,20 +109,22 @@ test('github: a board in step with a project, both ways, and nobody told by it',
   assert.ok(await byTitle(board.id, 'Idea: dark mode'))
   // The project has an Agent field with the board's agents, and a Type field with its types.
   assert.deepEqual(gh.look.field('Agent').options.map(o => o.name).sort(), ['gc1', 'gdev'])
-  assert.deepEqual(gh.look.field('Type').options.map(o => o.name), ['Task', 'Bug'])
+  assert.deepEqual(gh.look.field('Task type').options.map(o => o.name), ['Task', 'Bug'])
 
   // Made here: an issue in the repository, in the project, with its column, agent and type.
   const pricing = (await post('tasks/create', { board: board.id, title: 'Pricing table', status: st('In Progress'), assignee: { kind: 'session', id: 'gdev' }, type: 'Bug' })).result
   await sync(board.id)
   const iPricing = gh.look.issue('Pricing table')
   assert.ok(iPricing && gh.look.inProject(iPricing.id))
-  assert.deepEqual([gh.look.statusOf(iPricing.id), gh.look.fieldOf(iPricing.id, 'Agent'), gh.look.fieldOf(iPricing.id, 'Type')], ['In Progress', 'gdev', 'Bug'])
+  assert.deepEqual([gh.look.statusOf(iPricing.id), gh.look.fieldOf(iPricing.id, 'Agent'), gh.look.fieldOf(iPricing.id, 'Task type')], ['In Progress', 'gdev', 'Bug'])
   assert.match((await task(pricing.seq)).events.at(-1).data.github, /^acme\/web#\d+$/)
   // A subtask of it: a sub-issue. A comment: on the issue, signed.
   const sub = (await post('tasks/create', { board: board.id, title: 'Pricing: annual plan', parent: pricing.seq })).result
   await post('tasks/comment', { id: pricing.seq, text: 'Prices are in the sheet' })
   await sync(board.id)
   assert.equal(gh.look.issue('Pricing: annual plan').parent, iPricing.id)
+  assert.ok(gh.calls.includes('ItemOf')) // (GitHub had put it in the project by itself)
+  assert.deepEqual((await task(sub.seq)).github?.number, gh.look.issue('Pricing: annual plan').number)
   assert.match(iPricing.comments.at(-1).body, /^\*\*.+\*\* \(SquadraHQ\):\n\nPrices are in the sheet$/)
   // Done here: closed there, as completed, in its column.
   await post('tasks/update', { id: tLogin.seq, status: st('Done') })
@@ -152,12 +154,17 @@ test('github: a board in step with a project, both ways, and nobody told by it',
 
   // A change here goes on its own, soon, without reading the whole board.
   before = gh.calls.length
+  const ghState = async () => (await get('c/default/boards')).result.boards.find(x => x.id === board.id).github
   await post('tasks/update', { id: pricing.seq, title: 'Pricing table v2' })
+  assert.ok((await ghState()).pending >= 1) // (the dashboard says it is on its way)
   for (let i = 0; i < 100 && gh.look.issue('Pricing table v2') == null; i++) await sleep(100)
+  for (let i = 0; i < 50 && (await ghState()).pending; i++) await sleep(100)
+  assert.deepEqual([(await ghState()).pending, (await ghState()).syncing], [0, false])
   assert.ok(gh.look.issue('Pricing table v2'))
   // (Other changes from a moment ago may go too, each by itself: never the whole board.)
   assert.ok(!gh.calls.slice(before).includes('Items'), gh.calls.slice(before).join())
   assert.deepEqual(gh.calls.slice(before).filter(c => !['Project', 'Item'].includes(c)), ['UpdateIssue'])
+  assert.equal((await get('c/default/boards')).result.boards.find(x => x.id === board.id).github.error, null)
 
   // A column renamed here: renamed there, every card where it was.
   const statuses = b.statuses.map(({ id, name, category }) => ({ id, name: name === 'In Progress' ? 'Doing' : name, category }))
@@ -198,6 +205,25 @@ test('github: a board in step with a project, both ways, and nobody told by it',
   gh.person.addToProject(iPricing.id)
   await sync(board.id)
   assert.ok(await byTitle(board.id, 'Pricing table v2'))
+
+  // Its issue deleted on GitHub: in the trash here. Restored here: what was said here wins, as a new issue.
+  const doomed = (await post('tasks/create', { board: board.id, title: 'Doomed', parent: pricing.seq })).result
+  await sync(board.id)
+  const gone = gh.look.issue('Doomed')
+  assert.ok(gone && gh.look.inProject(gone.id))
+  gh.person.deleteIssue(gone.id)
+  await sync(board.id)
+  assert.equal(await byTitle(board.id, 'Doomed'), undefined)
+  assert.ok((await post('tasks/restore', { id: doomed.seq })).ok)
+  await sync(board.id)
+  await sync(board.id)
+  await sleep(3500) // (and the push of the restore, by itself)
+  await sync(board.id)
+  assert.ok(await byTitle(board.id, 'Doomed'))
+  const reborn = gh.look.issue('Doomed')
+  assert.ok(reborn.id !== gone.id && gh.look.inProject(reborn.id))
+  assert.equal(reborn.parent, iPricing.id)
+  assert.equal(gh.look.issues().filter(i => i.title === 'Doomed').length, 1)
 
   // Disconnected: no more GitHub, the tasks stay.
   b = (await post('boards/github-off', { board: board.id })).result

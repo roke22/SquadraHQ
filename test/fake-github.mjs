@@ -52,6 +52,8 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     },
     Item: v => ({ node: itemOf(v.id) ? itemView(itemOf(v.id), true) : null }),
     CreateField: ({ input }) => {
+      // (GitHub keeps some names for its own fields, not all of them listed.)
+      if (['type', 'labels', 'assignees', 'milestone', 'repository', 'reviewers', 'parent issue', 'sub-issues progress', 'linked pull requests'].includes(input.name.toLowerCase())) throw new Error('Name cannot have a reserved value, Name has already been taken')
       const f = { id: id('F'), name: input.name, dataType: 'SINGLE_SELECT', options: input.singleSelectOptions.map(o => ({ id: id('O'), name: o.name, color: o.color })) }
       project.fields.push(f)
       return { createProjectV2Field: { projectV2Field: f } }
@@ -73,13 +75,18 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     CreateIssue: ({ input }) => {
       const i = { id: id('I'), number: ++issueNumber, title: input.title, body: input.body ?? '', state: 'OPEN', stateReason: null, labels: input.labelIds ?? [], parent: input.parentIssueId ?? null, comments: [], updatedAt: at() }
       issues.set(i.id, i)
+      // (As GitHub does: a sub-issue goes into its parent's project by itself.)
+      if (i.parent && itemFor(i.parent)) project.items.push({ id: id('PVTI'), content: i.id, values: new Map(), updatedAt: at() })
       return { createIssue: { issue: { id: i.id, number: i.number, url: `https://github.com/acme/web/issues/${i.number}`, updatedAt: i.updatedAt } } }
     },
     AddItem: ({ input }) => {
-      let it = itemFor(input.contentId)
-      if (!it) { it = { id: id('PVTI'), content: input.contentId, values: new Map(), updatedAt: at() }; project.items.push(it) }
+      if (!issues.has(input.contentId) && !drafts.has(input.contentId)) throw Object.assign(new Error(`Could not resolve to a node with the global id of '${input.contentId}'.`), { type: 'NOT_FOUND' })
+      if (itemFor(input.contentId)) throw new Error('Content already exists in this project')
+      const it = { id: id('PVTI'), content: input.contentId, values: new Map(), updatedAt: at() }
+      project.items.push(it)
       return { addProjectV2ItemById: { item: { id: it.id } } }
     },
+    ItemOf: v => ({ node: issues.has(v.id) ? { projectItems: { nodes: project.items.filter(i => i.content === v.id).map(i => ({ id: i.id, project: { id: project.id } })) } } : null }),
     RemoveItem: ({ input }) => { project.items = project.items.filter(i => i.id !== input.itemId); return { deleteProjectV2Item: { deletedItemId: input.itemId } } },
     UpdateIssue: ({ input }) => {
       const i = issues.get(input.id)
@@ -111,7 +118,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
       calls.push(operationName)
       const op = ops[operationName]
       if (!op) return send(200, { errors: [{ message: `unknown operation ${operationName}` }] })
-      try { send(200, { data: op(variables ?? {}) }) } catch (err) { send(200, { errors: [{ message: err.message }] }) }
+      try { send(200, { data: op(variables ?? {}) }) } catch (err) { send(200, { errors: [{ message: err.message, ...(err.type ? { type: err.type } : {}) }] }) }
     })
   })
   await new Promise(r => server.listen(0, '127.0.0.1', r))
@@ -141,6 +148,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     close(issueId, reason = 'COMPLETED') { Object.assign(issues.get(issueId), { state: 'CLOSED', stateReason: reason, updatedAt: at() }) },
     comment(issueId, body, login = 'octocat') { issues.get(issueId).comments.push({ id: id('IC'), body, createdAt: at(), login }); issues.get(issueId).updatedAt = at() },
     setParent(issueId, parentId) { issues.get(issueId).parent = parentId; issues.get(issueId).updatedAt = at() },
+    deleteIssue(issueId) { issues.delete(issueId); project.items = project.items.filter(i => i.content !== issueId) },
     removeFromProject(issueId) { project.items = project.items.filter(i => i.content !== issueId) },
     addToProject(issueId) { project.items.push({ id: id('PVTI'), content: issueId, values: new Map(), updatedAt: at() }) },
     renameOption(name, to) { status.options.find(o => o.name === name).name = to },
