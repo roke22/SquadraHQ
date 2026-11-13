@@ -8,14 +8,16 @@ import { githubClient, parseProjectUrl, parseRepo, GithubError } from './github.
 //
 //   columns    GitHub's: the project's Status options are the board's columns
 //              (their category and step are set here). A column added or
-//              renamed here changes the field there.
+//              renamed here changes the field there; changed on both sides,
+//              GitHub's changes are kept and ours go over them.
 //   a task     an issue in the project (a draft item, if it is one there). A
 //              task made here becomes an issue in the board's repository.
 //   agents     a single-select field «Agent» of the project, with the agents
 //              of the board's teams. Its people, the issue's assignees: by the
 //              GitHub user in each one's profile (other assignees left alone).
 //   type       a single-select field «Type»; labels, the issue's.
-//   subtasks   sub-issues; comments, both ways (ours signed with the author).
+//   subtasks   sub-issues; comments, both ways (ours signed with the author);
+//              one edited there is edited here, one deleted there no longer shown.
 //   closed     done closes the issue as completed, cancelled as not planned;
 //              reopened there, it goes back to the first column where work waits.
 //   PRs        the repository's pull requests that name a task (SQ-12 in their
@@ -78,6 +80,7 @@ export function createGithubSync(ctx) {
   ctx.addColumn('board_github', 'prs_at', 'TEXT')       // (the last change to a pull request read: those after it are read next)
   ctx.addColumn('board_github', 'prs_from', 'INTEGER')  // (when they were first read: merged before, a task isn't moved)
   ctx.addColumn('board_github', 'merge_moves', 'INTEGER NOT NULL DEFAULT 1')
+  ctx.addColumn('board_github', 'columns_seen', 'TEXT') // (GitHub's columns when both sides last agreed: what changed there since)
   ctx.addColumn('board_statuses', 'gh_option', 'TEXT')
   ctx.addColumn('task_comments', 'gh_id', 'TEXT')
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS task_comments_gh ON task_comments(gh_id) WHERE gh_id IS NOT NULL')
@@ -222,6 +225,38 @@ export function createGithubSync(ctx) {
       db.prepare('UPDATE board_statuses SET gh_option = NULL, position = ? WHERE id = ?').run(position++, s.id)
       db.prepare('UPDATE board_github SET columns_dirty = 1 WHERE board_id = ?').run(boardId)
     }
+    seenColumns(boardId, field)
+  }
+  const seenColumns = (boardId, field) => db.prepare('UPDATE board_github SET columns_seen = ? WHERE board_id = ?').run(JSON.stringify(field.options.map(o => ({ id: o.id, name: o.name }))), boardId)
+
+  // Changed here, on their way there: what GitHub changed meanwhile, kept.
+  // Added there, a column here too (where GitHub has it); renamed there and
+  // not here, its name; deleted there, untouched here and empty, gone here.
+  function mergeColumns(boardId, field) {
+    const seen = JSON.parse(conn(boardId)?.columns_seen ?? 'null')
+    if (!seen) return
+    const was = new Map(seen.map(o => [o.id, o.name]))
+    const mine = () => ctx.statusRows(boardId)
+    const named = (name, but) => mine().some(x => x.id !== but && x.name.toLowerCase() === name.toLowerCase())
+    const byOption = () => new Map(mine().filter(s => s.gh_option).map(s => [s.gh_option, s]))
+    for (const o of field.options) {
+      const s = byOption().get(o.id)
+      if (s && was.has(o.id) && o.name !== was.get(o.id) && s.name === was.get(o.id) && !named(o.name, s.id)) db.prepare('UPDATE board_statuses SET name = ? WHERE id = ?').run(o.name.slice(0, MAX.name), s.id)
+    }
+    field.options.forEach((o, i) => {
+      if (was.has(o.id) || byOption().has(o.id) || named(o.name) || mine().length >= MAX.statuses) return
+      const after = field.options.slice(0, i).reverse().map(x => byOption().get(x.id)).find(Boolean)
+      const at = after ? after.position + 1 : 0
+      db.prepare('UPDATE board_statuses SET position = position + 1 WHERE board_id = ? AND position >= ?').run(boardId, at)
+      db.prepare('INSERT INTO board_statuses (board_id, name, category, position, gh_option) VALUES (?, ?, ?, ?, ?)').run(boardId, o.name.slice(0, MAX.name), guessCategory(o.name), at, o.id)
+    })
+    for (const [id, name] of was) {
+      const s = byOption().get(id)
+      if (!s || field.options.some(o => o.id === id) || s.name !== name) continue
+      if (db.prepare('SELECT COUNT(*) n FROM tasks WHERE status_id = ?').get(s.id).n) continue
+      for (const col of ['next_id', 'back_id']) db.prepare(`UPDATE board_statuses SET ${col} = NULL WHERE ${col} = ?`).run(s.id)
+      db.prepare('DELETE FROM board_statuses WHERE id = ?').run(s.id)
+    }
   }
 
   // --- what each side says of a task ---------------------------------------------------
@@ -283,6 +318,7 @@ export function createGithubSync(ctx) {
   const queued = new Map()     // board id -> a whole sync waiting its turn
   const lastBoard = new Map()  // board id -> when it was last read whole
   const lastTask = new Map()   // task seq -> when it was last read
+  const lastAsked = new Map()  // task seq -> when the button last asked for it
   const soonTimers = new Map() // board id -> the changes waiting to go: { timer, seqs } (null: the whole board)
   const busy = new Map()       // board id -> whole syncs running
   const sending = new Map()    // board id -> Set of the tasks whose changes are on their way
@@ -359,12 +395,14 @@ export function createGithubSync(ctx) {
   }
 
   // Someone has the board open, and maybe one of its tasks: what isn't fresh is read.
-  function watch(boardId, { task = null, opened = false, taskOpened = false } = {}) {
+  // (Asked for with the button: the task now, if the button didn't ask a moment ago.)
+  function watch(boardId, { task = null, opened = false, taskOpened = false, force = false } = {}) {
     if (!conn(boardId)) return Promise.resolve()
     const work = []
     if (stale(lastBoard.get(boardId), opened ? OPENED : FRESH - SLACK)) work.push(syncBoard(boardId))
     const t = task ? ctx.taskRow(task) : null
-    if (t?.board_id === boardId && linkOf(t.seq) && stale(lastTask.get(t.seq), taskOpened ? OPENED / 2 : FRESH - SLACK)) work.push(syncTasks(boardId, [t.seq]))
+    const due = force ? stale(lastAsked.get(t?.seq), SOON) : stale(lastTask.get(t?.seq), taskOpened ? OPENED / 2 : FRESH - SLACK)
+    if (t?.board_id === boardId && linkOf(t.seq) && due) { if (force) lastAsked.set(t.seq, Date.now()); work.push(syncTasks(boardId, [t.seq])) }
     return Promise.all(work)
   }
   // An agent reads the board, or a task of it: GitHub's first, if it isn't fresh (waiting a little at most).
@@ -382,6 +420,7 @@ export function createGithubSync(ctx) {
     // The columns: GitHub's, unless they were changed here (then ours, there).
     if (!conn(board.id).columns_dirty) inTx(() => adoptColumns(board.id, statusField))
     if (conn(board.id).columns_dirty) {
+      inTx(() => mergeColumns(board.id, statusField))
       await pushColumns(gh, project, statusField, items, board.id)
       project = await gh.project(where)
       items = await gh.items(project.id)
@@ -600,6 +639,7 @@ export function createGithubSync(ctx) {
     inTx(() => {
       for (const s of mine) db.prepare('UPDATE board_statuses SET gh_option = ? WHERE id = ?').run(next.options.find(o => o.name === s.name)?.id ?? null, s.id)
       db.prepare('UPDATE board_github SET columns_dirty = 0 WHERE board_id = ?').run(boardId)
+      seenColumns(boardId, next)
     })
     await putBack(gh, project.id, next, valuesOf(items, field), rename)
     // (What agreed before still does: the option ids changed, not the columns.)
@@ -814,13 +854,36 @@ export function createGithubSync(ctx) {
   }
 
   // Comments: GitHub's that are new here, and ours that aren't there yet.
+  // What a comment says, as GitHub has it (ours without the signature they were sent with).
+  const SIGNED = /^\*\*[^*\n]{1,200}\*\* \(SquadraHQ\):\n\n/
+  const textOf = cm => cleanText(String(cm.body ?? '').replace(/\r\n/g, '\n').replace(SIGNED, '')).trim().slice(0, MAX.comment)
+  // GitHub's comments on the issue: new ones here, edited ones edited, deleted ones no longer shown.
+  function commentsChanged(link, list) {
+    const there = new Map(list.nodes.filter(cm => cm?.id).map(cm => [cm.id, cm]))
+    // (Of the latest 50 only: one older than those is still there, as far as can be told.)
+    const oldest = Math.min(...[...there.values()].map(cm => Date.parse(cm.createdAt) || 0))
+    const whole = (list.totalCount ?? there.size) <= there.size
+    let changed = false
+    for (const c of db.prepare('SELECT * FROM task_comments WHERE task_seq = ? AND gh_id IS NOT NULL AND deleted_at IS NULL').all(link.task_seq)) {
+      const cm = there.get(c.gh_id)
+      if (!cm) {
+        if (whole || c.created_at >= oldest) { db.prepare('UPDATE task_comments SET deleted_at = ? WHERE id = ?').run(Date.now(), c.id); changed = true }
+        continue
+      }
+      const text = textOf(cm)
+      if (text && text !== c.text) { db.prepare('UPDATE task_comments SET text = ?, edited_at = ? WHERE id = ?').run(text, Date.now(), c.id); changed = true }
+    }
+    return changed
+  }
   async function comments(gh, link, item) {
-    for (const cm of item.content.comments?.nodes ?? []) {
+    const list = item.content.comments
+    if (list?.nodes && item !== NO_COMMENTS && commentsChanged(link, list)) { applying++; try { ctx.changedTask(link.task_seq) } finally { applying-- } }
+    for (const cm of list?.nodes ?? []) {
       if (!cm?.id || db.prepare('SELECT 1 FROM task_comments WHERE gh_id = ?').get(cm.id)) continue
       const login = cm.author?.login ?? 'ghost'
-      const text = cleanText(String(cm.body ?? '')).trim().slice(0, MAX.comment)
+      const text = textOf(cm)
       if (!text) continue
-      if (db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ?').get(link.task_seq).n >= MAX.comments) break
+      if (db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ? AND deleted_at IS NULL').get(link.task_seq).n >= MAX.comments) break
       db.prepare('INSERT INTO task_comments (task_seq, author, text, created_at, gh_id) VALUES (?, ?, ?, ?, ?)')
         .run(link.task_seq, JSON.stringify({ kind: 'github', id: login, name: `@${login}` }), text, Date.parse(cm.createdAt) || Date.now(), cm.id)
       applying++

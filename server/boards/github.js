@@ -31,7 +31,7 @@ const ISSUE = `id number title body state stateReason updatedAt url
   assignees(first: 10) { nodes { id login } }`
 const ASSIGNEES = 'assignees(first: 10) { nodes { id login } }'
 const logins = issue => (issue?.assignees?.nodes ?? []).filter(Boolean).map(n => n.login)
-const COMMENTS = 'comments(last: 50) { nodes { id body createdAt author { login } } }'
+const COMMENTS = 'comments(last: 50) { totalCount nodes { id body createdAt author { login } } }'
 
 const ITEM = (withComments = false) => `id isArchived updatedAt type
   fieldValues(first: 30) { nodes { ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2FieldCommon { id } } } } }

@@ -138,6 +138,7 @@ a.bd-gh:hover { color: var(--text); }
 .bd-subs .grow { flex: 1; }
 .bd-subs .bd-who { margin-left: 0; }
 .bd-comsec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.bd-edited { font-size: var(--fs-xs); color: var(--muted); font-style: italic; }
 /* Pull requests: their state in GitHub's colours, from the tokens. */
 [data-pr="open"] { --pr: var(--ok); }
 [data-pr="draft"] { --pr: var(--muted); }

@@ -399,7 +399,7 @@ const WHEN_FMT = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short
 const whoName = w => (w ? (w.kind === 'session' ? w.id : w.name) : '?')
 function comments(b, t) {
   const coordinator = t.assignee?.kind === 'session' ? teamOf(b.id, t.assignee.id) : null
-  const list = t.comments.map(c => `<li class="bd-com"><div class="bd-com-h"><b>${esc(whoName(c.author))}</b><span>${esc(WHEN_FMT.format(new Date(c.created_at)))}</span>${c.notified ? `<span class="tag">${esc(T.bToldTo(c.notified))}</span>` : ''}</div><p>${esc(c.text)}</p></li>`).join('')
+  const list = t.comments.map(c => `<li class="bd-com"><div class="bd-com-h"><b>${esc(whoName(c.author))}</b><span>${esc(WHEN_FMT.format(new Date(c.created_at)))}</span>${c.edited_at ? `<span class="bd-edited" title="${esc(WHEN_FMT.format(new Date(c.edited_at)))}">${esc(T.bEdited)}</span>` : ''}${c.notified ? `<span class="tag">${esc(T.bToldTo(c.notified))}</span>` : ''}</div><p>${esc(c.text)}</p></li>`).join('')
   return `<h3>${esc(T.bComments)}${t.comments.length ? ` <span class="badge soft">${t.comments.length}</span>` : ''}</h3>
     <ul class="bd-coms">${list}</ul>
     ${can('operator') ? `<form class="bd-cform" data-bcomment>
@@ -905,7 +905,7 @@ export function boardsTopClick(e) {
     // (The board, and the task open beside it with its comments.)
     const seq = typeof detail?.seq === 'number' ? detail.seq : null
     const work = [postJson('/api/boards/github-sync', { board: b.id })]
-    if (seq) work.push(postJson('/api/boards/github-watch', { board: b.id, task: seq, taskOpened: true }))
+    if (seq) work.push(postJson('/api/boards/github-watch', { board: b.id, task: seq, force: true }))
     Promise.all(work).catch(err => alertBox(err.message)).finally(() => { now.disabled = false; soon(renderTop) })
     return true
   }

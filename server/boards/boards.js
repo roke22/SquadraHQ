@@ -85,6 +85,9 @@ export function createBoards(platform, { sessions, messaging, members }) {
   // (Deleting a task puts it in the board's trash: it can be restored, it is never gone for good.)
   addColumn('tasks', 'deleted_at', 'INTEGER')
   addColumn('tasks', 'deleted_by', 'TEXT')
+  // (A comment edited or deleted on GitHub: edited here too; deleted, kept but no longer shown.)
+  addColumn('task_comments', 'edited_at', 'INTEGER')
+  addColumn('task_comments', 'deleted_at', 'INTEGER')
   addColumn('tasks', 'trash_batch', 'INTEGER') // (the task whose deletion took it: its subtasks go back with it)
   // A task has at most one agent (the session that works on it, and is told),
   // and any people besides, up to 10: as GitHub's Agent field and assignees.
@@ -208,15 +211,15 @@ export function createBoards(platform, { sessions, messaging, members }) {
       id: taskId(t.seq), seq: t.seq, board: t.board_id, title: t.title, status: t.status_id, type: t.type_id ?? null, labels,
       priority: t.priority, due: t.due ?? null, rank: t.rank, assignee, people, notify: t.notify_state, notified_to: t.notified_to ?? null,
       created_by: who(t.created_by), created_at: t.created_at, updated_by: who(t.updated_by), updated_at: t.updated_at, version: t.version,
-      comments: db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ?').get(t.seq).n,
+      comments: db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ? AND deleted_at IS NULL').get(t.seq).n,
       parent: t.parent_seq ?? null, subtasks: progressOf(t.seq), prs: sync?.prsOf(t.seq) ?? [],
     }
     if (!full) return view
     return {
       ...view,
       description: t.description ?? '',
-      comments: db.prepare('SELECT id, author, text, notified, created_at FROM task_comments WHERE task_seq = ? ORDER BY id').all(t.seq)
-        .map(c => ({ id: c.id, author: who(c.author), text: c.text, notified: c.notified ?? null, created_at: c.created_at })),
+      comments: db.prepare('SELECT id, author, text, notified, created_at, edited_at FROM task_comments WHERE task_seq = ? AND deleted_at IS NULL ORDER BY id').all(t.seq)
+        .map(c => ({ id: c.id, author: who(c.author), text: c.text, notified: c.notified ?? null, created_at: c.created_at, edited_at: c.edited_at ?? null })),
       events: db.prepare('SELECT at, who, what, data FROM task_events WHERE task_seq = ? ORDER BY id DESC LIMIT 100').all(t.seq).reverse()
         .map(e => ({ at: e.at, who: who(e.who), what: e.what, data: e.data ? JSON.parse(e.data) : null })),
       parent_title: t.parent_seq ? taskRow(t.parent_seq)?.title ?? null : null,
@@ -493,7 +496,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
   function commentOn(seq, text, by) {
     const body = short(text, MAX.comment, 'comment', { lines: true })
     if (!body) throw bad('the comment is empty')
-    if (db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ?').get(seq).n >= MAX.comments) throw bad(`at most ${MAX.comments} comments on a task`)
+    if (db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ? AND deleted_at IS NULL').get(seq).n >= MAX.comments) throw bad(`at most ${MAX.comments} comments on a task`)
     const id = Number(db.prepare('INSERT INTO task_comments (task_seq, author, text, created_at) VALUES (?, ?, ?, ?)').run(seq, JSON.stringify(by), body, now()).lastInsertRowid)
     db.prepare('UPDATE tasks SET updated_at = ? WHERE seq = ?').run(now(), seq)
     return { id, body }
@@ -748,7 +751,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     // Someone has the board open (and maybe a task): GitHub is read if it isn't fresh.
     async 'boards/github-watch'(p) {
       const b = humanBoard(p.board)
-      await sync.watch(b.id, { task: p.task == null ? null : Number(p.task), opened: p.opened === true, taskOpened: p.taskOpened === true })
+      await sync.watch(b.id, { task: p.task == null ? null : Number(p.task), opened: p.opened === true, taskOpened: p.taskOpened === true, force: p.force === true })
       return true
     },
     async 'boards/github-sync'(p) {

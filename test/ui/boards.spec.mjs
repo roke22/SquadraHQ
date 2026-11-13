@@ -259,7 +259,7 @@ test('the trash: a task deleted with its subtasks, and brought back with them', 
 
 test('GitHub: a board connected from its settings, its project\'s cards as tasks, each with its issue', async ({ page }) => {
   const footer = gh.person.addIssue({ title: 'From GitHub: fix the footer', status: 'Todo' })
-  gh.person.comment(footer.id, 'Only on mobile')
+  const note = gh.person.comment(footer.id, 'Only on mobile')
   await signIn(page, '#/boards')
   await page.locator('[data-newboard]').first().click()
   await page.locator('form[data-bnew] [name=name]').fill('Synced')
@@ -288,6 +288,10 @@ test('GitHub: a board connected from its settings, its project\'s cards as tasks
   await expect(page.locator('.bd-panel-h .bd-gh')).toHaveText(/^#\d+ on GitHub$/)
   // (Its comments come from GitHub once it is opened.)
   await expect(page.locator('.bd-comsec')).toContainText('Only on mobile')
+  // Edited there: edited here, and it says so.
+  gh.person.editComment(footer.id, note.id, 'Only on mobile, in Safari')
+  await ghState.locator('[data-ghnow]').click()
+  await expect(page.locator('.bd-com', { hasText: 'Only on mobile, in Safari' }).locator('.bd-edited')).toHaveText('edited')
   // A pull request naming it by its branch: in it and on its card, approved.
   const id = (await page.locator('.bd-panel-h .bd-id').textContent()).trim()
   const pr = gh.person.openPr({ title: 'Footer on mobile', branch: `${id.toLowerCase()}-footer` })

@@ -325,3 +325,67 @@ test('github: pull requests that name a task are on it, and one merged takes it 
   await sync(board.id)
   assert.equal((await task(cart.seq)).prs.find(x => x.number === both.number).state, 'closed')
 })
+
+test('github: a comment edited on GitHub is edited here, one deleted there is no longer shown', async () => {
+  const board = (await post('boards/create', { name: 'Comments' })).result
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+  const t = (await post('tasks/create', { board: board.id, title: 'Search box' })).result
+  assert.ok((await post('tasks/comment', { id: t.seq, text: 'Debounce it\nby 300 ms' })).ok)
+  await sync(board.id)
+  const issue = gh.look.issue('Search box')
+  const ours = gh.look.comments(issue.id)[0]
+  const theirs = gh.person.comment(issue.id, 'Also on mobile?')
+  const gone = gh.person.comment(issue.id, 'Wrong issue, sorry')
+  const open = async () => { await sleep(600); await watch({ board: board.id, task: t.seq, taskOpened: true }); return (await task(t.seq)).comments }
+  let list = await open()
+  assert.deepEqual(list.map(c => [c.text, c.edited_at]), [['Debounce it\nby 300 ms', null], ['Also on mobile?', null], ['Wrong issue, sorry', null]])
+  // Edited there (theirs, and ours under its signature), and one deleted.
+  gh.person.editComment(issue.id, theirs.id, 'Also on mobile and tablet?')
+  gh.person.editComment(issue.id, ours.id, ours.body.replace('300 ms', '250 ms'))
+  gh.person.deleteComment(issue.id, gone.id)
+  list = await open()
+  assert.deepEqual(list.map(c => c.text), ['Debounce it\nby 250 ms', 'Also on mobile and tablet?'])
+  assert.ok(list.every(c => c.edited_at))
+  assert.equal((await tasks(board.id)).find(x => x.seq === t.seq).comments, 2)
+  // (Nothing new: nothing changed, and nothing sent again.)
+  const before = gh.calls.length
+  list = await open()
+  assert.deepEqual(list.map(c => c.text), ['Debounce it\nby 250 ms', 'Also on mobile and tablet?'])
+  assert.ok(!gh.calls.slice(before).includes('AddComment'))
+})
+
+test('github: columns changed here and there at once: GitHub\'s changes kept, ours over them', async () => {
+  const board = (await post('boards/create', { name: 'Columns' })).result
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+  gh.person.addOption('Spare')
+  gh.person.addOption('Polish')
+  gh.person.addOption('Ready')
+  await sync(board.id)
+  const statuses = async () => (await get('c/default/boards')).result.boards.find(b => b.id === board.id).statuses
+  const before = await statuses()
+  assert.ok(before.some(s => s.name === 'Spare'))
+  // There: a column renamed, one added (with a card in it), one deleted.
+  gh.person.renameOption('Polish', 'Polishing')
+  gh.person.addOption('QA')
+  gh.person.removeOption('Spare')
+  const qa = gh.person.addIssue({ title: 'Check the forms', status: 'QA' })
+  // Here, before the board reads GitHub again: one renamed, one added.
+  const list = before.filter(s => s.name !== 'Spare').map(s => ({ id: s.id, name: s.name === 'Ready' ? 'Ready to go' : s.name, category: s.category }))
+  // (Spare isn't touched here: it stays on the list as it was.)
+  list.push({ id: before.find(s => s.name === 'Spare').id, name: 'Spare', category: before.find(s => s.name === 'Spare').category })
+  list.push({ id: null, name: 'On hold', category: 'started' })
+  const upd = await post('boards/update', { id: board.id, statuses: list }); assert.ok(upd.ok, upd.description)
+  await sync(board.id)
+  const names = (await statuses()).map(s => s.name)
+  assert.ok(names.includes('Polishing') && !names.includes('Polish'), names.join())
+  assert.ok(names.includes('Ready to go') && !names.includes('Ready') && names.includes('QA') && names.includes('On hold'), names.join())
+  assert.ok(!names.includes('Spare'), names.join())
+  assert.deepEqual(gh.look.options().slice().sort(), names.slice().sort())
+  // (The card in the column made there is in it here too, and still there.)
+  await sync(board.id)
+  const card = await byTitle(board.id, 'Check the forms')
+  assert.equal((await statuses()).find(s => s.id === card.status).name, 'QA')
+  assert.equal(gh.look.statusOf(qa.id), 'QA')
+})

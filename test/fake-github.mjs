@@ -34,7 +34,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
       repository: { nameWithOwner: repo.name }, labels: { nodes: i.labels.map(l => repo.labels.find(x => x.id === l)).filter(Boolean) },
       parent: i.parent ? { id: i.parent } : null,
       assignees: assigneesView(i),
-      ...(withComments ? { comments: { nodes: i.comments.slice(-50).map(c => ({ id: c.id, body: c.body, createdAt: c.createdAt, author: { login: c.login } })) } } : {}),
+      ...(withComments ? { comments: { totalCount: i.comments.length, nodes: i.comments.slice(-50).map(c => ({ id: c.id, body: c.body, createdAt: c.createdAt, author: { login: c.login } })) } } : {}),
     }
   }
   function itemView(it, withComments = false) {
@@ -164,7 +164,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     setField(issueId, fieldName, value) { const it = itemFor(issueId); const f = fieldNamed(fieldName); if (value == null) it.values.delete(f.id); else it.values.set(f.id, optionOf(f, value)); touch(it) },
     edit(issueId, patch) { Object.assign(issues.get(issueId), patch, { updatedAt: at() }) },
     close(issueId, reason = 'COMPLETED') { Object.assign(issues.get(issueId), { state: 'CLOSED', stateReason: reason, updatedAt: at() }) },
-    comment(issueId, body, login = 'octocat') { issues.get(issueId).comments.push({ id: id('IC'), body, createdAt: at(), login }); issues.get(issueId).updatedAt = at() },
+    comment(issueId, body, login = 'octocat') { const c = { id: id('IC'), body, createdAt: at(), login }; issues.get(issueId).comments.push(c); issues.get(issueId).updatedAt = at(); return c },
     setParent(issueId, parentId) { issues.get(issueId).parent = parentId; issues.get(issueId).updatedAt = at() },
     addUser(login, { collaborator = true } = {}) { users.set(login.toLowerCase(), { id: `U_${login}`, login, collaborator }) },
     assign(issueId, logins) { issues.get(issueId).assignees = logins.map(l => users.get(l.toLowerCase()).id); issues.get(issueId).updatedAt = at() },
@@ -180,6 +180,9 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     editPr(pr, patch) { Object.assign(pr, patch, { updatedAt: at() }) },
     mergePr(pr) { Object.assign(pr, { state: 'MERGED', mergedAt: new Date().toISOString(), updatedAt: at() }) },
     closePr(pr) { Object.assign(pr, { state: 'CLOSED', updatedAt: at() }) },
+    editComment(issueId, commentId, body) { issues.get(issueId).comments.find(c => c.id === commentId).body = body; issues.get(issueId).updatedAt = at() },
+    deleteComment(issueId, commentId) { const i = issues.get(issueId); i.comments = i.comments.filter(c => c.id !== commentId); i.updatedAt = at() },
+    removeOption(name) { const o = status.options.find(x => x.name === name); status.options = status.options.filter(x => x !== o); for (const it of project.items) if (it.values.get(status.id) === o.id) it.values.delete(status.id) },
     renameOption(name, to) { status.options.find(o => o.name === name).name = to },
     addOption(name) { status.options.push({ id: id('O'), name, color: 'GRAY' }) },
   }
@@ -190,6 +193,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     fieldOf: (issueId, fieldName) => { const it = itemFor(issueId); const f = fieldNamed(fieldName); return f?.options.find(o => o.id === it?.values.get(f.id))?.name ?? null },
     field: fieldNamed, inProject: issueId => !!itemFor(issueId), labelsOf: issueId => issues.get(issueId).labels.map(l => repo.labels.find(x => x.id === l)?.name),
     options: () => status.options.map(o => o.name),
+    comments: issueId => issues.get(issueId).comments,
     assigneesOf: issueId => issues.get(issueId).assignees.map(uid => userById(uid)?.login),
   }
   return { url, token, calls, person, look, stop: () => new Promise(r => server.close(r)) }
