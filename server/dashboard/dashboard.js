@@ -383,7 +383,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
       'org/squad': 'manager', 'org/positions': 'manager', 'org/describe': 'manager',
       'permissions/save': 'manager', 'permissions/delete': 'manager', 'permissions/assign': 'manager',
       'tasks/create': 'operator', 'tasks/update': 'operator', 'tasks/comment': 'operator', 'tasks/notify': 'operator',
-      'tasks/delete': 'manager', 'tasks/restore': 'manager', 'boards/create': 'manager', 'boards/update': 'manager', 'boards/delete': 'manager', 'boards/prefix': 'manager', 'boards/flow': 'manager', 'boards/github': 'manager', 'boards/github-off': 'manager', 'boards/github-sync': 'operator', 'boards/github-watch': 'observer',
+      'tasks/delete': 'manager', 'tasks/restore': 'manager', 'boards/create': 'manager', 'boards/update': 'manager', 'boards/delete': 'manager', 'boards/prefix': 'manager', 'boards/flow': 'manager', 'boards/github': 'manager', 'boards/github-off': 'manager', 'boards/github-merge': 'manager', 'boards/github-sync': 'operator', 'boards/github-watch': 'observer',
     },
   }
   for (const [table, roles] of [[dashboardActions, dashboardRoles.actions], [{ ...dashboardReads, stream: true }, dashboardRoles.reads]]) {

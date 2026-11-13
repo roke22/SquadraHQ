@@ -151,13 +151,22 @@ function parentTag(b, t) {
   const p = tasksOf.get(b.id)?.get(t.parent)
   return `<span class="bd-parent" title="${esc(T.bSubOf(prefixed(t.parent), p?.title ?? ''))}">↑ ${esc(prefixed(t.parent))}</span>`
 }
+// Its pull requests: on the card, how many and how the latest stands; open, the list.
+const prLine = p => `#${p.number} «${p.title}»: ${T.prState[p.state] ?? p.state}${p.review ? `, ${T.prReview[p.review] ?? p.review}` : ''}`
+const prTag = t => (t.prs?.length ? `<span class="bd-pr-tag" data-pr="${esc(t.prs[0].state)}" title="${esc(`${T.bPrsTag(t.prs.length)}\n${t.prs.map(prLine).join('\n')}`)}">${icon('pr')}${t.prs.length}</span>` : '')
+function prList(t) {
+  if (!t.prs?.length) return ''
+  return `<section class="bd-prsec"><h3>${esc(T.bPrs)}</h3><ul class="bd-prs">${t.prs.map(p => `<li data-pr="${esc(p.state)}"><span class="bd-pr-ic" aria-hidden="true">${icon('pr')}</span>
+      <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"><span class="bd-id">#${p.number}</span> ${esc(p.title)}</a><span class="grow"></span>
+      ${p.review ? `<span class="bd-pr-rv" data-rv="${esc(p.review)}">${esc(T.prReview[p.review] ?? p.review)}</span>` : ''}<span class="bd-pr-st">${esc(T.prState[p.state] ?? p.state)}</span></li>`).join('')}</ul></section>`
+}
 const progressTag = t => (t.subtasks ? `<span class="bd-subs-n${t.subtasks.done === t.subtasks.total ? ' all' : ''}" title="${esc(T.bSubProgress(t.subtasks.done, t.subtasks.total))}">☑ ${t.subtasks.done}/${t.subtasks.total}</span>` : '')
 
 function card(b, t) {
   return `<article class="bd-card${detail?.seq === t.seq ? ' on' : ''}" data-task="${t.seq}"${can('operator') ? ' draggable="true"' : ''}>
       <div class="bd-card-top"><span class="bd-id">${esc(prefixed(t.seq))}</span>${parentTag(b, t)}${typeChip(b, t)}${prioTag(t.priority)}${pendingTag(b, t)}</div>
       <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(t.seq))}">${esc(t.title)}</a>
-      ${t.labels.length || t.due || t.assignee || t.people?.length || t.comments || t.subtasks ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${progressTag(t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}${peopleTag(t.people)}</div>` : ''}
+      ${t.labels.length || t.due || t.assignee || t.people?.length || t.comments || t.subtasks || t.prs?.length ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${progressTag(t)}${prTag(t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}${peopleTag(t.people)}</div>` : ''}
     </article>`
 }
 
@@ -407,7 +416,7 @@ function subtasks(b, t) {
     ${can('operator') && !b.archived_at ? `<button type="button" class="btn quiet" data-addsub>${icon('plus')} ${esc(T.bAddSubtask)}</button>` : ''}`
 }
 function history(t) {
-  const what = e => (e.what === 'created' ? T.bCreatedIt : e.what === 'notified' ? T.bToldIt(e.data?.to ?? '?') : e.what === 'deleted' ? T.bDeletedIt : e.what === 'restored' ? T.bRestoredIt : T.bChangedIt)
+  const what = e => (e.what === 'created' ? T.bCreatedIt : e.what === 'notified' ? T.bToldIt(e.data?.to ?? '?') : e.what === 'deleted' ? T.bDeletedIt : e.what === 'restored' ? T.bRestoredIt : e.what === 'pr' ? T.bPrIt(e.data ?? {}) : T.bChangedIt)
   return `<details class="bd-hist"><summary>${esc(T.bHistory)}</summary><ul>${t.events.map(e => `<li><b>${esc(whoName(e.who))}</b> ${esc(what(e))} <span>${esc(WHEN_FMT.format(new Date(e.at)))}</span></li>`).join('')}</ul></details>`
 }
 
@@ -415,7 +424,7 @@ function panelHtml(b, t) {
   const gh = t.github?.url ? `<a class="bd-gh" href="${esc(t.github.url)}" target="_blank" rel="noopener noreferrer">${esc(T.ghIssue(t.github.number))}</a>` : t.github?.draft ? `<span class="bd-gh">${esc(T.ghDraft)}</span>` : ''
   return `<header class="bd-panel-h"><span class="bd-id">${esc(t.seq ? prefixed(t.seq) : T.newTask)}</span>${t.seq ? pendingTag(b, t) : ''}${gh}<span class="grow"></span>
       <a class="icon-btn" href="#/b/${b.id}" title="${esc(T.bClosePanel)}" aria-label="${esc(T.bClosePanel)}">${icon('close')}</a></header>
-    <div class="bd-panel-body">${t.parent ? `<a class="bd-up" href="#/b/${b.id}/${esc(prefixed(t.parent))}">↑ ${esc(T.bSubOf(prefixed(t.parent), t.parent_title ?? ''))}</a>` : ''}${form(b, t)}${t.seq ? `<section class="bd-subsec">${subtasks(b, t)}</section><section class="bd-comsec">${comments(b, t)}</section>${history(t)}` : ''}</div>`
+    <div class="bd-panel-body">${t.parent ? `<a class="bd-up" href="#/b/${b.id}/${esc(prefixed(t.parent))}">↑ ${esc(T.bSubOf(prefixed(t.parent), t.parent_title ?? ''))}</a>` : ''}${t.seq ? prList(t) : ''}${form(b, t)}${t.seq ? `<section class="bd-subsec">${subtasks(b, t)}</section><section class="bd-comsec">${comments(b, t)}</section>${history(t)}` : ''}</div>`
 }
 
 let newStatus = null
@@ -695,6 +704,13 @@ function settingsDialog(b) {
     } catch (err) { f.querySelector('.err').textContent = err.message }
   })
   d.el.querySelector('[data-ghconnect]')?.addEventListener('click', () => { d.close(); githubDialog(b) })
+  d.el.querySelector('.bd-ghsec').addEventListener('change', async e => {
+    const box = e.target.closest('[data-ghmerge]')
+    if (!box) return
+    box.disabled = true
+    try { const nb = await postJson('/api/boards/github-merge', { board: b.id, on: box.checked }); state.boards = state.boards.map(x => (x.id === nb.id ? nb : x)) } catch (err) { box.checked = !box.checked; f.querySelector('.err').textContent = err.message }
+    box.disabled = false
+  })
   d.el.querySelector('[data-ghsync]')?.addEventListener('click', async e => {
     e.target.disabled = true
     try { const nb = await postJson('/api/boards/github-sync', { board: b.id }); state.boards = state.boards.map(x => (x.id === nb.id ? nb : x)); d.el.querySelector('.bd-ghsec').innerHTML = `<h4>${esc(T.ghSection)}</h4>${ghSummary(nb)}`; void loadTasks(b.id).then(() => soon(renderBoard)) } catch (err) { f.querySelector('.err').textContent = err.message; e.target.disabled = false }
@@ -719,6 +735,8 @@ function ghSummary(b) {
   return `<p class="bd-ghstate"><a href="${esc(g.url ?? '#')}" target="_blank" rel="noopener noreferrer">${esc(T.ghStatus(g.title ?? '', g.repo))}</a></p>
     <p class="dim-note">${esc([g.synced_at ? T.ghSynced(ago(g.synced_at)) : T.ghSyncing, T.ghLinked(g.linked)].join(' · '))}</p>
     ${g.error ? `<p class="err" role="alert">${esc(g.error)}</p>` : ''}
+    <label class="check"><input type="checkbox" data-ghmerge${g.merge_moves ? ' checked' : ''}> ${esc(T.ghMergeMoves)}</label>
+    <p class="dim-note">${esc(T.ghPrsHint)}</p>
     <div class="bd-ghacts"><button type="button" class="btn" data-ghsync>${esc(T.ghSyncNow)}</button><button type="button" class="btn" data-ghconnect>${esc(T.ghChange)}</button><button type="button" class="btn danger" data-ghoff>${esc(T.ghDisconnect)}</button></div>`
 }
 

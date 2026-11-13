@@ -18,6 +18,10 @@ import { githubClient, parseProjectUrl, parseRepo, GithubError } from './github.
 //   subtasks   sub-issues; comments, both ways (ours signed with the author).
 //   closed     done closes the issue as completed, cancelled as not planned;
 //              reopened there, it goes back to the first column where work waits.
+//   PRs        the repository's pull requests that name a task (SQ-12 in their
+//              title, branch or text) or close its issue: shown on the task.
+//              One merged takes it to the first done column (unless the board
+//              says not to); the ones merged before the board first read them, not.
 //
 // Each field of a task keeps the value both sides last agreed on: whichever
 // side differs from it changed; if both did, the later change wins. Nothing
@@ -63,9 +67,17 @@ export function createGithubSync(ctx) {
       task_seq INTEGER PRIMARY KEY REFERENCES tasks(seq) ON DELETE CASCADE, board_id INTEGER NOT NULL,
       item_id TEXT NOT NULL UNIQUE, issue_id TEXT, draft_id TEXT, number INTEGER, repo TEXT, url TEXT, synced TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS task_prs (
+      task_seq INTEGER NOT NULL REFERENCES tasks(seq) ON DELETE CASCADE, pr_id TEXT NOT NULL, board_id INTEGER NOT NULL,
+      number INTEGER NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, state TEXT NOT NULL, review TEXT, author TEXT, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (task_seq, pr_id)
+    );
     CREATE TABLE IF NOT EXISTS github_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE, item_id TEXT NOT NULL, issue_id TEXT);
   `)
   ctx.addColumn('github_outbox', 'task_seq', 'INTEGER')
+  ctx.addColumn('board_github', 'prs_at', 'TEXT')       // (the last change to a pull request read: those after it are read next)
+  ctx.addColumn('board_github', 'prs_from', 'INTEGER')  // (when they were first read: merged before, a task isn't moved)
+  ctx.addColumn('board_github', 'merge_moves', 'INTEGER NOT NULL DEFAULT 1')
   ctx.addColumn('board_statuses', 'gh_option', 'TEXT')
   ctx.addColumn('task_comments', 'gh_id', 'TEXT')
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS task_comments_gh ON task_comments(gh_id) WHERE gh_id IS NOT NULL')
@@ -109,7 +121,7 @@ export function createGithubSync(ctx) {
     if (!c) return null
     return {
       owner_kind: c.owner_kind, owner: c.owner, number: c.number, title: c.title, url: c.url, repo: c.repo, synced_at: c.synced_at ?? null, error: c.error ?? null, linked: links(boardId).length,
-      syncing: busy.has(boardId) || queued.has(boardId), pending: notSent(boardId),
+      syncing: busy.has(boardId) || queued.has(boardId), pending: notSent(boardId), merge_moves: !!c.merge_moves,
     }
   }
   function notSent(boardId) {
@@ -147,6 +159,11 @@ export function createGithubSync(ctx) {
         db.prepare('DELETE FROM task_github WHERE board_id = ?').run(board.id)
         db.prepare('UPDATE board_statuses SET gh_option = NULL WHERE board_id = ?').run(board.id)
       }
+      // (Another repository: its pull requests, read afresh.)
+      if (old && old.repo !== repository.name) {
+        db.prepare('DELETE FROM task_prs WHERE board_id = ?').run(board.id)
+        db.prepare('UPDATE board_github SET prs_at = NULL, prs_from = NULL WHERE board_id = ?').run(board.id)
+      }
       db.prepare(`INSERT INTO board_github (board_id, owner_kind, owner, number, project_id, title, url, repo, repo_id, token, status_field, connected_by, connected_at, columns_dirty)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON CONFLICT(board_id) DO UPDATE SET owner_kind = excluded.owner_kind, owner = excluded.owner, number = excluded.number, project_id = excluded.project_id, title = excluded.title, url = excluded.url,
@@ -165,8 +182,14 @@ export function createGithubSync(ctx) {
       db.prepare('DELETE FROM board_github WHERE board_id = ?').run(boardId)
       db.prepare('DELETE FROM task_github WHERE board_id = ?').run(boardId)
       db.prepare('DELETE FROM github_outbox WHERE board_id = ?').run(boardId)
+      db.prepare('DELETE FROM task_prs WHERE board_id = ?').run(boardId)
       db.prepare('UPDATE board_statuses SET gh_option = NULL WHERE board_id = ?').run(boardId)
     })
+    ctx.changedBoard()
+  }
+  // Whether a merged pull request takes its tasks to done.
+  function setMergeMoves(boardId, on) {
+    db.prepare('UPDATE board_github SET merge_moves = ? WHERE board_id = ?').run(on ? 1 : 0, boardId)
     ctx.changedBoard()
   }
 
@@ -376,6 +399,9 @@ export function createGithubSync(ctx) {
       refetch ||= r.changed
     }
     if (refetch) items = await gh.items(project.id)
+
+    // (Before the items: a task a merged pull request moves goes there in this same sync.)
+    try { await pullRequests(gh, conn(board.id), board) } catch (err) { log(`GitHub pull requests of board ${board.id}: ${err.message}`); if (err.auth && err.status === 401) throw err }
 
     const seen = new Set()
     const byIssue = new Map()
@@ -809,6 +835,60 @@ export function createGithubSync(ctx) {
 
   // --- what boards.js tells it -------------------------------------------------------------
   // Into the trash here: out of the project there, its issue closed as not planned.
+  // --- pull requests -----------------------------------------------------------------
+  const PR_STATE = pr => (pr.merged || pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : pr.isDraft ? 'draft' : 'open')
+  const REVIEW = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes', REVIEW_REQUIRED: 'required' }
+  const prsOf = seq => db.prepare('SELECT number, title, url, state, review, author FROM task_prs WHERE task_seq = ? ORDER BY number DESC').all(seq)
+  // The tasks of this board a pull request names (SQ-12 in its title, branch or text), or whose issue it closes.
+  function tasksOfPr(pr, boardId, byIssue) {
+    const id = ctx.prefix().replace(/[^A-Za-z0-9]/g, '')
+    const re = new RegExp(`(?<![A-Za-z0-9])${id}-(\\d{1,9})(?![0-9])`, 'gi')
+    const seqs = new Set()
+    for (const text of [pr.title, pr.headRefName, pr.body]) for (const m of String(text ?? '').matchAll(re)) seqs.add(Number(m[1]))
+    for (const n of pr.closingIssuesReferences?.nodes ?? []) { const seq = n && byIssue.get(n.id); if (seq) seqs.add(seq) }
+    return [...seqs].filter(seq => ctx.taskRow(seq)?.board_id === boardId)
+  }
+  // The pull requests changed since the last time (the latest ones, the first time).
+  async function pullRequests(gh, c, board) {
+    const first = !c.prs_at
+    const prs = await gh.pullRequests(parseRepo(c.repo), c.prs_at)
+    const from = c.prs_from ?? Date.now()
+    const byIssue = new Map(links(board.id).filter(l => l.issue_id).map(l => [l.issue_id, l.task_seq]))
+    const moves = new Map() // task -> the pull request that, merged, takes it to done
+    const touched = new Set()
+    for (const pr of prs.slice().reverse()) { // (the oldest first: the latest word last)
+      const state = PR_STATE(pr), review = REVIEW[pr.reviewDecision] ?? null
+      const seqs = tasksOfPr(pr, board.id, byIssue)
+      const had = new Map(db.prepare('SELECT task_seq, state FROM task_prs WHERE pr_id = ? AND board_id = ?').all(pr.id, board.id).map(r => [r.task_seq, r.state]))
+      inTx(() => {
+        // (One that no longer names a task: off it.)
+        for (const seq of had.keys()) if (!seqs.includes(seq)) { db.prepare('DELETE FROM task_prs WHERE pr_id = ? AND task_seq = ?').run(pr.id, seq); touched.add(seq) }
+        for (const seq of seqs) {
+          db.prepare(`INSERT INTO task_prs (task_seq, pr_id, board_id, number, title, url, state, review, author, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(task_seq, pr_id) DO UPDATE SET number = excluded.number, title = excluded.title, url = excluded.url, state = excluded.state, review = excluded.review, author = excluded.author, updated_at = excluded.updated_at`)
+            .run(seq, pr.id, board.id, pr.number, String(pr.title ?? '').slice(0, 300), pr.url, state, review, pr.author?.login ?? null, Date.parse(pr.updatedAt) || Date.now())
+          touched.add(seq)
+          const before = had.get(seq)
+          // (In the history: linked, and merged or closed; not the first time, for the old ones.)
+          const news = !before ? (first ? null : 'linked') : before !== state && ['merged', 'closed'].includes(state) ? state : null
+          if (news) ctx.event(seq, FROM, 'pr', { number: pr.number, title: String(pr.title ?? '').slice(0, 300), url: pr.url, state, ...(news === 'linked' ? { linked: true } : {}) })
+          if (state === 'merged' && before !== 'merged' && (Date.parse(pr.mergedAt) || 0) >= from) moves.set(seq, pr.number)
+        }
+      })
+    }
+    const latest = prs.reduce((m, pr) => (Date.parse(pr.updatedAt) > Date.parse(m ?? 0) ? pr.updatedAt : m), c.prs_at)
+    db.prepare('UPDATE board_github SET prs_at = ?, prs_from = ? WHERE board_id = ?').run(latest ?? new Date(from).toISOString(), from, board.id)
+    // Merged: to the first done column, unless it is done or cancelled already (or the board says not to).
+    if (conn(board.id)?.merge_moves) {
+      const done = ctx.statusRows(board.id).find(s => s.category === 'done')
+      for (const seq of moves.keys()) {
+        const t = ctx.taskRow(seq)
+        if (done && t && !['done', 'closed'].includes(categoryOf(ctx.statusRow(t.status_id)))) applyHere(seq, { status: done.id })
+      }
+    }
+    for (const seq of touched) ctx.changedTask(seq)
+  }
+
   function taskDeleted(t) {
     lastTask.delete(t.seq)
     const l = linkOf(t.seq)
@@ -833,5 +913,5 @@ export function createGithubSync(ctx) {
     if (conn(boardId)) db.prepare('UPDATE board_github SET columns_dirty = 1 WHERE board_id = ?').run(boardId)
   }
 
-  return { connect, disconnect, view, touch, syncBoard, watch, fresh, freshTask, taskDeleted, taskRestored, columnsChanged, linkOf, FROM }
+  return { connect, disconnect, setMergeMoves, prsOf, view, touch, syncBoard, watch, fresh, freshTask, taskDeleted, taskRestored, columnsChanged, linkOf, FROM }
 }

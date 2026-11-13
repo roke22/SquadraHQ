@@ -209,7 +209,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
       priority: t.priority, due: t.due ?? null, rank: t.rank, assignee, people, notify: t.notify_state, notified_to: t.notified_to ?? null,
       created_by: who(t.created_by), created_at: t.created_at, updated_by: who(t.updated_by), updated_at: t.updated_at, version: t.version,
       comments: db.prepare('SELECT COUNT(*) n FROM task_comments WHERE task_seq = ?').get(t.seq).n,
-      parent: t.parent_seq ?? null, subtasks: progressOf(t.seq),
+      parent: t.parent_seq ?? null, subtasks: progressOf(t.seq), prs: sync?.prsOf(t.seq) ?? [],
     }
     if (!full) return view
     return {
@@ -733,6 +733,13 @@ export function createBoards(platform, { sessions, messaging, members }) {
       if (b.archived_at) throw bad('this board is archived')
       return sync.connect(b, p, person(actor))
     },
+    // Whether a merged pull request takes its tasks to done.
+    'boards/github-merge'(p) {
+      const b = humanBoard(p.board)
+      if (!sync.view(b.id)) throw bad('this board is not connected to GitHub')
+      sync.setMergeMoves(b.id, !!p.on)
+      return boardView(boardRow(b.id))
+    },
     'boards/github-off'(p) {
       const b = humanBoard(p.board)
       sync.disconnect(b.id)
@@ -906,6 +913,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
       when_done: nameOf(status?.next_id) ?? undefined,
       parent: t.parent_seq ? quoted(taskRow(t.parent_seq)) : undefined,
       subtasks: v.subtasks ? `${v.subtasks.done} of ${v.subtasks.total} finished` : undefined,
+      pull_requests: v.prs.length ? v.prs.map(p => `#${p.number} «${p.title}»: ${p.state}${p.review ? ` (review: ${p.review})` : ''}`) : undefined,
     }
     if (!full) return out
     const handler = status && handlerOf(status, t.board_id)
@@ -1059,7 +1067,7 @@ export function createBoards(platform, { sessions, messaging, members }) {
     statusRows: boardId => db.prepare('SELECT * FROM board_statuses WHERE board_id = ? ORDER BY position, id').all(boardId),
     statusRow, taskRow, boardRow, typeRows: typesOf, labelRows: labelsOf,
     labelNames: seq => db.prepare('SELECT l.name FROM task_labels x JOIN board_labels l ON l.id = x.label_id WHERE x.task_seq = ?').all(seq).map(r => r.name),
-    createTask, updateTask, checkAssignee, assignableSessions, event, changedTask, changedBoard, childrenOf, anyTask, members: memberList, peopleOf,
+    createTask, updateTask, checkAssignee, assignableSessions, event, changedTask, changedBoard, childrenOf, anyTask, members: memberList, peopleOf, prefix,
     trash: (t, data) => trashTasks(t, { by: FROM_GITHUB(), data, github: true }),
     restore: t => restoreTasks(t, { by: FROM_GITHUB(), github: true }),
   })

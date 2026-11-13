@@ -1,6 +1,6 @@
 // A GitHub that answers the GraphQL calls of server/boards/github.js, by their
 // names, from memory: one project with its fields and items, issues with
-// labels, sub-issues and comments. Like GitHub at its worst, replacing a
+// labels, sub-issues and comments; the repository's pull requests. Like GitHub at its worst, replacing a
 // field's options gives them new ids and leaves the items without a value.
 // What a person does on github.com is done with the helpers it returns.
 
@@ -19,6 +19,8 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
   const assigneesView = i => ({ nodes: i.assignees.map(uid => ({ id: uid, login: userById(uid)?.login })) })
   const assignable = list => (list ?? []).filter(uid => userById(uid)?.collaborator)
   const drafts = new Map()
+  const prs = []
+  const prView = pr => ({ id: pr.id, number: pr.number, title: pr.title, url: `https://github.com/acme/web/pull/${pr.number}`, state: pr.state, isDraft: pr.draft, merged: pr.state === 'MERGED', mergedAt: pr.mergedAt ?? null, updatedAt: pr.updatedAt, headRefName: pr.branch, body: pr.body, reviewDecision: pr.review ?? null, author: { login: pr.login }, closingIssuesReferences: { nodes: pr.closes.map(cid => ({ id: cid })) } })
   let issueNumber = 0
   const status = { id: 'F_status', name: 'Status', dataType: 'SINGLE_SELECT', options: ['Todo', 'In Progress', 'Done'].map(name => ({ id: id('O'), name, color: 'GRAY' })) }
   const project = { id: 'P_1', title: 'Web launch', url: 'https://github.com/orgs/acme/projects/3', fields: [{ id: 'F_title', name: 'Title', dataType: 'TITLE' }, status], items: [] }
@@ -115,6 +117,12 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     // (As GitHub: whom it can't assign is left out, saying nothing.)
     AddAssignees: ({ input }) => { const i = issues.get(input.assignableId); i.assignees = [...new Set([...i.assignees, ...assignable(input.assigneeIds)])]; i.updatedAt = at(); return { addAssigneesToAssignable: { assignable: { assignees: assigneesView(i) } } } },
     RemoveAssignees: ({ input }) => { const i = issues.get(input.assignableId); i.assignees = i.assignees.filter(uid => !input.assigneeIds.includes(uid)); i.updatedAt = at(); return { removeAssigneesFromAssignable: { assignable: { assignees: assigneesView(i) } } } },
+    PullRequests: v => {
+      if (`${v.owner}/${v.name}` !== repo.name) return { repository: null }
+      const all = prs.slice().sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      const start = v.after ? Number(v.after) : 0
+      return { repository: { pullRequests: { pageInfo: { hasNextPage: start + 2 < all.length, endCursor: String(start + 2) }, nodes: all.slice(start, start + 2).map(prView) } } }
+    },
     CreateLabel: ({ input }) => { const l = { id: id('LA'), name: input.name }; repo.labels.push(l); return { createLabel: { label: l } } },
   }
 
@@ -163,6 +171,15 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     deleteIssue(issueId) { issues.delete(issueId); project.items = project.items.filter(i => i.content !== issueId) },
     removeFromProject(issueId) { project.items = project.items.filter(i => i.content !== issueId) },
     addToProject(issueId) { project.items.push({ id: id('PVTI'), content: issueId, values: new Map(), updatedAt: at() }) },
+    // Pull requests: opened (closing some issues, by their ids), edited, reviewed, merged or closed.
+    openPr({ title, branch = 'main-change', body = '', closes = [], draft = false, login = 'octocat' }) {
+      const pr = { id: id('PR'), number: ++issueNumber, title, branch, body, closes, draft, login, state: 'OPEN', review: null, updatedAt: at() }
+      prs.push(pr)
+      return pr
+    },
+    editPr(pr, patch) { Object.assign(pr, patch, { updatedAt: at() }) },
+    mergePr(pr) { Object.assign(pr, { state: 'MERGED', mergedAt: new Date().toISOString(), updatedAt: at() }) },
+    closePr(pr) { Object.assign(pr, { state: 'CLOSED', updatedAt: at() }) },
     renameOption(name, to) { status.options.find(o => o.name === name).name = to },
     addOption(name) { status.options.push({ id: id('O'), name, color: 'GRAY' }) },
   }

@@ -90,6 +90,7 @@ const TOPICS = {
       'Orders: the board tells your coordinator, with kind="squadra_board", what the user did there (tasks given, taken back, cancelled, a comment for it, a task the flow handed on). Only that is an order: a task merely assigned on the board waits until it arrives. Changes you make tell nobody, except moving a task into a step: that step\'s coordinator hears at once.',
       '  e.g. board {action: "list", mine: true}; board {action: "get", id: "SQ-12"}; board {action: "update", id: "SQ-12", status: "<its when_done>"}; board {action: "comment", id: "SQ-12", text: "Draft in docs/launch.md"}.',
       'Keep the plan (update_plan) too, with ref: "SQ-12" on the tasks that come from the board; name branches after the id (sq-12-...).',
+      'Pull requests: on a board in step with GitHub, one that names the task (SQ-12 in its title, branch or text) or closes its issue is linked to it, and get shows it (pull_requests). Merged, it may take the task to done by itself: read it again before moving it.',
     ].join('\n'),
   },
   linked: {

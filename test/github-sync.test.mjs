@@ -43,6 +43,7 @@ const tasks = async board => (await get(`c/default/boards/tasks?board=${board}`)
 const task = async seq => (await get(`c/default/boards/task?id=${seq}`)).result
 const byTitle = async (board, title) => (await tasks(board)).find(t => t.title === title)
 const watch = async body => assert.ok((await post('boards/github-watch', body)).ok)
+const statusName = async (board, id) => (await get('c/default/boards')).result.boards.find(b => b.id === board.id).statuses.find(s => s.id === id)?.name
 const sync = async board => { const r = await post('boards/github-sync', { board }); assert.ok(r.ok, r.description); assert.equal(r.result.github.error, null); return r.result }
 
 test('github: a board in step with a project, both ways, and nobody told by it', async () => {
@@ -135,7 +136,7 @@ test('github: a board in step with a project, both ways, and nobody told by it',
   // (Nothing changed: nothing written there.)
   before = gh.calls.length
   await sync(board.id)
-  assert.deepEqual(gh.calls.slice(before).filter(c => !['Project', 'Items', 'Repository', 'Item'].includes(c)), [])
+  assert.deepEqual(gh.calls.slice(before).filter(c => !['Project', 'Items', 'Repository', 'Item', 'PullRequests'].includes(c)), [])
 
   // A change here goes on its own, soon, without reading the whole board.
   before = gh.calls.length
@@ -256,4 +257,71 @@ test('github: a task\'s people are the issue\'s assignees, by the GitHub user in
   await sync(board.id)
   assert.deepEqual((await task(header.seq)).people.map(p => p.id), [ana.id])
   assert.ok(!gh.calls.slice(before).includes('AddAssignees'), gh.calls.slice(before).join())
+})
+
+test('github: pull requests that name a task are on it, and one merged takes it to done', async () => {
+  const coord = await session('gpr', 'coordinator')
+  const board = (await post('boards/create', { name: 'PRs', teams: ['gpr'] })).result
+  const mk = async title => (await post('tasks/create', { board: board.id, title })).result
+  const old = await mk('Old work'), cart = await mk('Cart'), pay = await mk('Payments'), misc = await mk('Misc')
+  // Merged before the board was connected: on the task, but it doesn't move it.
+  const before = gh.person.openPr({ title: `SQ-${old.seq}: old work` })
+  gh.person.mergePr(before)
+  await sleep(5)
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+  const oldNow = await task(old.seq)
+  assert.deepEqual(oldNow.prs.map(p => [p.number, p.state]), [[before.number, 'merged']])
+  assert.notEqual(await statusName(board, oldNow.status), 'Done')
+  assert.ok(!oldNow.events.some(e => e.what === 'pr'), 'the old ones are not news')
+
+  // Named by its branch; another closing its issue; another naming two tasks in its text.
+  const byBranch = gh.person.openPr({ title: 'Cart totals', branch: `sq-${cart.seq}-totals` })
+  const payIssue = gh.look.issue('Payments')
+  const closing = gh.person.openPr({ title: 'Stripe', body: `Closes #${payIssue.number}`, closes: [payIssue.id], draft: true })
+  const both = gh.person.openPr({ title: 'Cleanup', body: `Touches SQ-${cart.seq} and sq-${misc.seq}; not SQ-${misc.seq}0` })
+  await sync(board.id)
+  let c = await task(cart.seq)
+  assert.deepEqual(c.prs.map(p => [p.number, p.state]).sort(), [[byBranch.number, 'open'], [both.number, 'open']].sort())
+  assert.equal(c.events.filter(e => e.what === 'pr').length, 2)
+  assert.deepEqual((await task(pay.seq)).prs.map(p => [p.number, p.state]), [[closing.number, 'draft']])
+  assert.deepEqual((await task(misc.seq)).prs.map(p => p.number), [both.number])
+  // (On the cards too.)
+  assert.equal((await tasks(board.id)).find(t => t.seq === cart.seq).prs.length, 2)
+
+  // Approved, and no longer naming Misc: said so.
+  gh.person.editPr(byBranch, { review: 'APPROVED' })
+  gh.person.editPr(both, { body: `Touches SQ-${cart.seq}` })
+  await sync(board.id)
+  assert.equal((await task(cart.seq)).prs.find(p => p.number === byBranch.number).review, 'approved')
+  assert.deepEqual((await task(misc.seq)).prs, [])
+
+  // The agent reads them.
+  const got = await coord.board({ action: 'get', id: `SQ-${cart.seq}` })
+  assert.ok(got.pull_requests.some(x => x.startsWith(`#${byBranch.number} «Cart totals»: open (review: approved)`)), JSON.stringify(got.pull_requests))
+
+  // Merged: the task goes to done, here and there, said by GitHub.
+  gh.person.mergePr(byBranch)
+  await sync(board.id)
+  c = await task(cart.seq)
+  assert.equal(await statusName(board, c.status), 'Done')
+  assert.equal(c.updated_by.kind, 'github')
+  assert.ok(c.events.some(e => e.what === 'pr' && e.data.state === 'merged' && e.data.number === byBranch.number))
+  await sync(board.id)
+  assert.equal(gh.look.statusOf(gh.look.issue('Cart').id), 'Done')
+  assert.equal(gh.look.issue('Cart').state, 'CLOSED')
+
+  // The board can say not to: merged, shown, not moved.
+  const off = await post('boards/github-merge', { board: board.id, on: false })
+  assert.equal(off.result.github.merge_moves, false)
+  gh.person.editPr(closing, { draft: false })
+  gh.person.mergePr(closing)
+  await sync(board.id)
+  const p = await task(pay.seq)
+  assert.equal(p.prs[0].state, 'merged')
+  assert.notEqual(await statusName(board, p.status), 'Done')
+  // (A closed one is just closed.)
+  gh.person.closePr(both)
+  await sync(board.id)
+  assert.equal((await task(cart.seq)).prs.find(x => x.number === both.number).state, 'closed')
 })

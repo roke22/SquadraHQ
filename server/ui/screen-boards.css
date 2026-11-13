@@ -138,6 +138,27 @@ a.bd-gh:hover { color: var(--text); }
 .bd-subs .grow { flex: 1; }
 .bd-subs .bd-who { margin-left: 0; }
 .bd-comsec { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+/* Pull requests: their state in GitHub's colours, from the tokens. */
+[data-pr="open"] { --pr: var(--ok); }
+[data-pr="draft"] { --pr: var(--muted); }
+[data-pr="merged"] { --pr: var(--coord); }
+[data-pr="closed"] { --pr: var(--err); }
+.bd-pr-tag { display: inline-flex; align-items: center; gap: 2px; font-size: var(--fs-xs); color: var(--pr); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bd-pr-tag svg { width: 13px; height: 13px; }
+.bd-prsec { margin-bottom: 16px; }
+.bd-prsec h3 { margin: 0 0 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--muted); }
+.bd-prs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.bd-prs li { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; font-size: var(--fs-sm); min-width: 0; }
+.bd-prs li + li { border-top: 1px solid var(--line); }
+.bd-prs a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); text-decoration: none; }
+.bd-prs a:hover { text-decoration: underline; }
+.bd-prs .grow { flex: 1; }
+.bd-pr-ic { display: inline-flex; flex: none; color: var(--pr); }
+.bd-pr-ic svg { width: 16px; height: 16px; }
+.bd-pr-st { flex: none; font-size: var(--fs-xs); color: var(--pr); border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; white-space: nowrap; }
+.bd-pr-rv { flex: none; font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+.bd-pr-rv[data-rv="approved"] { color: var(--ok); }
+.bd-pr-rv[data-rv="changes"] { color: var(--err); }
 .bd-comsec h3 { margin: 0 0 10px; font-size: var(--fs-md); font-weight: 600; }
 .bd-coms { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .bd-com { padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel-2); }

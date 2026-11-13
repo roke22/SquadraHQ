@@ -1,6 +1,6 @@
 // GitHub's GraphQL API, as the boards use it: a project (Projects v2) with its
 // Status, Agent and Type fields, its items and their issues, sub-issues and
-// comments. Only what the sync needs; every call is named, so a test can
+// comments; and the repository's pull requests. Only what the sync needs; every call is named, so a test can
 // answer it (SQUADRA_GITHUB_API points elsewhere).
 
 const API = () => process.env.SQUADRA_GITHUB_API || 'https://api.github.com/graphql'
@@ -36,6 +36,11 @@ const COMMENTS = 'comments(last: 50) { nodes { id body createdAt author { login 
 const ITEM = (withComments = false) => `id isArchived updatedAt type
   fieldValues(first: 30) { nodes { ... on ProjectV2ItemFieldSingleSelectValue { optionId field { ... on ProjectV2FieldCommon { id } } } } }
   content { __typename ... on Issue { ${ISSUE} ${withComments ? COMMENTS : ''} } ... on DraftIssue { id title body updatedAt } }`
+
+// (What links one to a task: its title, branch and text, and the issues it closes.)
+const PR = `id number title url state isDraft merged mergedAt updatedAt headRefName body reviewDecision
+  author { login }
+  closingIssuesReferences(first: 10) { nodes { id } }`
 
 const ITEMS = `items(first: 100, after: $after) { pageInfo { hasNextPage endCursor } nodes { ${ITEM()} } }`
 
@@ -176,6 +181,28 @@ export function githubClient(token) {
     async comment(subjectId, body) {
       const d = await gql('AddComment', `mutation AddComment($input: AddCommentInput!) { addComment(input: $input) { commentEdge { node { id } } } }`, { input: { subjectId, body } })
       return d.addComment.commentEdge.node.id
+    },
+    // The repository's pull requests, the latest changed first: those changed
+    // since then (an ISO time), or the latest `first` ones.
+    async pullRequests({ owner, name }, since = null, first = 100) {
+      const out = []
+      let after = null
+      for (let page = 0; page < 10; page++) {
+        const d = await gql('PullRequests', `query PullRequests($owner: String!, $name: String!, $after: String) {
+          repository(owner: $owner, name: $name) { pullRequests(first: 25, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
+            pageInfo { hasNextPage endCursor } nodes { ${PR} } } } }`, { owner, name, after })
+        if (!d.repository) throw new GithubError(`no repository ${owner}/${name} that this token can see`)
+        const prs = d.repository.pullRequests
+        for (const pr of prs.nodes) {
+          if (!pr) continue
+          if (since && Date.parse(pr.updatedAt) < Date.parse(since)) return out
+          out.push(pr)
+          if (!since && out.length >= first) return out
+        }
+        if (!prs.pageInfo.hasNextPage) return out
+        after = prs.pageInfo.endCursor
+      }
+      return out
     },
     async createLabel(repositoryId, name, color) {
       const d = await gql('CreateLabel', `mutation CreateLabel($input: CreateLabelInput!) { createLabel(input: $input) { label { id name } } }`, { input: { repositoryId, name, color } })
