@@ -207,6 +207,26 @@ test('subtasks: added from the task, shown on its card and listed in it, each a 
   await expect(parentCard.locator('.bd-subs-n')).toHaveText('☑ 1/1')
 })
 
+test('a task\'s agent and people: an agent who works on it, and people besides, shown on its card', async ({ page }) => {
+  await signIn(page, '#/boards')
+  await page.locator('.bl-card', { hasText: 'Launch' }).click()
+  await page.locator('.bd-card', { hasText: 'Write the launch post' }).locator('.bd-title').click()
+  const f = page.locator('form[data-bform]')
+  // The agent is chosen among the board's agents only; people are ticked.
+  await expect(f.locator('[name=assignee] option[value^="u:"]')).toHaveCount(0)
+  await f.locator('[name=person]').first().check()
+  await f.locator('[type=submit]').click()
+  const card = page.locator('.bd-card', { hasText: 'Write the launch post' })
+  await expect(card.locator('.bd-ppl-tag')).toHaveAttribute('title', 'The Owner')
+  await expect(card.locator('.bd-av')).toHaveText('TO')
+  // Filtered by that person: there; by nobody: not.
+  await page.locator('[data-bf=who]').selectOption({ label: 'The Owner' })
+  await expect(card).toBeVisible()
+  await page.locator('[data-bf=who]').selectOption('-')
+  await expect(card).toHaveCount(0)
+  await page.locator('[data-bf=who]').selectOption('')
+})
+
 test('the trash: a task deleted with its subtasks, and brought back with them', async ({ page }) => {
   await signIn(page, '#/boards')
   await page.locator('.bl-card', { hasText: 'Launch' }).click()

@@ -143,7 +143,7 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
       stage,
       // (Those of theirs waiting to be deleted: an owner can bring them back.)
       deleting: mine.filter(c => c.status === 'deleting' && c.role === 'owner').map(({ id, name, delete_after }) => ({ id, name, delete_after })),
-      user: { id: user.id, email: user.email, name: user.name, is_platform_admin: !!user.is_platform_admin, totp_enabled: !!user.totp_enabled_at },
+      user: { id: user.id, email: user.email, name: user.name, github: user.github ?? null, is_platform_admin: !!user.is_platform_admin, totp_enabled: !!user.totp_enabled_at },
       companies,
     }
   }
@@ -429,6 +429,17 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
       audit(user, 'totp-enabled', user.email, req)
       const codes = newRecoveryCodes(user)
       return answer({ recovery_codes: codes, ...me(userById(user.id), finished) })
+    }
+
+    // Their own GitHub user (or none): what boards in step with GitHub assign them by.
+    if (path === '/auth/profile') {
+      if (stageOf(user, session) !== 'ok') throw new ApiError(401, 'Unauthorized')
+      const raw = String(params.github ?? '').trim().replace(/^@/, '')
+      if (raw && !/^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(raw)) throw bad('that is not a GitHub user name')
+      const taken = raw && q('SELECT 1 FROM users WHERE lower(github) = lower(?) AND id != ?').get(raw, user.id)
+      if (taken) throw bad('another person here already has that GitHub user')
+      q('UPDATE users SET github = ? WHERE id = ?').run(raw || null, user.id)
+      return answer(me(userById(user.id), session))
     }
 
     if (path === '/auth/password') {

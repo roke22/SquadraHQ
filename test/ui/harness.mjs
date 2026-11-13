@@ -42,6 +42,7 @@ export async function startServer({ tokenApi = true, env = {} } = {}) {
   let cookie = ''
   return {
     url,
+    log: () => log, // (what the server wrote, to see why a test failed)
     async call(path, params = {}, { auth = SERVER_TOKEN, instance } = {}) {
       const res = await fetch(`${url}/${path}`, {
         method: 'POST',

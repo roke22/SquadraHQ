@@ -44,7 +44,7 @@ export function createCompanies(server) {
     const company = createCompany(server, {
       id: r.id, dir: folderOf(r.id), quotas: quotasOf(r),
       // (Who works in it, for its boards: a task can be one of them's.)
-      members: () => control.prepare('SELECT u.id, u.name FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.company_id = ? AND u.disabled_at IS NULL ORDER BY u.name').all(r.id),
+      members: () => control.prepare('SELECT u.id, u.name, u.github FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.company_id = ? AND u.disabled_at IS NULL ORDER BY u.name').all(r.id),
       routeEnrollment: (hash, expires) => {
         if (r.id !== FIRST_COMPANY) control.prepare('INSERT OR REPLACE INTO enrollment_routes (code_hash, company_id, expires_at) VALUES (?, ?, ?)').run(hash, r.id, expires)
       },

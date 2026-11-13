@@ -27,7 +27,10 @@ const FIELDS = `fields(first: 50) { nodes {
 const ISSUE = `id number title body state stateReason updatedAt url
   repository { nameWithOwner }
   labels(first: 30) { nodes { id name } }
-  parent { id }`
+  parent { id }
+  assignees(first: 10) { nodes { id login } }`
+const ASSIGNEES = 'assignees(first: 10) { nodes { id login } }'
+const logins = issue => (issue?.assignees?.nodes ?? []).filter(Boolean).map(n => n.login)
 const COMMENTS = 'comments(last: 50) { nodes { id body createdAt author { login } } }'
 
 const ITEM = (withComments = false) => `id isArchived updatedAt type
@@ -117,10 +120,24 @@ export function githubClient(token) {
           { input: { projectId, itemId, fieldId } })
       }
     },
-    async createIssue({ repositoryId, title, body, labelIds, parentIssueId }) {
-      const d = await gql('CreateIssue', `mutation CreateIssue($input: CreateIssueInput!) { createIssue(input: $input) { issue { id number url updatedAt } } }`,
-        { input: { repositoryId, title, body, labelIds, ...(parentIssueId ? { parentIssueId } : {}) } })
-      return d.createIssue.issue
+    async createIssue({ repositoryId, title, body, labelIds, parentIssueId, assigneeIds = [] }) {
+      const d = await gql('CreateIssue', `mutation CreateIssue($input: CreateIssueInput!) { createIssue(input: $input) { issue { id number url updatedAt ${ASSIGNEES} } } }`,
+        { input: { repositoryId, title, body, labelIds, ...(parentIssueId ? { parentIssueId } : {}), ...(assigneeIds.length ? { assigneeIds } : {}) } })
+      return { ...d.createIssue.issue, assignees: logins(d.createIssue.issue) }
+    },
+    // A GitHub user's id, by their login (null: no such user).
+    async userId(login) {
+      const d = await gql('UserId', 'query UserId($login: String!) { user(login: $login) { id } }', { login })
+      return d.user?.id ?? null
+    },
+    // (Both answer who the issue has afterwards: GitHub leaves out, saying nothing, whom it can't assign.)
+    async addAssignees(assignableId, assigneeIds) {
+      const d = await gql('AddAssignees', `mutation AddAssignees($input: AddAssigneesToAssignableInput!) { addAssigneesToAssignable(input: $input) { assignable { ... on Issue { ${ASSIGNEES} } } } }`, { input: { assignableId, assigneeIds } })
+      return logins(d.addAssigneesToAssignable.assignable)
+    },
+    async removeAssignees(assignableId, assigneeIds) {
+      const d = await gql('RemoveAssignees', `mutation RemoveAssignees($input: RemoveAssigneesFromAssignableInput!) { removeAssigneesFromAssignable(input: $input) { assignable { ... on Issue { ${ASSIGNEES} } } } }`, { input: { assignableId, assigneeIds } })
+      return logins(d.removeAssigneesFromAssignable.assignable)
     },
     // (Already in it, as GitHub puts a sub-issue in its parent's project by itself: the item it has.)
     async addItem(projectId, contentId) {

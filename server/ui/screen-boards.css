@@ -209,3 +209,11 @@ a.bd-gh:hover { color: var(--text); }
 @keyframes bd-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .bd-ghstat.busy .bd-ghnow .ic { animation: none; } }
 @media (max-width: 900px) { .bd-ghstat .long { display: none; } }
+
+/* A task's people: their initials, overlapping a little. */
+.bd-ppl-tag { display: inline-flex; align-items: center; margin-left: auto; }
+.bd-card-foot .bd-who + .bd-ppl-tag { margin-left: 4px; }
+.bd-av { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--panel); background: var(--panel-2); color: var(--text); font-size: 10px; font-weight: 600; line-height: 1; }
+.bd-av + .bd-av { margin-left: -6px; }
+.bd-av.more { color: var(--muted); }
+.bd-subs .bd-ppl-tag { margin-left: 0; }

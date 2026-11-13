@@ -135,6 +135,12 @@ function whoTag(a) {
   const role = sessions.get(a.id)?.role === 'coordinator' ? 'coord' : 'worker'
   return `<span class="bd-who bd-agent"><span class="role ${role}" aria-hidden="true"></span>${esc(a.id)}</span>`
 }
+// The people of a task: their initials (three at most, then how many more), their names on hover.
+function peopleTag(list) {
+  if (!list?.length) return ''
+  const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0).toUpperCase()).join('')
+  return `<span class="bd-ppl-tag" title="${esc(list.map(p => p.name).join(', '))}">${list.slice(0, 3).map(p => `<span class="bd-av">${esc(initials(p.name))}</span>`).join('')}${list.length > 3 ? `<span class="bd-av more">+${list.length - 3}</span>` : ''}</span>`
+}
 // (Backlog never tells anyone: there it isn't waiting to be told.)
 const untold = (b, t) => t.notify === 'pending' && t.assignee?.kind === 'session' && ACTIVE.has(statusOf(b, t.status)?.category)
 const pendingTag = (b, t) => (untold(b, t) ? `<span class="bd-pending" title="${esc(T.pendingTitle)}">${esc(T.pendingTag)}</span>` : '')
@@ -151,7 +157,7 @@ function card(b, t) {
   return `<article class="bd-card${detail?.seq === t.seq ? ' on' : ''}" data-task="${t.seq}"${can('operator') ? ' draggable="true"' : ''}>
       <div class="bd-card-top"><span class="bd-id">${esc(prefixed(t.seq))}</span>${parentTag(b, t)}${typeChip(b, t)}${prioTag(t.priority)}${pendingTag(b, t)}</div>
       <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(t.seq))}">${esc(t.title)}</a>
-      ${t.labels.length || t.due || t.assignee || t.comments || t.subtasks ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${progressTag(t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}</div>` : ''}
+      ${t.labels.length || t.due || t.assignee || t.people?.length || t.comments || t.subtasks ? `<div class="bd-card-foot">${labelChips(b, t)}${dueTag(b, t)}${progressTag(t)}${t.comments ? `<span class="bd-ncom" title="${esc(T.bComments)}">💬 ${t.comments}</span>` : ''}${whoTag(t.assignee)}${peopleTag(t.people)}</div>` : ''}
     </article>`
 }
 
@@ -207,7 +213,8 @@ function renderList() {
 const filterOf = id => filters.get(id) ?? (filters.set(id, { text: '', who: '', label: '', type: '', pending: false }), filters.get(id))
 function matches(b, t, f) {
   if (f.text && !`${prefixed(t.seq)} ${t.title}`.toLowerCase().includes(f.text.toLowerCase())) return false
-  if (f.who && (f.who === '-' ? t.assignee : `${t.assignee?.kind === 'user' ? 'u' : 's'}:${t.assignee?.id}` !== f.who)) return false
+  if (f.who === '-' && (t.assignee || t.people?.length)) return false
+  if (f.who && f.who !== '-' && assigneeValue(t.assignee) !== f.who && !(t.people ?? []).some(p => `u:${p.id}` === f.who)) return false
   if (f.label && !t.labels.includes(Number(f.label))) return false
   if (f.type && t.type !== Number(f.type)) return false
   if (f.pending && !untold(b, t)) return false
@@ -223,7 +230,7 @@ function assigneeOptions(b, value) {
   const teams = new Map()
   for (const s of people.sessions[b.id] ?? []) { if (!teams.has(s.team)) teams.set(s.team, []); teams.get(s.team).push(s.name) }
   const groups = [...teams].map(([team, names]) => `<optgroup label="${esc(T.bTeamOf(state.squadMeta.get(team)?.title || team))}">${names.sort((x, y) => (x === team ? -1 : y === team ? 1 : COLLATOR.compare(x, y))).map(n => opt(`s:${n}`, n === team ? `${n} (${T.roleCoordinator})` : n)).join('')}</optgroup>`)
-  return `${opt('', T.nobody)}${people.members.length ? `<optgroup label="${esc(T.bPeople)}">${people.members.map(m => opt(`u:${m.id}`, m.name)).join('')}</optgroup>` : ''}${groups.join('')}`
+  return `${opt('', T.nobody)}${groups.join('')}`
 }
 // What a task can be a subtask of: any other task of the board but its own subtasks.
 function parentOptions(b, t) {
@@ -239,7 +246,10 @@ const assigneeFrom = v => (!v ? null : { kind: v.startsWith('u:') ? 'user' : 'se
 function filterBar(b) {
   const f = filterOf(b.id)
   const who = new Map()
-  for (const t of tasksOf.get(b.id)?.values() ?? []) if (t.assignee) who.set(assigneeValue(t.assignee), t.assignee.kind === 'user' ? t.assignee.name : t.assignee.id)
+  for (const t of tasksOf.get(b.id)?.values() ?? []) {
+    if (t.assignee) who.set(assigneeValue(t.assignee), t.assignee.kind === 'user' ? t.assignee.name : t.assignee.id)
+    for (const p of t.people ?? []) who.set(`u:${p.id}`, p.name)
+  }
   const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`
   return `<div class="bd-filters" role="search">
       <input type="search" class="input" data-bf="text" placeholder="${esc(T.bFilter)}" aria-label="${esc(T.bFilter)}" value="${esc(f.text)}">
@@ -364,9 +374,10 @@ function form(b, t) {
         <label class="field"><span>${esc(T.taskPriority)}</span><select name="priority"${dis}>${T.priorities.map((p, i) => opt(i, p, t.priority ?? 0)).join('')}</select></label>
         <label class="field"><span>${esc(T.taskDue)}</span><input type="date" name="due" value="${esc(t.due ?? '')}"${dis}></label>
       </div>
-      <label class="field"><span>${esc(T.taskAssignee)}</span><select name="assignee"${dis}>${assigneeOptions(b, assigneeValue(t.assignee))}</select>
+      <label class="field"><span>${esc(T.taskAgent)}</span><select name="assignee"${dis}>${assigneeOptions(b, assigneeValue(t.assignee))}</select>
         ${!(people.sessions[b.id] ?? []).length ? `<span class="hint">${esc(T.noAssignable)}</span>` : ''}
         ${untold(b, t) && coordinator ? `<span class="hint bd-pending-hint">${esc(T.pendingTitle)}</span>` : ''}</label>
+      ${people.members.length ? `<fieldset class="bd-labels bd-ppl"><legend>${esc(T.taskPeople)}</legend>${people.members.map(m => `<label class="bd-lpick"${b.github && !m.github ? ` title="${esc(T.bNoGithubUser)}"` : ''}><input type="checkbox" name="person" value="${esc(m.id)}"${(t.people ?? []).some(x => x.id === m.id) ? ' checked' : ''}${dis}><span>${esc(m.name)}${b.github && !m.github ? ' <span class="dim-note">*</span>' : ''}</span></label>`).join('')}</fieldset>` : ''}
       <label class="field"><span>${esc(T.taskParent)}</span><select name="parent"${dis}>${parentOptions(b, t)}</select></label>
       ${b.labels.length ? `<fieldset class="bd-labels"><legend>${esc(T.taskLabels)}</legend>${b.labels.map(l => `<label class="bd-lpick"><input type="checkbox" name="label" value="${l.id}"${(t.labels ?? []).includes(l.id) ? ' checked' : ''}${dis}>${chip(l.name, l.color)}</label>`).join('')}</fieldset>` : ''}
       <label class="field"><span>${esc(T.taskDescription)}</span><textarea name="description" rows="7" maxlength="20000"${dis}>${esc(t.description ?? '')}</textarea></label>
@@ -390,7 +401,7 @@ function comments(b, t) {
 }
 function subtasks(b, t) {
   const rows = t.children.map(c => `<li data-task="${c.seq}"><span class="bd-dot" data-cat="${statusOf(b, c.status)?.category ?? 'unstarted'}" title="${esc(statusOf(b, c.status)?.name ?? '')}" aria-hidden="true"></span><span class="bd-id">${esc(prefixed(c.seq))}</span>
-      <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(c.seq))}">${esc(c.title)}</a>${progressTag(c)}<span class="grow"></span>${whoTag(c.assignee)}</li>`).join('')
+      <a class="bd-title" href="#/b/${b.id}/${esc(prefixed(c.seq))}">${esc(c.title)}</a>${progressTag(c)}<span class="grow"></span>${whoTag(c.assignee)}${peopleTag(c.people)}</li>`).join('')
   return `<h3>${esc(T.bSubtasks)}${t.subtasks ? ` <span class="badge soft">${t.subtasks.done}/${t.subtasks.total}</span>` : ''}</h3>
     ${rows ? `<ul class="bd-subs">${rows}</ul>` : ''}
     ${can('operator') && !b.archived_at ? `<button type="button" class="btn quiet" data-addsub>${icon('plus')} ${esc(T.bAddSubtask)}</button>` : ''}`
@@ -450,6 +461,7 @@ function fromForm(f) {
   return {
     title: v('title').trim(), status: Number(v('status')), type: v('type') ? Number(v('type')) : null, priority: Number(v('priority')),
     due: v('due') || null, assignee: assigneeFrom(v('assignee')), description: v('description'),
+    people: [...f.querySelectorAll('[name=person]:checked')].map(x => x.value),
     labels: [...f.querySelectorAll('[name=label]:checked')].map(x => Number(x.value)),
     parent: v('parent') ? Number(v('parent')) : null,
   }

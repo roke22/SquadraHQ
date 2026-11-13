@@ -86,5 +86,8 @@ export function openControl() {
   // An invitation to several companies at once: the first in company_id and
   // role, the rest here (JSON: [{ company, role }]).
   if (!control.prepare('PRAGMA table_info(invitations)').all().some(c => c.name === 'also')) control.exec('ALTER TABLE invitations ADD COLUMN also TEXT')
+  // (A person's GitHub user: boards in step with GitHub give them its issues.)
+  if (!control.prepare('PRAGMA table_info(users)').all().some(c => c.name === 'github')) control.exec('ALTER TABLE users ADD COLUMN github TEXT')
+  control.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_github ON users(lower(github)) WHERE github IS NOT NULL')
   return control
 }

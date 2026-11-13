@@ -13,6 +13,11 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
   const calls = []
   const repo = { id: 'R_1', name: 'acme/web', labels: [{ id: id('LA'), name: 'bug' }] }
   const issues = new Map()
+  // GitHub's users: who can be assigned in the repository (collaborators), and who can't.
+  const users = new Map([['octocat', { id: 'U_octocat', login: 'octocat', collaborator: true }]])
+  const userById = uid => [...users.values()].find(u => u.id === uid)
+  const assigneesView = i => ({ nodes: i.assignees.map(uid => ({ id: uid, login: userById(uid)?.login })) })
+  const assignable = list => (list ?? []).filter(uid => userById(uid)?.collaborator)
   const drafts = new Map()
   let issueNumber = 0
   const status = { id: 'F_status', name: 'Status', dataType: 'SINGLE_SELECT', options: ['Todo', 'In Progress', 'Done'].map(name => ({ id: id('O'), name, color: 'GRAY' })) }
@@ -26,6 +31,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
       __typename: 'Issue', id: i.id, number: i.number, title: i.title, body: i.body, state: i.state, stateReason: i.stateReason, updatedAt: i.updatedAt, url: `https://github.com/acme/web/issues/${i.number}`,
       repository: { nameWithOwner: repo.name }, labels: { nodes: i.labels.map(l => repo.labels.find(x => x.id === l)).filter(Boolean) },
       parent: i.parent ? { id: i.parent } : null,
+      assignees: assigneesView(i),
       ...(withComments ? { comments: { nodes: i.comments.slice(-50).map(c => ({ id: c.id, body: c.body, createdAt: c.createdAt, author: { login: c.login } })) } } : {}),
     }
   }
@@ -73,11 +79,11 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     },
     ClearSelect: ({ input }) => { const it = itemOf(input.itemId); it.values.delete(input.fieldId); touch(it); return { clearProjectV2ItemFieldValue: { projectV2Item: { id: it.id } } } },
     CreateIssue: ({ input }) => {
-      const i = { id: id('I'), number: ++issueNumber, title: input.title, body: input.body ?? '', state: 'OPEN', stateReason: null, labels: input.labelIds ?? [], parent: input.parentIssueId ?? null, comments: [], updatedAt: at() }
+      const i = { id: id('I'), number: ++issueNumber, title: input.title, body: input.body ?? '', state: 'OPEN', stateReason: null, labels: input.labelIds ?? [], parent: input.parentIssueId ?? null, assignees: assignable(input.assigneeIds), comments: [], updatedAt: at() }
       issues.set(i.id, i)
       // (As GitHub does: a sub-issue goes into its parent's project by itself.)
       if (i.parent && itemFor(i.parent)) project.items.push({ id: id('PVTI'), content: i.id, values: new Map(), updatedAt: at() })
-      return { createIssue: { issue: { id: i.id, number: i.number, url: `https://github.com/acme/web/issues/${i.number}`, updatedAt: i.updatedAt } } }
+      return { createIssue: { issue: { id: i.id, number: i.number, url: `https://github.com/acme/web/issues/${i.number}`, updatedAt: i.updatedAt, assignees: assigneesView(i) } } }
     },
     AddItem: ({ input }) => {
       if (!issues.has(input.contentId) && !drafts.has(input.contentId)) throw Object.assign(new Error(`Could not resolve to a node with the global id of '${input.contentId}'.`), { type: 'NOT_FOUND' })
@@ -105,6 +111,10 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
       issues.get(input.subjectId).comments.push(c)
       return { addComment: { commentEdge: { node: { id: c.id } } } }
     },
+    UserId: v => ({ user: users.has(v.login.toLowerCase()) ? { id: users.get(v.login.toLowerCase()).id } : null }),
+    // (As GitHub: whom it can't assign is left out, saying nothing.)
+    AddAssignees: ({ input }) => { const i = issues.get(input.assignableId); i.assignees = [...new Set([...i.assignees, ...assignable(input.assigneeIds)])]; i.updatedAt = at(); return { addAssigneesToAssignable: { assignable: { assignees: assigneesView(i) } } } },
+    RemoveAssignees: ({ input }) => { const i = issues.get(input.assignableId); i.assignees = i.assignees.filter(uid => !input.assigneeIds.includes(uid)); i.updatedAt = at(); return { removeAssigneesFromAssignable: { assignable: { assignees: assigneesView(i) } } } },
     CreateLabel: ({ input }) => { const l = { id: id('LA'), name: input.name }; repo.labels.push(l); return { createLabel: { label: l } } },
   }
 
@@ -129,7 +139,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
   const fieldNamed = name => project.fields.find(f => f.name === name)
   const person = {
     addIssue({ title, body = '', status: s, labels = [] }) {
-      const i = { id: id('I'), number: ++issueNumber, title, body, state: 'OPEN', stateReason: null, labels: labels.map(name => repo.labels.find(l => l.name === name)?.id ?? (repo.labels.push({ id: id('LA'), name }), repo.labels.at(-1).id)), parent: null, comments: [], updatedAt: at() }
+      const i = { id: id('I'), number: ++issueNumber, title, body, state: 'OPEN', stateReason: null, assignees: [], labels: labels.map(name => repo.labels.find(l => l.name === name)?.id ?? (repo.labels.push({ id: id('LA'), name }), repo.labels.at(-1).id)), parent: null, comments: [], updatedAt: at() }
       issues.set(i.id, i)
       const it = { id: id('PVTI'), content: i.id, values: new Map(), updatedAt: at() }
       if (s) it.values.set(status.id, optionOf(status, s))
@@ -148,6 +158,8 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     close(issueId, reason = 'COMPLETED') { Object.assign(issues.get(issueId), { state: 'CLOSED', stateReason: reason, updatedAt: at() }) },
     comment(issueId, body, login = 'octocat') { issues.get(issueId).comments.push({ id: id('IC'), body, createdAt: at(), login }); issues.get(issueId).updatedAt = at() },
     setParent(issueId, parentId) { issues.get(issueId).parent = parentId; issues.get(issueId).updatedAt = at() },
+    addUser(login, { collaborator = true } = {}) { users.set(login.toLowerCase(), { id: `U_${login}`, login, collaborator }) },
+    assign(issueId, logins) { issues.get(issueId).assignees = logins.map(l => users.get(l.toLowerCase()).id); issues.get(issueId).updatedAt = at() },
     deleteIssue(issueId) { issues.delete(issueId); project.items = project.items.filter(i => i.content !== issueId) },
     removeFromProject(issueId) { project.items = project.items.filter(i => i.content !== issueId) },
     addToProject(issueId) { project.items.push({ id: id('PVTI'), content: issueId, values: new Map(), updatedAt: at() }) },
@@ -161,6 +173,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     fieldOf: (issueId, fieldName) => { const it = itemFor(issueId); const f = fieldNamed(fieldName); return f?.options.find(o => o.id === it?.values.get(f.id))?.name ?? null },
     field: fieldNamed, inProject: issueId => !!itemFor(issueId), labelsOf: issueId => issues.get(issueId).labels.map(l => repo.labels.find(x => x.id === l)?.name),
     options: () => status.options.map(o => o.name),
+    assigneesOf: issueId => issues.get(issueId).assignees.map(uid => userById(uid)?.login),
   }
   return { url, token, calls, person, look, stop: () => new Promise(r => server.close(r)) }
 }

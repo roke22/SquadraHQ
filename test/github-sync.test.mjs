@@ -6,33 +6,18 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawn } from 'node:child_process'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { tempDir } from './tempdirs.mjs'
 import { startFakeGithub } from './fake-github.mjs'
+import { startServer, SERVER_TOKEN as TOKEN } from './ui/harness.mjs'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const TOKEN = 'test-server-token-github-0123456789'
-const PORT = 19900 + Math.floor(Math.random() * 90)
-const URL_ = `http://127.0.0.1:${PORT}`
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-let server, gh
+let server, gh, URL_
 before(async () => {
   gh = await startFakeGithub()
-  server = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: tempDir('squadra-github-'), SQUADRA_SERVER_TOKEN: TOKEN, SQUADRA_GITHUB_API: gh.url, SQUADRA_GITHUB_FRESH_MS: '6000' },
-    stdio: ['ignore', 'ignore', 'pipe'],
-  })
-  server.stderr.on('data', d => { if (process.env.DEBUG) process.stderr.write(d) })
-  for (let i = 0; ; i++) {
-    try { if ((await fetch(`${URL_}/health`)).ok) break } catch {}
-    if (i > 160) throw new Error('server did not start')
-    await sleep(50)
-  }
+  server = await startServer({ env: { SQUADRA_GITHUB_API: gh.url, SQUADRA_GITHUB_FRESH_MS: '6000' } })
+  URL_ = server.url
 })
-after(async () => { server?.kill('SIGTERM'); await gh?.stop() })
+after(async () => { if (process.env.DEBUG) process.stderr.write(server?.log() ?? ''); await server?.stop(); await gh?.stop() })
 
 const api = async (method, params, secret, instance) => (await fetch(`${URL_}/${method}`, {
   method: 'POST',
@@ -229,4 +214,46 @@ test('github: a board in step with a project, both ways, and nobody told by it',
   b = (await post('boards/github-off', { board: board.id })).result
   assert.equal(b.github, null)
   assert.ok(await byTitle(board.id, 'Pricing table v2'))
+})
+
+test('github: a task\'s people are the issue\'s assignees, by the GitHub user in their profile', async () => {
+  // A person says who they are on GitHub, in their profile.
+  const cookie = await server.ownerCookie()
+  const profile = async github => (await fetch(`${URL_}/auth/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: URL_, Cookie: cookie }, body: JSON.stringify({ github }) })).json()
+  assert.match((await profile('not a login!')).description, /not a GitHub user/)
+  assert.equal((await profile('@Ana-Dev')).result.user.github, 'Ana-Dev')
+  gh.person.addUser('ana-dev')
+  const ana = (await get('c/default/boards')).result.members.find(m => m.github === 'Ana-Dev')
+  assert.ok(ana)
+
+  const board = (await post('boards/create', { name: 'People' })).result
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+
+  // Hers here: hers there.
+  const footer = (await post('tasks/create', { board: board.id, title: 'Footer', people: [ana.id] })).result
+  assert.deepEqual(footer.people.map(p => p.id), [ana.id])
+  await sync(board.id)
+  const issue = gh.look.issue('Footer')
+  assert.deepEqual(gh.look.assigneesOf(issue.id), ['ana-dev'])
+  // There, octocat instead of her: here, nobody (octocat isn't one of ours).
+  gh.person.assign(issue.id, ['octocat'])
+  await sync(board.id)
+  assert.deepEqual((await task(footer.seq)).people, [])
+  // Hers again here: there too, and octocat stays.
+  await post('tasks/update', { id: footer.seq, people: [ana.id] })
+  await sync(board.id)
+  assert.deepEqual(gh.look.assigneesOf(issue.id).sort(), ['ana-dev', 'octocat'])
+
+  // Someone GitHub can't assign in the repository: still theirs here, and not asked again.
+  gh.person.addUser('outsider', { collaborator: false })
+  assert.ok((await profile('outsider')).ok)
+  const header = (await post('tasks/create', { board: board.id, title: 'Header', people: [ana.id] })).result
+  await sync(board.id)
+  assert.deepEqual(gh.look.assigneesOf(gh.look.issue('Header').id), [])
+  await sleep(3500)
+  const before = gh.calls.length
+  await sync(board.id)
+  assert.deepEqual((await task(header.seq)).people.map(p => p.id), [ana.id])
+  assert.ok(!gh.calls.slice(before).includes('AddAssignees'), gh.calls.slice(before).join())
 })

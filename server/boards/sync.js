@@ -12,7 +12,8 @@ import { githubClient, parseProjectUrl, parseRepo, GithubError } from './github.
 //   a task     an issue in the project (a draft item, if it is one there). A
 //              task made here becomes an issue in the board's repository.
 //   agents     a single-select field «Agent» of the project, with the agents
-//              of the board's teams; people aren't synced yet.
+//              of the board's teams. Its people, the issue's assignees: by the
+//              GitHub user in each one's profile (other assignees left alone).
 //   type       a single-select field «Type»; labels, the issue's.
 //   subtasks   sub-issues; comments, both ways (ours signed with the author).
 //   closed     done closes the issue as completed, cancelled as not planned;
@@ -206,7 +207,16 @@ export function createGithubSync(ctx) {
     body: v => cleanText(String(v ?? '')).replace(/\r\n?/g, '\n').trim().slice(0, MAX.description),
   }
   const categoryOf = s => s?.category ?? 'unstarted'
-  function ours(t, parentIssue) {
+  // People, by their GitHub user (in lower case): only the company's who have one in their profile.
+  const split = v => (v ? String(v).split('\n') : [])
+  const loginsOf = () => new Map(ctx.members().filter(m => m.github).map(m => [m.id, m.github.toLowerCase()]))
+  const peopleLogins = (seq, refused = []) => { const by = loginsOf(); return ctx.peopleOf(seq).map(id => by.get(id)).filter(l => l && !refused.includes(l)).sort().join('\n') }
+  const userIds = new Map() // (a GitHub user's id, by login: it doesn't change)
+  async function userIdOf(gh, login) {
+    if (!userIds.has(login)) userIds.set(login, await gh.userId(login))
+    return userIds.get(login)
+  }
+  function ours(t, parentIssue, refused = []) {
     const s = ctx.statusRow(t.status_id)
     const cat = categoryOf(s)
     return {
@@ -216,6 +226,7 @@ export function createGithubSync(ctx) {
       type: t.type_id ? ctx.typeRows(t.board_id).find(x => x.id === t.type_id)?.name.toLowerCase() ?? null : null,
       labels: ctx.labelNames(t.seq).map(n => n.toLowerCase()).sort().join('\n'),
       parent: parentIssue,
+      people: peopleLogins(t.seq, refused),
     }
   }
   function theirs(item, fields) {
@@ -230,6 +241,8 @@ export function createGithubSync(ctx) {
       out.closed = c.state === 'CLOSED' ? (c.stateReason === 'NOT_PLANNED' || c.stateReason === 'DUPLICATE' ? 'NOT_PLANNED' : 'COMPLETED') : 'OPEN'
       out.labels = (c.labels?.nodes ?? []).map(l => l.name.toLowerCase()).sort().join('\n')
       out.parent = c.parent?.id ?? null
+      const known = new Set(loginsOf().values()) // (assignees who aren't the company's people: left as they are)
+      out.people = (c.assignees?.nodes ?? []).filter(Boolean).map(n => n.login.toLowerCase()).filter(l => known.has(l)).sort().join('\n')
     }
     return out
   }
@@ -631,11 +644,14 @@ export function createGithubSync(ctx) {
     let t = ctx.taskRow(link.task_seq)
     if (!t) return
     const parentLink = t.parent_seq ? linkOf(t.parent_seq) : null
-    const here = ours(t, t.parent_seq ? parentLink?.issue_id ?? 'unpublished' : null)
-    const there = theirs(item, fields)
     const synced = JSON.parse(link.synced)
     const prefer = synced.prefer // (back from the trash: one side's word, whatever the other says)
     delete synced.prefer
+    // (People GitHub wouldn't assign to it: not its business. Taken off the task, forgotten.)
+    const refused = (synced.refused ?? []).filter(l => split(peopleLogins(t.seq)).includes(l))
+    if (refused.length) synced.refused = refused; else delete synced.refused
+    const here = ours(t, t.parent_seq ? parentLink?.issue_id ?? 'unpublished' : null, refused)
+    const there = theirs(item, fields)
     const keys = Object.keys(there) // (a draft has no state, labels or parent)
     const theirsAt = Math.max(Date.parse(item.updatedAt) || 0, Date.parse(item.content.updatedAt) || 0)
     const toHere = [], toThere = []
@@ -658,6 +674,13 @@ export function createGithubSync(ctx) {
         if (k === 'type') p.type = there.type ? typeId(board.id, typeThere(item, fields)) : null
         if (k === 'labels') p.labels = labelsThere(item).map(n => labelId(board.id, n)).filter(Boolean)
         if (k === 'parent') p.parent = there.parent ? byIssue.get(there.parent) ?? null : null
+        if (k === 'people') {
+          // (Those GitHub can't have stay: people without a GitHub user, or one it wouldn't assign.)
+          const by = loginsOf()
+          const ids = new Map([...by].map(([id, l]) => [l, id]))
+          const keep = ctx.peopleOf(t.seq).filter(id => !by.has(id) || refused.includes(by.get(id)))
+          p.people = [...new Set([...keep, ...split(there.people).map(l => ids.get(l)).filter(Boolean)])].slice(0, MAX.people ?? 10)
+        }
         if (k === 'agent') {
           if (!there.agent) assignee = t.assignee_kind === 'session' ? null : undefined
           else { try { assignee = ctx.checkAssignee(board.id, { kind: 'session', id: there.agent }) } catch {} }
@@ -673,12 +696,12 @@ export function createGithubSync(ctx) {
       t = ctx.taskRow(t.seq)
       for (const k of toHere) synced[k] = there[k]
       // (What that changed besides, such as the column a closed issue took here: there too.)
-      const after = ours(t, t.parent_seq ? linkOf(t.parent_seq)?.issue_id ?? 'unpublished' : null)
+      const after = ours(t, t.parent_seq ? linkOf(t.parent_seq)?.issue_id ?? 'unpublished' : null, refused)
       for (const k of keys) if (!toHere.includes(k) && !toThere.includes(k) && after[k] !== there[k] && after[k] !== 'unpublished') toThere.push(k)
     }
     // Ours, there.
     if (toThere.length) {
-      const now = ours(t, t.parent_seq ? linkOf(t.parent_seq)?.issue_id ?? null : null)
+      const now = ours(t, t.parent_seq ? linkOf(t.parent_seq)?.issue_id ?? null : null, refused)
       const issue = link.issue_id
       if (link.draft_id && (toThere.includes('title') || toThere.includes('body'))) await gh.updateDraft(link.draft_id, { title: now.title, body: now.body })
       if (issue && (toThere.includes('title') || toThere.includes('body'))) await gh.updateIssue(issue, { title: now.title, body: now.body })
@@ -699,9 +722,26 @@ export function createGithubSync(ctx) {
         if (now.parent) await gh.setParent(now.parent, issue)
         else if (there.parent) await gh.removeParent(there.parent, issue)
       }
+      if (issue && toThere.includes('people')) {
+        const want = split(now.people), have = split(there.people)
+        const add = want.filter(l => !have.includes(l)), remove = have.filter(l => !want.includes(l))
+        if (remove.length) await gh.removeAssignees(issue, (item.content.assignees?.nodes ?? []).filter(n => remove.includes(n.login.toLowerCase())).map(n => n.id))
+        if (add.length) synced.refused = [...new Set([...refused, ...await assign(gh, issue, add)])]
+      }
       for (const k of toThere) synced[k] = now[k]
+      if (synced.refused?.length) synced.people = split(synced.people).filter(l => !synced.refused.includes(l)).join('\n')
     }
     db.prepare('UPDATE task_github SET synced = ? WHERE task_seq = ?').run(JSON.stringify(synced), t.seq)
+  }
+
+  // People onto an issue; who GitHub wouldn't take (no such user, or no access to the repository).
+  async function assign(gh, issue, logins) {
+    const ids = []
+    for (const l of logins) { const id = await userIdOf(gh, l); if (id) ids.push(id) }
+    const after = ids.length ? new Set((await gh.addAssignees(issue, ids)).map(l => l.toLowerCase())) : new Set()
+    const refused = logins.filter(l => !after.has(l))
+    if (refused.length) log(`GitHub wouldn't assign ${refused.join(', ')}: they need access to the repository`)
+    return refused
   }
 
   async function labelIdsThere(gh, c, repoLabels, names) {
@@ -723,9 +763,15 @@ export function createGithubSync(ctx) {
     if (!t || linkOf(t.seq)) return
     const parentIssue = t.parent_seq ? linkOf(t.parent_seq)?.issue_id ?? null : null
     const now = ours(t, parentIssue)
-    const issue = await gh.createIssue({ repositoryId: c.repo_id, title: now.title, body: now.body, labelIds: await labelIdsThere(gh, c, repoLabels, now.labels), parentIssueId: parentIssue ?? undefined })
+    const want = split(now.people)
+    const ids = []
+    for (const l of want) { const id = await userIdOf(gh, l); if (id) ids.push(id) }
+    const issue = await gh.createIssue({ repositoryId: c.repo_id, title: now.title, body: now.body, labelIds: await labelIdsThere(gh, c, repoLabels, now.labels), parentIssueId: parentIssue ?? undefined, assigneeIds: ids })
     // (Linked at once, before it is in the project: a failure from here on is put right on the next sync, never made twice.)
-    const synced = { ...now, status: null, agent: null, type: null, closed: 'OPEN' }
+    const got = new Set(issue.assignees.map(l => l.toLowerCase()))
+    const refused = want.filter(l => !got.has(l))
+    const synced = { ...now, status: null, agent: null, type: null, closed: 'OPEN', people: want.filter(l => got.has(l)).join('\n'), ...(refused.length ? { refused } : {}) }
+    if (refused.length) log(`GitHub wouldn't assign ${refused.join(', ')} to ${c.repo}#${issue.number}: they need access to the repository`)
     db.prepare('INSERT INTO task_github (task_seq, board_id, item_id, issue_id, number, repo, url, synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(t.seq, c.board_id, `pending:${issue.id}`, issue.id, issue.number, c.repo, issue.url, JSON.stringify(synced))
     const itemId = await gh.addItem(project.id, issue.id)
