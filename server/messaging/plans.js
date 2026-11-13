@@ -41,6 +41,12 @@ export function createPlans(platform, { sessions }) {
       if (who && !NAME_RE.test(who)) throw bad(`${where}'s who must be a session's name`)
       return { title, state: t.state, ...(who ? { who } : {}), ...(t.ref ? { ref: short(t.ref, MAX_REF, `${where}'s ref`) } : {}), ...(t.note ? { note: short(t.note, MAX_NOTE, `${where}'s note`) } : {}) }
     })
+    // (Since when each task has been under way: kept while it stays so, under
+    // the same title and person, so the dashboard can say how long it has taken.)
+    const before = JSON.parse(db.prepare('SELECT tasks FROM plans WHERE coordinator = ?').get(name)?.tasks ?? '[]')
+    const key = t => `${t.who ?? ''}\u0000${t.title}`
+    const was = new Map(before.filter(t => t.state === 'doing' && t.since).map(t => [key(t), t.since]))
+    for (const t of tasks) if (t.state === 'doing') t.since = was.get(key(t)) ?? now()
     const title = short(p.title, MAX_TITLE, 'title') || null
     if (!allow('plan', name, PER_HOUR, 3600_000)) throw new ApiError(429, `Too Many Requests: at most ${PER_HOUR} changes an hour: send it when a task changes, not on every step`)
     const json = JSON.stringify(tasks)

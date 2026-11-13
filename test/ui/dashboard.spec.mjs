@@ -332,6 +332,25 @@ test('the org chart: a squad shows its coordinator and its worker', async ({ pag
   await page.locator('.org-card[data-squad="coord"] .org-head').focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/#\/q\/coord$/)
+  // Its people: what its coordinator hands one shows on its card as what it is on,
+  // with a light down to it; pressing an agent opens it (its terminal, where it has one).
+  await page.goto(`${server.url}/?company=default#/org`)
+  const worker = page.locator('.org-card[data-squad="coord"] .org-agent[data-orgopen="worker1"]')
+  await expect(worker.locator('.oa-st')).toBeVisible()
+  await coord.send('worker1', 'Round the cart total to two decimals')
+  await expect(worker.locator('.oa-task')).toContainText('Round the cart total to two decimals')
+  await expect(worker.locator('.oa-clock')).toHaveText(/^\d+:\d\d$/)
+  // A task of its own in its coordinator's plan goes first, its clock kept while it stays under way.
+  const plan = { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'doing', who: 'worker1', ref: 'GH-7' }] }
+  await coord.call('setPlan', plan)
+  await expect(worker.locator('.oa-task')).toContainText('GH-7')
+  await expect(worker.locator('.oa-task')).toContainText('Round the total')
+  await page.waitForTimeout(2100)
+  await coord.call('setPlan', plan)
+  await expect(worker.locator('.oa-clock')).toHaveText(/^0:0[2-9]$/)
+  await coord.call('setPlan', { tasks: [] })
+  await worker.click({ position: { x: 120, y: 80 } })
+  await expect(page).toHaveURL(/#\/s\/worker1$/)
 })
 
 test('a chat: it shows the history, and a new message without reloading', async ({ page }) => {

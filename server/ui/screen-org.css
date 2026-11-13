@@ -1,0 +1,113 @@
+/* The org chart: each team a grey tray around its people, its coordinator's
+   card first and wider, its workers' cards in rows below it, the first row
+   joined to it by lines; what each one is on, how long, and how full its
+   context is. (Over the older rules in styles.css.) */
+
+.org-card {
+  width: max-content; padding: 6px; border: 0; border-radius: 24px;
+  background: var(--tray); box-shadow: 0 0 0 1px var(--line), 0 10px 30px -18px rgba(0, 0, 0, .25);
+}
+.org-card.drop { outline: 2px solid var(--coord); outline-offset: 3px; }
+
+/* Its header: what the team is, how many work or wait on you, its menu. */
+.org-head {
+  height: 56px; display: flex; align-items: center; gap: 10px; padding: 0 6px 0 10px;
+  border: 0; border-radius: 18px 18px 0 0; background: none;
+}
+.org-tic { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--panel); box-shadow: var(--shadow-card); color: var(--coord); }
+.org-tic .ic { width: 15px; height: 15px; }
+.org-tt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.org-title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.01em; flex: none; }
+.org-goal { height: auto; padding: 0; font-size: var(--fs-sm); line-height: 1.3; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.org-counts { display: flex; gap: 10px; flex: none; font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; }
+.org-counts .work { color: var(--info); font-weight: 500; }
+.org-counts .need { color: var(--warn); font-weight: 500; }
+.org-head .org-more { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; }
+.org-handle { top: 21px; }
+
+/* Its people, on a lighter ground inside the tray. */
+.org-crew {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  padding: 14px; border-radius: 18px; background: color-mix(in srgb, var(--panel) 45%, var(--tray));
+}
+.org-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; width: var(--crew); }
+.oa-wires { display: block; flex: none; overflow: visible; }
+.oa-wires path { fill: none; stroke: var(--line-2); stroke-width: 1.5; }
+.oa-wires .run { stroke: var(--info); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 28 600; animation: oa-run 1.1s cubic-bezier(.4, 0, .2, 1) both; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--info) 70%, transparent)); }
+@keyframes oa-run { from { stroke-dashoffset: 28; } to { stroke-dashoffset: -320; } }
+.oa-wires circle { fill: var(--panel); stroke: var(--line-2); stroke-width: 1.5; }
+.org-fold { width: auto; height: 32px; margin-top: 10px; padding: 0 12px; border-radius: var(--r); text-align: center; }
+.org-fold:hover { background: var(--raised); color: var(--text); }
+.org-add {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: var(--crew); max-width: 100%; height: 40px; margin-top: 12px;
+  border: 1.5px dashed var(--line-2); border-radius: 14px; background: none; color: var(--muted); font: 500 var(--fs-md)/1 var(--sans); cursor: pointer;
+  transition: color var(--t-fast) ease, border-color var(--t-fast) ease, background-color var(--t-fast) ease;
+}
+.org-add:hover { color: var(--text); border-color: var(--muted); background: var(--panel); }
+.org-add .ic { width: 14px; height: 14px; }
+
+/* An agent: a white card; pressed, its terminal. The coordinator's is wider and ringed. */
+.org-agent {
+  position: relative; width: 232px; height: auto; display: flex; flex-direction: column; align-items: stretch; gap: 7px; text-align: left;
+  padding: 12px 10px 11px 12px; border-radius: 16px; background: var(--panel); box-shadow: var(--shadow-card);
+  font-size: var(--fs-md); cursor: pointer; transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease);
+}
+.org-agent:hover, .org-agent:focus-visible { background: var(--panel); box-shadow: var(--shadow-card-hover); }
+.org-agent:active { transform: scale(.985); }
+.org-agent:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.org-agent.coord { width: 300px; padding: 14px 10px 12px 14px; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--coord) 55%, var(--line)), 0 8px 24px -14px color-mix(in srgb, var(--coord) 60%, transparent); }
+.org-agent.coord:hover { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--coord) 75%, var(--line)), 0 10px 26px -12px color-mix(in srgb, var(--coord) 60%, transparent); }
+.org-agent.got { animation: oa-got 1.8s ease-out; }
+@keyframes oa-got { 30%, 60% { box-shadow: 0 0 0 1.5px var(--info), 0 0 0 6px color-mix(in srgb, var(--info) 16%, transparent); } }
+.org-agent.worker { padding-left: 12px; }
+
+.oa-h { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.oa-av { position: relative; flex: none; }
+.oa-av .agent { width: 30px; height: 30px; border-radius: 9px; font-size: 12px; }
+.oa-rl { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 6px; background: var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.oa-rl .role { width: 11px; height: 11px; }
+.oa-who { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.oa-nm { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.oa-nm b { font: 600 13.5px/1.3 var(--mono); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org-agent.coord .oa-nm b { font-size: 14.5px; }
+.oa-model { color: var(--muted); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oa-lead { width: max-content; margin-top: 4px; height: 18px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: 6px; background: color-mix(in srgb, var(--coord) 12%, var(--panel)); color: var(--coord); font-size: var(--fs-xs); font-weight: 600; }
+.oa-st { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 21px; padding: 0 7px; border-radius: 7px; background: var(--tray); color: var(--muted); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+.oa-st.work { background: var(--info-soft); color: var(--info); }
+.oa-st.need { background: var(--warn-soft); color: var(--warn); }
+.oa-st.off { background: transparent; box-shadow: 0 0 0 1px var(--line); color: var(--faint); }
+.oa-spin { width: 9px; height: 9px; border-radius: 50%; border: 1.6px solid currentColor; border-right-color: transparent; animation: oa-spin .9s linear infinite; }
+@keyframes oa-spin { to { transform: rotate(1turn); } }
+.oa-pd { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.oa-st.off .oa-pd { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.oa-h .org-more { width: 24px; height: 24px; margin: -2px -2px 0 0; display: grid; place-items: center; padding: 0; opacity: .6; }
+.org-agent:hover .oa-h .org-more, .oa-h .org-more:focus-visible { opacity: 1; }
+
+/* What it is on, and how long: its plan task, else what it was last handed. */
+.oa-task { display: flex; align-items: baseline; gap: 6px; min-width: 0; color: var(--text); font-weight: 500; }
+.oa-task.none { color: var(--faint); font-weight: 400; }
+.oa-tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oa-ref { flex: none; padding: 0 5px; border-radius: 5px; background: var(--tray); color: var(--muted); font: 500 11px/18px var(--mono); }
+.oa-from { flex: none; color: var(--muted); font: 500 12px var(--mono); }
+.oa-clock { flex: none; color: var(--muted); font: 500 var(--fs-sm)/1 var(--sans); font-variant-numeric: tabular-nums; }
+.oa-now { color: var(--muted); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oa-ctx { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.oa-bar { flex: 1; height: 4px; border-radius: 4px; background: var(--tray); overflow: hidden; }
+.oa-bar i { display: block; height: 100%; border-radius: 4px; background: var(--info); }
+.oa-bar i.warm { background: var(--warn); }
+.oa-bar i.hot { background: var(--err); }
+
+/* Agents with no team (or on their own): as they were, in a quiet list. */
+.org-extra { border-radius: 18px; border: 1.5px dashed var(--line-2); background: none; padding: 8px; display: flex; flex-direction: column; gap: 8px; width: auto; }
+.org-extra .org-agent { width: 232px; }
+
+@media (prefers-reduced-motion: reduce) { .oa-wires .run, .org-agent.got, .oa-spin { animation: none; } }
+
+@media (max-width: 900px) {
+  .org-card { width: auto; }
+  .org-crew { align-items: stretch; }
+  .org-row { width: auto; flex-direction: column; }
+  .org-agent, .org-agent.coord, .org-add { width: auto; }
+  .oa-wires { display: none; }
+  .org-row { margin-top: 12px; padding-left: 14px; border-left: 2px solid var(--line-2); }
+}

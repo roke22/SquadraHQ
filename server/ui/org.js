@@ -19,10 +19,12 @@ import { icon } from './icons.js'
 // squads and agents are added, described, moved, linked, closed and
 // deleted, through the same actions as everywhere else in the dashboard.
 
-const ORG_W = 280, ORG_GAP_X = 90, ORG_GAP_Y = 40, ORG_PAD = 32, ORG_FOLD = 6
-
-// (Fixed heights, as in the CSS: cards are laid out and linked without measuring them.)
-const ORG_H = { head: 44, goal: 36, row: 32, fold: 28, foot: 42 }
+const ORG_GAP_X = 72, ORG_GAP_Y = 48, ORG_PAD = 32, ORG_FOLD = 6
+// A team: a tray around its coordinator's card, and its workers' cards in
+// rows below it (three a row), the first row joined to it by lines.
+const CARD_W = 232, LEAD_W = 300, CARD_GAP = 14, PER_ROW = 3, CREW_PAD = 14, TRAY = 6, HEAD_H = 56
+// (Each team's size as last drawn: where the next one goes, and the lines between teams.)
+const orgSize = new Map()
 export let orgZoom = (() => { const z = Number(store.get(companyPref('pishaOrgZoom'))); return z >= 0.4 && z <= 1.6 ? z : 1 })()
 let orgDrag = null                       // a card or a new link being dragged
 let orgPos = new Map()                   // coordinator -> {x, y, h}, as drawn
@@ -54,10 +56,14 @@ export function orgSquads() {
   }
 }
 
-function orgCardHeight(q) {
-  const shown = orgOpen.has(q.coord.name) ? q.workers.length : Math.min(q.workers.length, ORG_FOLD)
-  return 2 + ORG_H.head + (state.squadMeta.get(q.coord.name)?.goal ? ORG_H.goal : 0) + ORG_H.row * (1 + shown) +
-    (q.workers.length > ORG_FOLD ? ORG_H.fold : 0) + ORG_H.foot
+const shownOf = q => (orgOpen.has(q.coord.name) ? q.workers : q.workers.slice(0, ORG_FOLD))
+// How wide its people are, inside the tray; the team's width and (until drawn) height.
+const rowWidth = n => (n ? n * CARD_W + (n - 1) * CARD_GAP : 0)
+const crewWidth = q => Math.max(LEAD_W, rowWidth(Math.min(PER_ROW, shownOf(q).length)))
+function orgCardSize(q) {
+  const seen = orgSize.get(q.coord.name)
+  const n = shownOf(q).length
+  return seen ?? { w: crewWidth(q) + 2 * (CREW_PAD + TRAY), h: HEAD_H + 2 * CREW_PAD + 150 + (n ? 34 + Math.ceil(n / PER_ROW) * (160 + CARD_GAP) : 0) + 60 }
 }
 
 // Where each card goes: where it was put, or, for a new squad, the lowest
@@ -67,23 +73,21 @@ function orgLayout(squads, { arrange = false } = {}) {
   const loose = []
   for (const q of squads) {
     const m = state.squadMeta.get(q.coord.name)
-    if (!arrange && Number.isFinite(m?.x) && Number.isFinite(m?.y)) pos.set(q.coord.name, { x: m.x, y: m.y, h: orgCardHeight(q) })
+    if (!arrange && Number.isFinite(m?.x) && Number.isFinite(m?.y)) pos.set(q.coord.name, { x: m.x, y: m.y, ...orgCardSize(q) })
     else loose.push(q)
   }
   if (loose.length) {
+    // (Side by side from the left, a row at a time, below the ones already placed.)
     const width = ($('org').clientWidth || 1200) / orgZoom
-    const cols = Math.max(1, Math.floor((width - ORG_PAD) / (ORG_W + ORG_GAP_X)))
-    const bottoms = Array.from({ length: cols }, (_, i) => {
-      const x0 = ORG_PAD + i * (ORG_W + ORG_GAP_X)
-      let b = ORG_PAD
-      for (const p of pos.values()) if (p.x < x0 + ORG_W && p.x + ORG_W > x0) b = Math.max(b, p.y + p.h + ORG_GAP_Y)
-      return b
-    })
+    let y = ORG_PAD
+    for (const p of pos.values()) y = Math.max(y, p.y + p.h + ORG_GAP_Y)
+    let x = ORG_PAD, shelf = 0
     for (const q of loose) {
-      const i = bottoms.indexOf(Math.min(...bottoms))
-      const p = { x: ORG_PAD + i * (ORG_W + ORG_GAP_X), y: bottoms[i], h: orgCardHeight(q), auto: true }
-      bottoms[i] = p.y + p.h + ORG_GAP_Y
-      pos.set(q.coord.name, p)
+      const size = orgCardSize(q)
+      if (x > ORG_PAD && x + size.w > width - ORG_PAD) { x = ORG_PAD; y += shelf + ORG_GAP_Y; shelf = 0 }
+      pos.set(q.coord.name, { x, y, ...size, auto: true })
+      x += size.w + ORG_GAP_X
+      shelf = Math.max(shelf, size.h)
     }
   }
   return pos
@@ -92,11 +96,11 @@ function orgLayout(squads, { arrange = false } = {}) {
 // A link's line, between the two cards' sides (or top and bottom, when one
 // is above the other), and the middle point for its label.
 function orgLinkPath(p, q) {
-  const pc = p.x + ORG_W / 2, qc = q.x + ORG_W / 2
-  if (Math.abs(pc - qc) >= ORG_W + 20) {
+  const pc = p.x + p.w / 2, qc = q.x + q.w / 2
+  if (Math.abs(pc - qc) >= (p.w + q.w) / 2 + 20) {
     const right = qc > pc
-    const x1 = right ? p.x + ORG_W : p.x, x2 = right ? q.x : q.x + ORG_W
-    const y1 = p.y + ORG_H.head / 2, y2 = q.y + ORG_H.head / 2
+    const x1 = right ? p.x + p.w : p.x, x2 = right ? q.x : q.x + q.w
+    const y1 = p.y + HEAD_H / 2, y2 = q.y + HEAD_H / 2
     const d = Math.max(40, Math.abs(x2 - x1) / 2) * (right ? 1 : -1)
     return { d: `M${x1} ${y1} C${x1 + d} ${y1} ${x2 - d} ${y2} ${x2} ${y2}`, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 }
   }
@@ -120,39 +124,119 @@ function orgLinesHtml() {
   return { paths, labels }
 }
 
+// What an agent is on: its task in its coordinator's plan (since when), else
+// the last thing its coordinator handed it, else, for a coordinator, its plan.
+const handed = new Map() // worker -> { from, text, at }: the last message its coordinator sent it
+const flashes = new Map() // worker -> when something was just handed to it (a light runs to it)
+export function noteHandoff(m) {
+  if (m.system || !m.from || !m.target || !m.text) return
+  const w = sessions.get(m.target)
+  if (!w || orgCoordOf(w) !== m.from) return
+  handed.set(m.target, { from: m.from, text: m.text, at: m.created_at ?? now() })
+  flashes.set(m.target, now())
+  if (currentRoute().view !== 'org') return
+  soon(renderOrg)
+  setTimeout(() => { flashes.delete(m.target); if (currentRoute().view === 'org') soon(renderOrg) }, 2200)
+}
+function taskOf(s, kind) {
+  const coord = kind === 'coord' ? s.name : orgCoordOf(s)
+  const plan = coord ? state.plans.get(coord) : null
+  const t = plan?.tasks.find(x => x.who === s.name && x.state === 'doing')
+  if (t) return { title: t.title, ref: t.ref, since: t.since }
+  const h = handed.get(s.name)
+  if (h) return { title: h.text.replace(/\s+/g, ' '), from: h.from, since: h.at }
+  if (kind === 'coord' && plan?.title) return { title: plan.title }
+  return null
+}
+// Its state, as a pill: at work, waiting on you, idle, away.
+function stateOf(s) {
+  const a = s.activity ?? {}
+  if (!s.online) return { cls: 'off', label: T.orgSt.off }
+  if (status(s).waiting) return { cls: 'need', label: T.orgSt.need }
+  if (['tool', 'working', 'compacting'].includes(a.state)) return { cls: 'work', label: T.orgSt.work }
+  return { cls: '', label: T.orgSt.idle }
+}
+// "claude-opus-5-5" as "Claude Opus 5.5"; other models as they come.
+const modelName = m => (/^claude-/.test(m ?? '') ? m.replace(/^claude-([a-z]+)-(\d+)-(\d+).*$/, (_, f, a, b) => `Claude ${f[0].toUpperCase()}${f.slice(1)} ${a}.${b}`) : m ?? '')
+const kTokens = n => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
+const clockHtml = since => (since ? `<time class="oa-clock" data-since="${Number(since)}"></time>` : '')
+
 function orgAgent(s, kind) {
-  const pct = s.activity?.context_pct
-  const persona = personaOf(s)
-  return `<div class="org-agent ${kind}" data-orgtip="agent:${esc(s.name)}" tabindex="0">
-      <span class="role ${kind === 'coord' ? 'coord' : 'worker'}" aria-hidden="true"></span>${agentMark(s)}<span class="n">${esc(s.name)}</span><span class="dot ${status(s).dot || 'off'}" title="${esc(status(s).text)}" aria-hidden="true"></span>${persona ? `<span class="org-persona">${esc(persona)}</span>` : ''}
-      <span class="org-ctx">${Number.isFinite(pct) ? `<span class="ctx ${pct >= 80 ? 'hot' : pct >= 60 ? 'warm' : ''}">${Math.round(pct)}%</span>` : ''}</span>
-      <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}" aria-haspopup="menu">${icon('more')}</button></div>`
+  const a = s.activity ?? {}
+  const st = stateOf(s)
+  const pct = a.context_pct
+  const window = a.context_window ?? (Number.isFinite(pct) && pct > 0 && a.context_tokens ? Math.round(a.context_tokens * 100 / pct) : null)
+  const task = taskOf(s, kind)
+  const model = [modelName(a.model), personaOf(s)].filter(Boolean).join(' · ')
+  const flash = flashes.has(s.name) && now() - flashes.get(s.name) < 2200
+  return `<div class="org-agent ${kind}${flash ? ' got' : ''}" data-orgtip="agent:${esc(s.name)}" data-orgopen="${esc(s.name)}" tabindex="0">
+      <div class="oa-h"><span class="oa-av">${agentMark(s)}<span class="oa-rl"><span class="role ${kind === 'coord' ? 'coord' : 'worker'}" aria-hidden="true"></span></span></span>
+        <span class="oa-who"><span class="oa-nm"><b>${esc(s.name)}</b><span class="oa-st ${st.cls}">${st.cls === 'work' ? '<span class="oa-spin" aria-hidden="true"></span>' : st.cls ? '<span class="oa-pd" aria-hidden="true"></span>' : ''}${esc(st.label)}</span></span>
+          ${model ? `<span class="oa-model">${esc(model)}</span>` : ''}${kind === 'coord' ? `<span class="oa-lead">${esc(T.roleName.coordinator)}</span>` : ''}</span>
+        <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}" aria-haspopup="menu">${icon('more')}</button></div>
+      <div class="oa-task${task ? '' : ' none'}" title="${esc(task?.title ?? '')}">${task?.from ? `<span class="oa-from">↳ ${esc(task.from)}</span>` : ''}${task?.ref ? `<span class="oa-ref">${esc(task.ref)}</span>` : ''}<span class="oa-tt">${esc(task?.title ?? T.orgNoTask)}</span>${clockHtml(task?.since)}</div>
+      <div class="oa-now">${esc(status(s).text)}</div>
+      ${Number.isFinite(pct) ? `<div class="oa-ctx" title="${esc(T.contextPct(Math.round(pct)))}"><span class="oa-bar"><i class="${pct >= 95 ? 'hot' : pct >= 80 ? 'warm' : ''}" style="width:${Math.max(2, Math.min(100, pct))}%"></i></span>${a.context_tokens && window ? `${kTokens(a.context_tokens)} / ${kTokens(window)}` : `${Math.round(pct)}%`}</div>` : ''}
+    </div>`
+}
+// The lines from a coordinator down to its first row of workers (one lit while something is handed to it).
+function orgWires(q) {
+  const first = shownOf(q).slice(0, PER_ROW)
+  if (!first.length) return ''
+  const inner = crewWidth(q), mid = inner / 2, start = (inner - rowWidth(first.length)) / 2
+  const paths = first.map((w, i) => {
+    const x = start + i * (CARD_W + CARD_GAP) + CARD_W / 2
+    const d = Math.abs(x - mid) < 1 ? `M${mid} 0 V34` : `M${mid} 0 V14 Q${mid} 18 ${mid + Math.sign(x - mid) * 4} 18 H${x - Math.sign(x - mid) * 4} Q${x} 18 ${x} 22 V34`
+    return `<path d="${d}"/>${flashes.has(w.name) ? `<path class="run" d="${d}"/>` : ''}`
+  }).join('')
+  return `<svg class="oa-wires" width="${inner}" height="34" viewBox="0 0 ${inner} 34" aria-hidden="true">${paths}<circle cx="${mid}" cy="1.5" r="3"/></svg>`
 }
 function orgCard(q, p) {
   const c = q.coord, m = state.squadMeta.get(c.name) ?? {}
-  const shown = orgOpen.has(c.name) ? q.workers : q.workers.slice(0, ORG_FOLD)
+  const shown = shownOf(q)
+  const all = [c, ...q.workers]
+  const working = all.filter(x => stateOf(x).cls === 'work').length, waiting = all.filter(x => stateOf(x).cls === 'need').length
   const on = q.workers.filter(w => w.online).length
   return `<div class="org-card" data-squad="${esc(c.name)}" style="left:${p.x}px;top:${p.y}px">
-      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-title">${esc(m.title || c.name)}</span>${c.online && !on ? `<span class="org-self role worker" role="img" title="${esc(T.orgSelfWorking)}" aria-label="${esc(T.orgSelfWorking)}"></span>` : ''}<span class="org-count" title="${esc(T.squadCount(on, q.workers.length))}">${on}/${q.workers.length}</span><button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}" aria-haspopup="menu">${icon('more')}</button></div>
-      ${m.goal ? `<div class="org-goal">${esc(m.goal)}</div>` : ''}
-      ${orgAgent(c, 'coord')}${shown.map(w => orgAgent(w, 'worker')).join('')}
-      ${q.workers.length > ORG_FOLD ? `<button class="org-fold" data-orgfold="${esc(c.name)}">${orgOpen.has(c.name) ? T.orgLess : T.orgMore(q.workers.length - shown.length)}</button>` : ''}
-      ${can('operator') ? `<div class="org-foot"><button class="btn" data-orgact="addagent" data-name="${esc(c.name)}">${T.orgAddAgent}</button></div>` : ''}
+      <div class="org-head" data-orgtip="squad:${esc(c.name)}" tabindex="0"><span class="org-tic">${icon('teams')}</span>
+        <span class="org-tt"><span class="org-title">${esc(m.title || c.name)}</span>${m.goal ? `<span class="org-goal">${esc(m.goal)}</span>` : ''}</span>
+        <span class="org-counts" title="${esc(T.squadCount(on, q.workers.length))}">${working ? `<span class="work">${esc(T.orgWorkingN(working))}</span>` : ''}${waiting ? `<span class="need">${esc(T.orgWaitingN(waiting))}</span>` : ''}<span>${esc(T.orgAgentsN(all.length))}</span></span>
+        <button class="org-more" data-orgmenu="squad" data-name="${esc(c.name)}" aria-label="${esc(T.orgSquadMenu(c.name))}" aria-haspopup="menu">${icon('more')}</button></div>
+      <div class="org-crew" style="--crew:${crewWidth(q)}px">
+        ${orgAgent(c, 'coord')}
+        ${orgWires(q)}
+        ${shown.length ? `<div class="org-row">${shown.map(w => orgAgent(w, 'worker')).join('')}</div>` : ''}
+        ${q.workers.length > ORG_FOLD ? `<button class="org-fold" data-orgfold="${esc(c.name)}">${orgOpen.has(c.name) ? T.orgLess : T.orgMore(q.workers.length - shown.length)}</button>` : ''}
+        ${can('operator') ? `<button class="org-add" data-orgact="addagent" data-name="${esc(c.name)}">${icon('plus')} ${T.orgAddAgent}</button>` : ''}
+      </div>
       ${can('manager') ? `<span class="org-handle" data-orghandle="${esc(c.name)}" title="${esc(T.orgLinkHandle)}"></span>` : ''}</div>`
 }
 
-export function renderOrg() {
+// After a draw: each team's real size (for the next layout and the lines between them), and the clocks.
+function measureOrg() {
+  let changed = false
+  for (const el of $('org').querySelectorAll('.org-card[data-squad]')) {
+    const name = el.dataset.squad, size = { w: el.offsetWidth, h: el.offsetHeight }
+    const was = orgSize.get(name)
+    if (!was || was.w !== size.w || was.h !== size.h) { orgSize.set(name, size); changed = true }
+    const p = orgPos.get(name)
+    if (p) Object.assign(p, size)
+  }
+  if (changed && $('org').querySelector('.org-lines')) drawOrgLines()
+  tickOrg()
+  return changed
+}
+const orgClock = ms => { const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60; return t >= 86400 ? `${Math.floor(t / 86400)} d` : h ? `${h}:${String(m).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}` : `${m}:${String(t % 60).padStart(2, '0')}` }
+function tickOrg() { for (const el of $('org').querySelectorAll('[data-since]')) el.textContent = orgClock(now() - Number(el.dataset.since)) }
+setInterval(() => { if (!$('org').hidden && currentRoute().view === 'org') tickOrg() }, 1000)
+
+export function renderOrg(settling = false) {
   if (orgDrag) return // (drawn again when the drag ends)
   const { squads, orphans, solos } = orgSquads()
   orgPos = orgLayout(squads)
-  // New squads stay where they were first put.
   const fresh = squads.filter(q => orgPos.get(q.coord.name).auto && !orgSaved.has(q.coord.name))
-  if (fresh.length) {
-    for (const q of fresh) orgSaved.add(q.coord.name)
-    if (can('manager')) postJson('/api/org/positions', { positions: fresh.map(q => ({ coordinator: q.coord.name, x: orgPos.get(q.coord.name).x, y: orgPos.get(q.coord.name).y })) }).catch(() => {})
-  }
   let w = 0, h = 0
-  for (const p of orgPos.values()) { w = Math.max(w, p.x + ORG_W); h = Math.max(h, p.y + p.h) }
+  for (const p of orgPos.values()) { w = Math.max(w, p.x + p.w); h = Math.max(h, p.y + p.h) }
   w += ORG_PAD + 240; h += ORG_PAD + 160 // (room to drag a card further)
   const { paths, labels } = orgLinesHtml()
   const extra = [[T.noCoordinator, orphans], [T.standalone, solos]].filter(([, l]) => l.length)
@@ -165,6 +249,13 @@ export function renderOrg() {
           <div class="org-labels">${labels}</div>
         </div>
       </div>${extra ? `<div class="org-extras">${extra}</div>` : ''}`)
+  const resized = measureOrg()
+  // New squads: placed again once their real size is known, then they stay where they were put.
+  if (fresh.length && resized && settling !== true) return renderOrg(true)
+  if (fresh.length) {
+    for (const q of fresh) orgSaved.add(q.coord.name)
+    if (can('manager')) postJson('/api/org/positions', { positions: fresh.map(q => ({ coordinator: q.coord.name, x: orgPos.get(q.coord.name).x, y: orgPos.get(q.coord.name).y })) }).catch(() => {})
+  }
   if (orgTipKey) {
     const el = $('org').querySelector(`[data-orgtip="${CSS.escape(orgTipKey)}"]`)
     if (el) showOrgTip(el); else hideOrgTip()
@@ -282,7 +373,7 @@ addEventListener('pointermove', e => {
   const p = orgPos.get(orgDrag.from)
   if (!p) return
   const to = stagePoint(e)
-  const x1 = p.x + ORG_W, y1 = p.y + ORG_H.head / 2
+  const x1 = p.x + p.w, y1 = p.y + HEAD_H / 2
   $('org').querySelector('.org-lines .tmp')?.setAttribute('d', `M${x1} ${y1} C${x1 + 60} ${y1} ${to.x - 60} ${to.y} ${to.x} ${to.y}`)
   const over = document.elementFromPoint(e.clientX, e.clientY)?.closest('.org-card')
   $('org').querySelectorAll('.org-card.drop').forEach(x => { if (x !== over) x.classList.remove('drop') })
@@ -327,12 +418,19 @@ $('org').addEventListener('click', e => {
 $('org').addEventListener('keydown', e => {
   const head = e.target.closest?.('.org-head')
   if (head && e.target === head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSquad(head.closest('.org-card').dataset.squad) }
+  const agent = e.target.closest?.('[data-orgopen]')
+  if (agent && e.target === agent && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openAgent(agent.dataset.orgopen) }
 })
 // A team's page: what its header leads to, here as in the list.
 const openSquad = name => { location.hash = `#/q/${encodeURIComponent(name)}` }
-$('org').addEventListener('dblclick', e => {
-  const a = e.target.closest('.org-agent')
-  if (a && !e.target.closest('button')) location.hash = `#/s/${encodeURIComponent(a.dataset.orgtip.slice(6))}`
+// An agent pressed: its terminal, where it runs (else its session).
+function openAgent(name) {
+  const where = terminalOf(name)
+  location.hash = where?.host?.online && can('operator') ? `#/t/${encodeURIComponent(where.host.id)}/${encodeURIComponent(name)}` : `#/s/${encodeURIComponent(name)}`
+}
+$('org').addEventListener('click', e => {
+  const a = e.target.closest('[data-orgopen]')
+  if (a && !e.target.closest('button')) openAgent(a.dataset.orgopen)
 })
 
 // (The top bar's buttons too.)
