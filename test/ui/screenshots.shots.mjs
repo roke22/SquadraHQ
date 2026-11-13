@@ -112,11 +112,10 @@ const SHOTS = [
   // name, address, what to wait for, phone?
   ['inbox', '#/inbox/i1', '.ibx-opts'],
   ['inbox-list', '#/inbox', '.ibx-item'],
-  ['inbox-running', '#/inbox/running', '.ibx-item'],
   ['teams', '#/teams', '.tm-card'],
   ['team', '#/q/coord-dev', '.pl-table'],
   ['session', '#/s/web/chat', '.sv-aside .sv-member'],
-  ['terminal', '#/s/web', '.tv-aside .tl-item'],
+  ['timeline', '#/s/web', '.tv-aside .tl-item'], // (the terminal with its timeline beside it: the website shows it)
   ['machines', '#/hosts', '.mc-table'],
   ['org-chart', '#/org', '.org-card'],
   ['live', '#/q/coord-dev/live', '.pane'],
