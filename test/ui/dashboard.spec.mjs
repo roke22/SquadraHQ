@@ -360,6 +360,12 @@ test('the inbox: what a coordinator left is there, with what it wrote kept as te
   // Nothing is open until one is picked: the list has the page.
   await expect(box.locator('.ibx-item').first()).toContainText('Migrate the <b>column</b>?')
   await expect(box.locator('.ibx-detail')).toBeHidden()
+  // Each says what it is, and how long it has waited, on a clock that runs.
+  const first = box.locator('.ibx-item').first()
+  await expect(first.locator('.ibx-side .tag')).toHaveText('Decision')
+  await expect(first.locator('.ibx-clock')).toHaveText(/^\d+:\d\d$/)
+  const at = await first.locator('.ibx-clock').textContent()
+  await expect(first.locator('.ibx-clock')).not.toHaveText(at, { timeout: 3000 })
   await box.locator('.ibx-item').first().click()
   await expect(box.locator('a[href="https://example.com/issues/421"]')).toBeVisible()
   // Esc closes it, and clicking it again opens it.
@@ -705,6 +711,25 @@ test('a terminal: it shows the screen, and what is typed reaches the machine', a
   await page.keyboard.type('hello')
   await expect(screen).toContainText('hello')
   expect(machine.typed.join('')).toContain('hello')
+})
+
+test('the inbox, running: who is at work now, with its clock, and it opens its session', async ({ page }) => {
+  const s = await startSession(server, 'busy1', 'worker', 'coord')
+  // (At work for over a minute, from one tool to its text to the next: the clock counts it all.)
+  const t0 = Date.now() - 65_000
+  await s.observe([
+    { kind: 'prompt', ts: t0 }, { kind: 'tool_start', id: 'b1', tool: 'Bash', ts: t0 + 1000, summary: 'npm test' },
+    { kind: 'tool_end', id: 'b1', tool: 'Bash', ts: t0 + 20_000, ok: true }, { kind: 'text', text: 'tests pass', ts: t0 + 30_000 },
+    { kind: 'tool_start', id: 'b2', tool: 'Bash', ts: Date.now() - 2000, summary: 'npm run lint' },
+  ])
+  await signIn(page, '#/inbox')
+  await expect(page.locator('#topTabs [data-ibxtab=running] .badge')).not.toHaveCount(0)
+  await page.locator('#topTabs [data-ibxtab=running]').click()
+  const row = page.locator('#inbox .ibx-item', { hasText: 'busy1' })
+  await expect(row.locator('.ibx-side .tag')).toHaveText('Working')
+  await expect(row.locator('.ibx-clock')).toHaveText(/^1:\d\d$/)
+  await row.click()
+  await expect(page).toHaveURL(/#\/s\/busy1$/)
 })
 
 test('the chat: what is opened stays open when more arrives, and text being selected is not redrawn away', async ({ page }) => {

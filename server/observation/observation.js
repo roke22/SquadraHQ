@@ -15,6 +15,7 @@ export function createObservation(platform) {
   ])
   const MAX_EVENT_JSON = 20_000
   const activity = new Map() // name -> derived state
+  const BUSY = ['working', 'tool', 'compacting'] // (at work: not idle, waiting or ended)
 
   // An event as seen by the dashboard. The plugin's own "id" (tool use id or
   // subagent id) is exposed as "ref"; "id" is always the event's row id.
@@ -69,7 +70,15 @@ export function createObservation(platform) {
 
   function applyEvent(name, ev) {
     const a = activityOf(name)
-    const set = state => { if (a.state !== state) { a.state = state; a.since = ev.ts } }
+    // (busy_since: when it set to work, kept while it goes from tool to text and
+    // back; it ends when it stops, waits on someone or ends.)
+    const set = state => {
+      if (a.state === state) return
+      const was = BUSY.includes(a.state)
+      a.state = state; a.since = ev.ts
+      if (!BUSY.includes(state)) a.busy_since = null
+      else if (!was || a.busy_since == null) a.busy_since = ev.ts
+    }
     a.last_event_at = Math.max(a.last_event_at ?? 0, ev.ts)
     if (typeof ev.cwd === 'string') a.cwd = ev.cwd
     switch (ev.kind) {

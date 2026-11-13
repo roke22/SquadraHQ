@@ -57,7 +57,14 @@ details.ibx-group > summary:hover { color: var(--text); }
 .ibx-mark.ok { background: var(--ok-soft); color: var(--ok); }
 .ibx-mark.err { background: var(--err-soft); color: var(--err); }
 .ibx-item.done .ibx-mark { background: var(--tray); color: var(--faint); }
-.ibx-item-b { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 1px; }
+.ibx-item-b { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding-top: 1px; }
+/* Its title, and on the right its state and, while it waits or works, its clock. */
+.ibx-item-top { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.ibx-item-top .ibx-item-t { flex: 1; min-width: 0; }
+.ibx-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex: none; }
+.ibx-clock { font: 500 var(--fs-sm)/1 var(--sans); font-variant-numeric: tabular-nums; color: var(--muted); }
+.ibx-live { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: ds-pulse 1.4s var(--ease) infinite; }
+.ibx-item.done .ibx-side .tag { background: transparent; box-shadow: 0 0 0 1px var(--line); }
 .ibx-item-t { font-weight: 500; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .ibx.has-pick .ibx-item-t { -webkit-line-clamp: 2; }
 .ibx-item.done .ibx-item-t { font-weight: 400; color: var(--muted); }
@@ -186,3 +193,9 @@ details.ibx-group > summary:hover { color: var(--text); }
   .voice-bar { bottom: calc(70px + env(safe-area-inset-bottom)); grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "say" "actions"; gap: 6px; }
   .voice-actions .btn { flex: 1; min-height: 44px; }
 }
+
+/* A count that changed rolls in: from below when it grew, from above when it fell. */
+.seg .badge.up { animation: ibx-roll-up var(--t-slow) var(--ease); }
+.seg .badge.down { animation: ibx-roll-down var(--t-slow) var(--ease); }
+@keyframes ibx-roll-up { from { transform: translateY(60%); opacity: 0; } }
+@keyframes ibx-roll-down { from { transform: translateY(-60%); opacity: 0; } }

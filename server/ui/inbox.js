@@ -10,6 +10,7 @@ import { currentRoute } from './router.js'
 import { replaceHash, closeTo } from './back.js'
 import { api } from './api.js'
 import { icon } from './icons.js'
+import { nowPhrase } from './doing.js'
 
 // The inbox: everything that waits on you, in one list across the page; the
 // one picked opens on the right, and closes again (✕ or Esc) to the list.
@@ -64,8 +65,8 @@ export function cantAnswer(i) {
 const permWhat = s => { const a = s.activity ?? {}; return a.tool?.name ? [a.tool.name, a.tool.summary].filter(Boolean).join(' · ') : a.waiting ?? '' }
 
 // Which tab, and where its list and its entries are.
-const tabOf = r => (r.tab === 'done' ? 'done' : 'pending')
-const listHash = (r = currentRoute()) => (tabOf(r) === 'done' ? '#/inbox/done' : '#/inbox')
+const tabOf = r => (r.tab === 'done' || r.tab === 'running' ? r.tab : 'pending')
+const listHash = (r = currentRoute()) => ({ done: '#/inbox/done', running: '#/inbox/running' }[tabOf(r)] ?? '#/inbox')
 const itemHash = (tab, key) => (tab === 'done' ? `#/inbox/done/${key}` : `#/inbox/${key}`)
 
 // What waits, in its groups. Each entry: { key, kind, ... }.
@@ -82,6 +83,23 @@ function entries() {
     { id: 'know', label: T.inboxTell, list: tells.sort(newest) },
   ]
 }
+
+// What runs now: each session at work, the longest at it first. (A session
+// waiting on you is in Pending, not here.)
+const BUSY = ['tool', 'working', 'compacting']
+function running() {
+  return sortedSessions().filter(s => s.online && BUSY.includes(s.activity?.state))
+    .map(s => ({ key: `r${s.name}`, kind: 'running', s, at: s.activity.busy_since ?? s.activity.since ?? now() }))
+    .sort((a, b) => a.at - b.at)
+}
+
+// A live clock: how long it has waited, or worked (m:ss, then h:mm:ss, then days).
+function clock(ms) {
+  const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = String(t % 60).padStart(2, '0')
+  return t >= 86400 ? T.ibxDays(Math.floor(t / 86400)) : h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
+}
+const tick = () => { for (const el of $('inbox').querySelectorAll('[data-since]')) el.textContent = clock(now() - Number(el.dataset.since)) }
+setInterval(() => { if (!$('inbox').hidden) tick() }, 1000)
 
 // What is done: the pages asked for, and what the live list brings on top of
 // them (closed meanwhile), without what has since been opened again.
@@ -143,10 +161,14 @@ function row(e, on, tab = 'pending') {
   const fresh = Date.now() - (arrived.get(e.key) ?? 0) < FRESH_MS
   let dot, title, meta
   // (Its mark: what it is, in the colour of what it needs.)
-  const mark = { perm: 'shield', approve: 'userok', ask: 'ask', tell: 'info', done: 'check' }[e.kind] ?? 'info'
-  if (e.kind === 'perm') {
+  const mark = { perm: 'shield', approve: 'userok', ask: 'ask', tell: 'info', done: 'check', running: 'spark' }[e.kind] ?? 'info'
+  if (e.kind === 'running') {
+    const a = e.s.activity ?? {}
+    dot = 'info'; title = a.state === 'tool' ? nowPhrase(a.tool) : a.state === 'compacting' ? T.compacting : T.ibxWorkingNow
+    meta = [who(e.s.name), esc(teamOf(e.s.name))]
+  } else if (e.kind === 'perm') {
     dot = 'warn'; title = T.ibxPermTitle(e.s.name, permWhat(e.s))
-    meta = [who(e.s.name), esc(T.ibxPermission), esc(teamOf(e.s.name)), esc(ago(e.at))]
+    meta = [who(e.s.name), esc(teamOf(e.s.name))]
   } else if (e.kind === 'approve') {
     dot = 'warn'; title = T.ibxApproveTitle(e.s.name)
     meta = [who(e.s.name), esc(T.approveNote)]
@@ -154,10 +176,15 @@ function row(e, on, tab = 'pending') {
     const i = e.i
     dot = e.kind === 'ask' ? 'warn' : e.kind === 'tell' ? 'info' : 'ok'
     title = i.text.replace(/\s+/g, ' ')
-    meta = [who(i.session), esc(teamOf(i.session)), i.updated_at && e.kind === 'ask' ? `<span class="ibx-upd">${esc(T.inboxUpdated(ago(i.updated_at)))}</span>` : '', esc(ago(e.at))]
+    meta = [who(i.session), esc(teamOf(i.session)), i.updated_at && e.kind === 'ask' ? `<span class="ibx-upd">${esc(T.inboxUpdated(ago(i.updated_at)))}</span>` : '', tab === 'done' ? esc(ago(e.at)) : '']
   }
-  return `<li><a href="${href}" class="ibx-item${on ? ' on' : ''}${e.kind === 'done' ? ' done' : ''}${fresh ? ' new' : ''}"${on ? ' aria-current="true"' : ''} data-key="${esc(e.key)}">`
-    + `<span class="ibx-mark ${dot}" aria-hidden="true">${icon(mark)}</span><span class="ibx-item-b"><span class="ibx-item-t">${esc(title)}</span><span class="ibx-item-m">${meta.filter(Boolean).join('<span aria-hidden="true">·</span>')}</span></span></a></li>`
+  // Its state, as a tag; and, while it waits or works, its clock.
+  const st = e.kind === 'done' ? (e.i?.answer != null ? 'answered' : e.i?.dismissed_by ? 'dismissed' : 'closed') : e.kind
+  const tone = { perm: 'warn', approve: 'warn', ask: 'warn', tell: 'info', running: 'info' }[st] ?? ''
+  const side = `<span class="ibx-side"><span class="tag ${tone}">${st === 'running' ? '<span class="ibx-live" aria-hidden="true"></span>' : ''}${esc(T.ibxTag[st] ?? '')}</span>${tab !== 'done' ? `<time class="ibx-clock" data-since="${Number(e.at)}" title="${esc(when(e.at))}"></time>` : ''}</span>`
+  const to = e.kind === 'running' ? `#/s/${encodeURIComponent(e.s.name)}` : href
+  return `<li><a href="${to}" class="ibx-item${on ? ' on' : ''}${e.kind === 'done' ? ' done' : ''}${fresh ? ' new' : ''}"${on ? ' aria-current="true"' : ''} data-key="${esc(e.key)}">`
+    + `<span class="ibx-mark ${dot}" aria-hidden="true">${icon(mark)}</span><span class="ibx-item-b"><span class="ibx-item-top"><span class="ibx-item-t">${esc(title)}</span>${side}</span><span class="ibx-item-m">${meta.filter(Boolean).join('<span aria-hidden="true">·</span>')}</span></span></a></li>`
 }
 
 // Nothing open yet on this company: the three steps to a first team.
@@ -249,9 +276,22 @@ function detail(e) {
 let hadPick = null // the key of the one open at the last draw
 
 // The two tabs, in the header: how many wait on the first.
-function tabs(tab, waiting) {
-  const a = (t, href, label, n) => `<a href="${href}"${t === tab ? ' class="on" aria-current="page"' : ''} data-ibxtab="${t}">${esc(label)}${n ? ` <span class="badge soft">${n}</span>` : ''}</a>`
-  return `<nav class="seg" aria-label="${esc(T.inbox)}">${a('pending', '#/inbox', T.ibxPending, waiting)}${a('done', '#/inbox/done', T.ibxDoneTab, 0)}</nav>`
+// (A count that changed rolls in: up when it grows, down when it shrinks.)
+const counted = new Map()
+function tabs(tab, waiting, busy) {
+  const a = (t, href, label, n) => {
+    const was = counted.get(t)
+    counted.set(t, n)
+    const roll = was != null && was !== n ? (n > was ? ' up' : ' down') : ''
+    return `<a href="${href}"${t === tab ? ' class="on" aria-current="page"' : ''} data-ibxtab="${t}">${esc(label)}${n ? ` <span class="badge soft${roll}" data-n="${n}">${n}</span>` : ''}</a>`
+  }
+  return `<nav class="seg" aria-label="${esc(T.inbox)}">${a('pending', '#/inbox', T.ibxPending, waiting)}${a('running', '#/inbox/running', T.ibxRunningTab, busy)}${a('done', '#/inbox/done', T.ibxDoneTab, 0)}</nav>`
+}
+
+// Running: who is at work now; each opens its session.
+function runningList(list) {
+  if (!list.length) return `<div class="empty">${icon('spark', 'empty-ic')}<b>${esc(T.ibxNoneRunning)}</b><span>${esc(T.ibxNoneRunningHint)}</span></div>`
+  return `<section class="ibx-group"><ul>${list.map(e => row(e, false, 'running')).join('')}</ul></section>`
 }
 
 // Pending: what needs you, then what to know (read all at once, if several).
@@ -299,7 +339,8 @@ export function renderInbox() {
   const waiting = groups[0].list.length
   if (tab === 'done' && !done.loaded && !done.loading && !done.failed) void loadDone()
   const doneList_ = tab === 'done' ? doneEntries() : []
-  const all = tab === 'done' ? doneList_ : pending
+  const busy = running()
+  const all = tab === 'done' ? doneList_ : tab === 'running' ? [] : pending
   // What arrived since the last draw of the list (not on the first).
   const keys = pending.map(e => e.key)
   if (listedKeys) for (const k of keys) if (!listedKeys.has(k) && !arrived.has(k)) arrived.set(k, Date.now())
@@ -315,17 +356,21 @@ export function renderInbox() {
   const focusKey = focus?.closest('[data-key]')?.dataset.key
   const typing = focus?.name === 'answer'
   const searching = focus?.id === 'ibxQ' ? [focus.selectionStart, focus.selectionEnd] : null
-  const list = tab === 'done' ? doneList(doneList_, picked) : pendingList(groups, picked)
+  const list = tab === 'done' ? doneList(doneList_, picked) : tab === 'running' ? runningList(busy) : pendingList(groups, picked)
   const fresh = tab === 'pending' && !pending.length && !sortedSessions().length
   const caughtUp = tab === 'pending' && !pending.length
   const pick = !!picked
+  // (Where each row was: after the draw, a row that moved glides to its new place.)
+  const was = new Map([...$('inbox').querySelectorAll('.ibx-item[data-key]')].map(el => [el.dataset.key, el.getBoundingClientRect().top]))
   setHtml($('inbox'), `<div class="ibx${pick ? ' has-pick' : ''}${fresh ? ' fresh' : ''}${caughtUp && !fresh ? ' none' : ''}" data-tab="${tab}">
       <nav class="ibx-list" aria-label="${esc(T.inbox)}"><div class="ibx-col">${tab === 'pending' ? (caughtUp && !fresh ? '' : list || `<p class="ibx-none">${esc(T.ibxNothingListed)}</p>`) : list}</div></nav>
-      <section class="ibx-detail${pick && !hadPick ? ' enter' : ''}" aria-live="polite">${tab === 'done' && !picked ? doneHint() : detail(picked)}</section>
+      <section class="ibx-detail${pick && !hadPick ? ' enter' : ''}" aria-live="polite">${tab === 'done' && !picked ? doneHint() : tab === 'running' ? '' : detail(picked)}</section>
     </div>`)
+  tick()
+  glide(was)
   const closed = !pick && hadPick
   hadPick = picked?.key ?? null
-  setHtml($('topTabs'), tabs(tab, pending.length))
+  setHtml($('topTabs'), tabs(tab, pending.length, busy.length))
   $('topSub').textContent = tab === 'pending' && waiting ? T.ibxWaiting(waiting) : ''
   if (moreSeen) { moreSeen.disconnect(); const m = $('inbox').querySelector('.ibx-more [data-more]'); if (m) moreSeen.observe(m) }
   // Back where the user was: the answer they were typing, the search, the row they were on.
@@ -341,6 +386,17 @@ export function renderInbox() {
   if (focusKey && !typing && !searching && document.activeElement !== focus) $('inbox').querySelector(`[data-key="${CSS.escape(focusKey)}"]`)?.focus()
   // Just closed: the keyboard goes back to its row.
   else if (closed) $('inbox').querySelector(`[data-key="${CSS.escape(closed)}"]`)?.focus({ preventScroll: true })
+}
+// Rows that moved since the last draw glide from where they were (not for who asks for no motion).
+const still = matchMedia('(prefers-reduced-motion: reduce)')
+function glide(was) {
+  if (!was.size || still.matches) return
+  for (const el of $('inbox').querySelectorAll('.ibx-item[data-key]')) {
+    const from = was.get(el.dataset.key)
+    if (from == null) continue
+    const dy = from - el.getBoundingClientRect().top
+    if (Math.abs(dy) > 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 360, easing: 'cubic-bezier(.22, 1, .36, 1)' })
+  }
 }
 // (Done, with none open: what the tab is.)
 const doneHint = () => `<div class="empty">${icon('archive', 'empty-ic')}<b>${esc(T.ibxDoneTab)}</b><span>${esc(T.ibxDoneHint)}</span></div>`

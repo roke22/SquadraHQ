@@ -13,6 +13,7 @@ export function parseRoute(hash) {
   // One entry of it picked: a question or result (i12), a permission (p<name>), a name to approve (a<name>).
   // What is done is its own tab, with its own entries.
   if (hash === '#/inbox/done') return { view: 'inbox', tab: 'done' }
+  if (hash === '#/inbox/running') return { view: 'inbox', tab: 'running' }
   const ib = hash.match(/^#\/inbox\/(done\/)?([ipa][A-Za-z0-9_-]{1,64})$/)
   if (ib) return ib[1] ? { view: 'inbox', tab: 'done', item: ib[2] } : { view: 'inbox', item: ib[2] }
   if (hash === '#/teams') return { view: 'teams' }
