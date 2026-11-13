@@ -142,6 +142,8 @@ function row(e, on, tab = 'pending') {
   const href = itemHash(tab, e.key)
   const fresh = Date.now() - (arrived.get(e.key) ?? 0) < FRESH_MS
   let dot, title, meta
+  // (Its mark: what it is, in the colour of what it needs.)
+  const mark = { perm: 'shield', approve: 'userok', ask: 'ask', tell: 'info', done: 'check' }[e.kind] ?? 'info'
   if (e.kind === 'perm') {
     dot = 'warn'; title = T.ibxPermTitle(e.s.name, permWhat(e.s))
     meta = [who(e.s.name), esc(T.ibxPermission), esc(teamOf(e.s.name)), esc(ago(e.at))]
@@ -155,7 +157,7 @@ function row(e, on, tab = 'pending') {
     meta = [who(i.session), esc(teamOf(i.session)), i.updated_at && e.kind === 'ask' ? `<span class="ibx-upd">${esc(T.inboxUpdated(ago(i.updated_at)))}</span>` : '', esc(ago(e.at))]
   }
   return `<li><a href="${href}" class="ibx-item${on ? ' on' : ''}${e.kind === 'done' ? ' done' : ''}${fresh ? ' new' : ''}"${on ? ' aria-current="true"' : ''} data-key="${esc(e.key)}">`
-    + `<span class="dot ${dot}" aria-hidden="true"></span><span class="ibx-item-b"><span class="ibx-item-t">${esc(title)}</span><span class="ibx-item-m">${meta.filter(Boolean).join('<span aria-hidden="true">·</span>')}</span></span></a></li>`
+    + `<span class="ibx-mark ${dot}" aria-hidden="true">${icon(mark)}</span><span class="ibx-item-b"><span class="ibx-item-t">${esc(title)}</span><span class="ibx-item-m">${meta.filter(Boolean).join('<span aria-hidden="true">·</span>')}</span></span></a></li>`
 }
 
 // Nothing open yet on this company: the three steps to a first team.

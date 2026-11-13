@@ -8,6 +8,13 @@
 .tm-h h2 { margin: 0; font-size: var(--fs-md); font-weight: 600; letter-spacing: -.005em; }
 .tm-h h2 a { color: var(--text); text-decoration: none; }
 .tm-h h2 a:hover { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+/* (The whole header leads to the team, not just its name.) */
+.tm-h { position: relative; transition: background-color var(--t-fast) ease; }
+.tm-h h2 a::after { content: ""; position: absolute; inset: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.tm-h:has(h2 a):hover { background: var(--raised); }
+.tm-h:has(h2 a):hover h2 a { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.tm-h h2 a:focus-visible { outline: none; }
+.tm-h h2 a:focus-visible::after { outline: 2px solid var(--focus); outline-offset: -2px; }
 .tm-sub { font-size: var(--fs-sm); color: var(--muted); }
 
 .tm-people { list-style: none; margin: 0; padding: 4px 0; }

@@ -297,7 +297,10 @@ addEventListener('pointerup', async e => {
       state.squadMeta.set(d.name, { ...(state.squadMeta.get(d.name) ?? { coordinator: d.name }), x: p.x, y: p.y })
       postJson('/api/org/positions', { positions: [{ coordinator: d.name, x: p.x, y: p.y }] }).catch(err => alertBox(err.message))
     }
-    return endOrgDrag()
+    endOrgDrag()
+    // (Its header pressed without moving it: the team, as its name in the list.)
+    if (!d.moved) openSquad(d.name)
+    return
   }
   const to = document.elementFromPoint(e.clientX, e.clientY)?.closest('.org-card')?.dataset.squad
   endOrgDrag()
@@ -317,7 +320,16 @@ $('org').addEventListener('click', e => {
   if (fold) { const n = fold.dataset.orgfold; if (orgOpen.has(n)) orgOpen.delete(n); else orgOpen.add(n); return renderOrg() }
   const link = e.target.closest('[data-la]')
   if (link) return linkMenu(link, link.dataset.la, link.dataset.lb)
+  // (A header pressed where it can't be dragged: on a phone, or without the right to move it.)
+  const head = e.target.closest('.org-head')
+  if (head && !e.target.closest('button') && (orgNarrow() || !can('manager'))) openSquad(head.closest('.org-card').dataset.squad)
 })
+$('org').addEventListener('keydown', e => {
+  const head = e.target.closest?.('.org-head')
+  if (head && e.target === head && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openSquad(head.closest('.org-card').dataset.squad) }
+})
+// A team's page: what its header leads to, here as in the list.
+const openSquad = name => { location.hash = `#/q/${encodeURIComponent(name)}` }
 $('org').addEventListener('dblclick', e => {
   const a = e.target.closest('.org-agent')
   if (a && !e.target.closest('button')) location.hash = `#/s/${encodeURIComponent(a.dataset.orgtip.slice(6))}`

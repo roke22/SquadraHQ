@@ -297,6 +297,12 @@ test('the sessions: they are listed with their squad', async ({ page }) => {
   await expect(team.locator('.tm-person').first()).toContainText('coord')
   await expect(team.locator('.tm-person.sub', { hasText: 'worker1' })).toHaveCount(1)
   await expect(page.locator('#topTabs a[aria-current=page]')).toHaveText('List')
+  // Its whole header leads to the team, not just its name.
+  const head = team.locator('.tm-h')
+  const box = await head.boundingBox()
+  await page.mouse.click(box.x + box.width - 12, box.y + box.height / 2)
+  await expect(page).toHaveURL(/#\/q\/coord$/)
+  await page.goto(`${server.url}/?company=default#/teams`)
   // The plan its coordinator keeps: how far it is on its card, each task on its page.
   await coord.call('setPlan', { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'done', who: 'worker1' }, { title: 'Drop the old column', state: 'waiting', ref: 'GH-6', who: 'coord' }] })
   await expect(team.locator('.tm-foot')).toContainText('Ship the cart')
@@ -319,6 +325,13 @@ test('the org chart: a squad shows its coordinator and its worker', async ({ pag
   const card = page.locator('.org-card[data-squad="coord"]')
   await expect(card).toBeVisible()
   await expect(card).toContainText('worker1')
+  // Its header pressed without dragging it opens the team; by the keyboard too.
+  await card.locator('.org-head').click({ position: { x: 20, y: 20 } })
+  await expect(page).toHaveURL(/#\/q\/coord$/)
+  await page.goto(`${server.url}/?company=default#/org`)
+  await page.locator('.org-card[data-squad="coord"] .org-head').focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/#\/q\/coord$/)
 })
 
 test('a chat: it shows the history, and a new message without reloading', async ({ page }) => {

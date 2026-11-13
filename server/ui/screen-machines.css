@@ -2,6 +2,10 @@
 
 #hosts { padding: 20px; }
 .host-list { max-width: none; margin: 0; gap: 16px; }
+/* The machines side by side, as many as fit (one on a phone); the overview
+   and a machine in trouble across the whole width. */
+.host-list:has(> .host) { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 500px), 1fr)); align-items: start; }
+.host-list > :not(.host) { grid-column: 1 / -1; }
 .host-meta .t { font-family: var(--sans); font-size: var(--fs-sm); }
 
 .mc-card { overflow: hidden; }
@@ -24,19 +28,49 @@
 .mc-trouble .cmdrow { display: flex; align-items: flex-start; gap: 6px; }
 .mc-trouble .cmd { flex: 1; min-width: 0; margin: 0; overflow-x: auto; }
 
-.host { border-radius: var(--r-md); }
+.host { border: 0; border-radius: var(--r-lg); box-shadow: var(--shadow-card); }
 .host.offline { opacity: .78; }
-.host-head { padding: 12px 16px; }
+.host-head { gap: 8px; padding: 10px 12px 8px 14px; }
 .host-head .n { font-size: var(--fs-md); font-weight: 600; }
 .host-head .m, .host-meta { font-size: var(--fs-sm); }
-.host-meta { padding: 0 16px 12px; }
-.plugin-missing { color: var(--err); font-weight: 500; }
-.host-warn { margin: 0 16px 10px; padding: 8px 10px; border-radius: var(--r); background: color-mix(in srgb, var(--warn) 12%, var(--panel)); color: var(--text); font-size: var(--fs-sm); }
-.term-row { padding: 9px 16px; }
+.host-head .acts { gap: 4px; order: 2; }
+/* What it says of itself, in parts, each with its icon in one column:
+   what it runs, its folders, its limits. */
+.host-head .st { color: var(--muted); font-size: var(--fs-sm); }
+.host-info { display: flex; flex-direction: column; gap: 8px; padding: 2px 14px 12px; }
+.hi-row { display: flex; align-items: flex-start; gap: 10px; min-width: 0; font-size: var(--fs-sm); color: var(--muted); }
+.hi-ic { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 7px; background: var(--tray); color: var(--muted); }
+.hi-ic .ic { width: 13px; height: 13px; stroke-width: 1.9; }
+.hi-b { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; padding-top: 3px; }
+.hi-t { overflow-wrap: anywhere; line-height: 1.45; }
+.hi-folders { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.hi-folders .fchip code { color: var(--text); font-size: 12px; }
+.hi-t .t { margin-top: 3px; line-height: 1.5; }
+.hi-b .plugin-missing { flex: none; }
+.host-info .t { font-family: var(--sans); font-size: var(--fs-sm); }
+/* (What it runs: one thing a line, the name grey, the version plain.) */
+.hi-dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 16px; margin: 0; }
+.hi-dl dt { color: var(--muted); }
+.hi-dl dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host-meta { gap: 4px 12px; padding: 0 14px 10px; }
+/* (Something to do on the machine: a note in its colour, not a red line across.) */
+.plugin-missing { flex: 1 1 100%; padding: 6px 10px; border-radius: var(--r); background: var(--err-soft); color: var(--err); font-weight: 500; line-height: 1.45; }
+.host-warn { margin: 0 14px 10px; padding: 6px 10px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn); font-size: var(--fs-sm); }
+.term-row { gap: 8px; padding: 5px 10px 5px 14px; flex-wrap: nowrap; }
 .term-row .n { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
-.host-empty { padding: 12px 16px; font-size: var(--fs-sm); }
+.term-row .m { font-size: 12px; }
+.term-row .acts { flex: none; gap: 4px; }
+/* (Small buttons on a machine: many of them, one per session.) */
+.host .btn { height: 28px; padding: 0 9px; font-size: var(--fs-sm); }
+.host .term-row .btn.danger { background: transparent; box-shadow: none; }
+.host .term-row .btn.danger:hover { background: var(--err-soft); }
+.host-empty { padding: 10px 14px; font-size: var(--fs-sm); }
 
 @media (max-width: 900px) {
   #hosts { padding: 12px; }
 }
 #hosts > .empty { min-height: 60vh; justify-content: center; }
+@media (max-width: 600px) {
+  .term-row { flex-wrap: wrap; }
+  .term-row .acts { margin-left: auto; }
+}

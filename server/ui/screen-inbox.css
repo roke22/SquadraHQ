@@ -6,20 +6,19 @@
 .ibx-list { flex: 1; min-width: 0; overflow-y: auto; padding: 8px 20px 32px; }
 .ibx-col { max-width: 860px; margin: 0 auto; }
 .ibx-detail { display: none; flex: 1; min-width: 0; overflow-y: auto; padding: 20px 28px 48px; }
-.ibx.has-pick .ibx-list { flex: 0 0 400px; padding: 8px 12px 24px; border-right: 1px solid var(--line); }
+.ibx.has-pick .ibx-list { flex: 0 0 420px; padding: 8px 16px 24px; border-right: 1px solid var(--line); }
 .ibx.has-pick .ibx-detail, .ibx.none .ibx-detail, .ibx.fresh .ibx-detail { display: block; }
 .ibx.none .ibx-list, .ibx.fresh .ibx-list { display: none; }
 .ibx-detail.enter { animation: ibx-in var(--t-slow) var(--ease); }
 @keyframes ibx-in { from { opacity: 0; transform: translateX(10px); } }
 .ibx-col > .empty { padding: 40px 0 8px; }
 
-/* Each group is one card; its entries part with a hairline that starts at the text. */
-.ibx-group { margin: 0 0 6px; }
-.ibx-group ul { list-style: none; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); }
+/* Each entry is a card of its own, a little apart from the next, on the
+   page's grey; the one open is ringed in ink and lifted, so it can't be missed. */
+.ibx-group { margin: 0 0 10px; }
+.ibx-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .ibx-group li { position: relative; }
-.ibx-group li + li::before { content: ""; position: absolute; top: 0; left: 36px; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
-.ibx-group li:has(.on)::before, .ibx-group li:has(.on) + li::before { opacity: 0; }
-.ibx-group-h { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 16px 4px 8px 16px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+.ibx-group-h { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 16px 6px 8px 4px; font-size: var(--fs-sm); font-weight: 500; color: var(--muted); }
 details.ibx-group > summary { cursor: pointer; list-style: none; }
 details.ibx-group > summary::-webkit-details-marker { display: none; }
 details.ibx-group > summary:hover { color: var(--text); }
@@ -38,15 +37,27 @@ details.ibx-group > summary:hover { color: var(--text); }
 .ibx-end { padding: 16px 4px 4px; text-align: center; font-size: var(--fs-sm); color: var(--muted); }
 /* Just arrived: marked a moment, where it landed. */
 .ibx-item.new { animation: ibx-new 2.6s var(--ease); }
-@keyframes ibx-new { from, 35% { background: color-mix(in srgb, var(--info) 14%, var(--panel)); } }
-@media (prefers-reduced-motion: reduce) { .ibx-item.new { animation: none; box-shadow: inset 3px 0 0 var(--info); } }
+@keyframes ibx-new { from, 35% { background: color-mix(in srgb, var(--info) 10%, var(--panel)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--info) 40%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .ibx-item.new { animation: none; box-shadow: 0 0 0 1px var(--info); } }
 
-.ibx-item { display: flex; gap: 12px; padding: 13px 16px; color: inherit; text-decoration: none; transition: background-color var(--t-fast) var(--ease); }
-.ibx-item:hover { background: color-mix(in srgb, var(--raised) 60%, var(--panel)); }
-.ibx-item.on { background: var(--raised); }
-.ibx-item:focus-visible { outline-offset: -2px; border-radius: var(--r-lg); }
-.ibx-item .dot { margin-top: 6px; }
-.ibx-item-b { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ibx-item {
+  display: flex; gap: 12px; padding: 12px 14px; border-radius: var(--r-lg);
+  background: var(--panel); box-shadow: var(--shadow-card); color: inherit; text-decoration: none;
+  transition: box-shadow var(--t) var(--ease), transform var(--t) var(--ease), background-color var(--t) var(--ease);
+}
+.ibx-item:hover { box-shadow: var(--shadow-card-hover); }
+.ibx-item:active { transform: scale(.99); }
+.ibx-item.on { box-shadow: 0 0 0 1.5px var(--text), 0 8px 20px -10px rgba(0, 0, 0, .28); }
+.ibx-item:focus-visible { outline-offset: 2px; border-radius: var(--r-lg); }
+/* Its mark: what it is, on a soft tile in the colour of what it needs. */
+.ibx-mark { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--tray); color: var(--muted); }
+.ibx-mark .ic { width: 16px; height: 16px; stroke-width: 1.8; }
+.ibx-mark.warn { background: var(--warn-soft); color: var(--warn); }
+.ibx-mark.info { background: var(--info-soft); color: var(--info); }
+.ibx-mark.ok { background: var(--ok-soft); color: var(--ok); }
+.ibx-mark.err { background: var(--err-soft); color: var(--err); }
+.ibx-item.done .ibx-mark { background: var(--tray); color: var(--faint); }
+.ibx-item-b { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 1px; }
 .ibx-item-t { font-weight: 500; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .ibx.has-pick .ibx-item-t { -webkit-line-clamp: 2; }
 .ibx-item.done .ibx-item-t { font-weight: 400; color: var(--muted); }
@@ -144,7 +155,7 @@ details.ibx-group > summary:hover { color: var(--text); }
 .fs-mark { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border: 1px solid var(--line-2); border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
 .fs-step.done .fs-mark { border-color: var(--ok); color: var(--ok); }
 .fs-step.done b { color: var(--muted); }
-.fs-step.now .fs-mark { background: var(--info); border-color: var(--info); color: var(--on-accent); }
+.fs-step.now .fs-mark { background: var(--info); border-color: var(--info); color: var(--on-fill); }
 .fs-step:not(.done):not(.now) b { color: var(--muted); font-weight: 400; }
 .fs-hint { font-size: var(--fs-sm); color: var(--muted); }
 
