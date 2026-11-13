@@ -128,7 +128,7 @@ export function openSettings(start) {
       <p class="note settings-ver">${esc(document.querySelector('.ver')?.textContent ?? '')}</p>`
     for (const b of body.querySelectorAll('[data-theme]')) b.onclick = () => setTheme(b.dataset.theme)
     for (const b of body.querySelectorAll('[data-notify]')) b.onclick = async () => { await setNotify(b.dataset.notify); appearance() }
-    for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('squadraLang', b.dataset.lang); location.reload() } }
+    for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('pishaLang', b.dataset.lang); location.reload() } }
   }
 
   // Everyone in the companies you manage, a column each: their role there,

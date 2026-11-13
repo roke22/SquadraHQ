@@ -8,6 +8,9 @@
 .rail-top { display: flex; flex-direction: column; gap: 10px; padding: 14px 12px 10px; }
 .rail-brand { display: flex; align-items: center; gap: 9px; padding: 0 4px; font-weight: 600; font-size: 14px; letter-spacing: -.01em; }
 .rail-brand .logo { width: 22px; height: 22px; flex: none; }
+/* The logotype: the face and «pisha», as the brand writes it. */
+.wordmark { font-family: var(--brand-font); font-weight: 700; color: var(--brand-ink); letter-spacing: -.02em; line-height: 1; }
+.rail-brand .wordmark { font-size: 19px; }
 
 /* The company: a native select, drawn as a quiet button. */
 .rail-co { position: relative; display: flex; }

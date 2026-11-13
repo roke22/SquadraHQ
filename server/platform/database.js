@@ -4,7 +4,7 @@ import { now } from './basics.js'
 import { logError } from './http.js'
 
 export function openDatabase(dir) {
-  const db = new DatabaseSync(join(dir, 'squadra.db'))
+  const db = new DatabaseSync(join(dir, 'pisha.db'))
   db.exec(`
   PRAGMA journal_mode = WAL;
   PRAGMA synchronous = NORMAL;

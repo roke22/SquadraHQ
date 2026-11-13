@@ -183,7 +183,7 @@ test('the shell: Ctrl+K goes anywhere, and the settings open over everything and
   await expect(page.locator('#settingsBtn')).toBeFocused()
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await page.evaluate(() => localStorage.removeItem('squadraTheme'))
+  await page.evaluate(() => localStorage.removeItem('pishaTheme'))
 })
 
 test('the shell on a phone: no sidebar, the places and the settings at the bottom, and back as an arrow', async ({ browser }) => {
@@ -440,7 +440,7 @@ test('the inbox: a question opened from the dashboard is answered there, and one
 test('the inbox read aloud: each decision with its options, answered by voice and sent only on a yes; a note replied to', async ({ page }) => {
   // The browser's speech, played by the test: what it says is kept, what is "heard" is queued.
   await page.addInitScript(() => {
-    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    try { localStorage.setItem('pisha.voice-ok', '1') } catch {}
     window.__said = []
     window.__heard = []
     window.SpeechRecognition = class {
@@ -483,7 +483,7 @@ test('the inbox read aloud: each decision with its options, answered by voice an
 
 test('the inbox read aloud: "stop" ends it, also while it asks whether to send, and nothing is sent', async ({ page }) => {
   await page.addInitScript(() => {
-    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    try { localStorage.setItem('pisha.voice-ok', '1') } catch {}
     window.__said = []
     window.__heard = ['la uno', 'para']
     window.SpeechRecognition = class {
@@ -507,7 +507,7 @@ test('the inbox read aloud: "stop" ends it, also while it asks whether to send, 
 test('the inbox read aloud: its speed changes with a tap on the card, at once, and is remembered', async ({ page }) => {
   // A voice that keeps talking until it is cut short, as a long question would.
   await page.addInitScript(() => {
-    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    try { localStorage.setItem('pisha.voice-ok', '1') } catch {}
     window.__said = []
     window.SpeechRecognition = class { start() { setTimeout(() => this.onend?.(), 20) } abort() {} }
     window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text } }
@@ -548,8 +548,8 @@ test('the inbox read aloud: its speed changes with a tap on the card, at once, a
   await page.locator('#voiceBar [data-voicestop]').click()
   await expect(page.locator('#voiceBar')).toHaveCount(0)
   // Remembered here, for the next time.
-  expect(await page.evaluate(() => localStorage.getItem('squadra.voice-rate'))).toBe('1.1')
-  await page.evaluate(() => localStorage.removeItem('squadra.voice-rate'))
+  expect(await page.evaluate(() => localStorage.getItem('pisha.voice-rate'))).toBe('1.1')
+  await page.evaluate(() => localStorage.removeItem('pisha.voice-rate'))
 })
 
 test('the inbox: pending and done apart; done a page at a time, by words or team; what arrives shows by itself', async ({ page }) => {
@@ -669,7 +669,7 @@ test('a company: its activity, what it keeps, its export; deleted, and brought b
   await expect(page.locator('[name=retention_days]')).toHaveValue('30')
   const download = page.waitForEvent('download')
   await page.locator('a[href$="/company/export"]').click()
-  expect((await download).suggestedFilename()).toContain(`squadra-${co.id}-`)
+  expect((await download).suggestedFilename()).toContain(`pisha-${co.id}-`)
   const del = page.locator('[data-delete-company]')
   await del.locator('[name=confirm]').fill('not the name')
   await del.locator('button').click()

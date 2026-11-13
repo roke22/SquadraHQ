@@ -1,5 +1,5 @@
 {
-  "name": "squadra",
+  "name": "pisha",
   "version": "0.0.10",
   "license": "MIT",
   "private": true,
@@ -15,9 +15,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roke22/SquadraHQ.git"
+    "url": "git+https://github.com/roke22/pisha.git"
   },
-  "homepage": "https://github.com/roke22/SquadraHQ",
+  "homepage": "https://github.com/roke22/pisha",
   "devDependencies": {
     "@playwright/test": "1.64.1"
   }

@@ -19,7 +19,7 @@ import { cleanExports } from './company-export.js'
 //   messaging      messages, groups, attachments
 //   observation    what each session is doing
 //   permissions    permission profiles: what the agents may do without asking
-//   machines       squadra-host: joining, its link, terminals
+//   machines       pisha-host: joining, its link, terminals
 //   organization   squads, links between them, templates
 //   boards         task boards: people's and agents' tasks
 //   dashboard      what the dashboard reads and does

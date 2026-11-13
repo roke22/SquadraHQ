@@ -1,0 +1,5 @@
+#!/bin/sh
+# squadra-host launcher (written by squadra-host)
+N='/usr/local/bin/node'
+[ -x "$N" ] || N=node
+exec "$N" '/squadra/home/.config/squadra-host/squadra-host.mjs' "$@"

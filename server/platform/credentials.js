@@ -19,18 +19,18 @@ export function openServerCredentials() {
   mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 })
   try { chmodSync(DATA_DIR, 0o700) } catch {}
 
-  // Server token: SQUADRA_SERVER_TOKEN if set; otherwise the one saved in
+  // Server token: PISHA_SERVER_TOKEN if set; otherwise the one saved in
   // DATA_DIR/server-token; otherwise a new one, generated and saved there so
   // restarts keep the same token and plugins don't need reconfiguring.
   const TOKEN_FILE = join(DATA_DIR, 'server-token')
   const { token: SERVER_TOKEN, source: TOKEN_SOURCE } = (() => {
-    const fromEnv = process.env.SQUADRA_SERVER_TOKEN ?? process.env.SWARM_SERVER_TOKEN // SWARM_: former name
+    const fromEnv = process.env.PISHA_SERVER_TOKEN ?? process.env.SWARM_SERVER_TOKEN // SWARM_: former name
     if (fromEnv) {
       if (fromEnv.length < 16) {
-        process.stderr.write('squadra-server: SQUADRA_SERVER_TOKEN must be at least 16 chars\n')
+        process.stderr.write('pisha-server: PISHA_SERVER_TOKEN must be at least 16 chars\n')
         process.exit(1)
       }
-      return { token: fromEnv, source: 'env SQUADRA_SERVER_TOKEN' }
+      return { token: fromEnv, source: 'env PISHA_SERVER_TOKEN' }
     }
     try {
       const saved = readFileSync(TOKEN_FILE, 'utf8').trim()
@@ -48,7 +48,7 @@ export function openServerCredentials() {
   const SERVER_KEY = (() => {
     let pem = null
     try { pem = readFileSync(SERVER_KEY_FILE) } catch (err) {
-      if (err.code !== 'ENOENT') { process.stderr.write(`squadra-server: cannot read ${SERVER_KEY_FILE}: ${err.message}\n`); process.exit(1) }
+      if (err.code !== 'ENOENT') { process.stderr.write(`pisha-server: cannot read ${SERVER_KEY_FILE}: ${err.message}\n`); process.exit(1) }
     }
     if (pem === null) {
       pem = generateKeyPairSync('ed25519').privateKey.export({ format: 'pem', type: 'pkcs8' })
@@ -61,7 +61,7 @@ export function openServerCredentials() {
       const hash = createHash('sha256').update(pub).digest('hex')
       return { privateKey, public: pub, hash, fingerprint: hash.slice(0, 16).replace(/(.{4})(?=.)/g, '$1 ') }
     } catch (err) {
-      process.stderr.write(`squadra-server: ${SERVER_KEY_FILE} is not a usable key (${err.message}). Put the backup back; a new key would make every machine and session refuse this server\n`)
+      process.stderr.write(`pisha-server: ${SERVER_KEY_FILE} is not a usable key (${err.message}). Put the backup back; a new key would make every machine and session refuse this server\n`)
       process.exit(1)
     }
   })()
@@ -77,7 +77,7 @@ export function openServerCredentials() {
     for (const [c, exp] of serverChallenges) { if (exp >= Date.now() && serverChallenges.size < 5000) break; serverChallenges.delete(c) }
     const challenge = randomBytes(24).toString('base64url')
     serverChallenges.set(challenge, Date.now() + 60_000)
-    return { key: SERVER_KEY.public, challenge, sig: signAsServer(['squadra-server-identity-1', nonce, challenge]) }
+    return { key: SERVER_KEY.public, challenge, sig: signAsServer(['pisha-server-identity-1', nonce, challenge]) }
   }
   function takeChallenge(challenge) {
     const exp = serverChallenges.get(challenge)
@@ -90,7 +90,7 @@ export function openServerCredentials() {
     try {
       const key = createPublicKey({ key: Buffer.from(String(publicKey), 'base64url'), format: 'der', type: 'spki' })
       if (key.asymmetricKeyType !== 'ed25519') return false
-      return verifyBytes(null, Buffer.from(JSON.stringify(['squadra-client-proof-1', SERVER_KEY.public, purpose, subject, String(challenge), String(extra)])), key, Buffer.from(String(proof), 'base64url'))
+      return verifyBytes(null, Buffer.from(JSON.stringify(['pisha-client-proof-1', SERVER_KEY.public, purpose, subject, String(challenge), String(extra)])), key, Buffer.from(String(proof), 'base64url'))
     } catch {
       return false
     }
@@ -106,7 +106,7 @@ export function openServerCredentials() {
 export function openCompanyCredentials(dir, { SERVER_TOKEN }, { credentialPrefix }) {
   mkdirSync(join(dir, 'files'), { recursive: true, mode: 0o700 })
   for (const p of [dir, join(dir, 'files')]) { try { chmodSync(p, 0o700) } catch {} }
-  for (const f of ['squadra.db', 'squadra.db-wal', 'squadra.db-shm']) { try { chmodSync(join(dir, f), 0o600) } catch {} }
+  for (const f of ['pisha.db', 'pisha.db-wal', 'pisha.db-shm']) { try { chmodSync(join(dir, f), 0o600) } catch {} }
 
   // Join token: lets a machine register NEW session names (POST /register
   // without reset) and nothing else. It is what plugins and enrolled machines
@@ -114,15 +114,15 @@ export function openCompanyCredentials(dir, { SERVER_TOKEN }, { credentialPrefix
   // web terminals, /admin, rotating identities) and never leaves the browser.
   const JOIN_TOKEN_FILE = join(dir, 'join-token')
   // (The first company's, the one a server without companies has.)
-  const FROM_ENV = credentialPrefix ? null : process.env.SQUADRA_JOIN_TOKEN
+  const FROM_ENV = credentialPrefix ? null : process.env.PISHA_JOIN_TOKEN
   let { token: JOIN_TOKEN, source: JOIN_TOKEN_SOURCE } = (() => {
     const fromEnv = FROM_ENV
     if (fromEnv) {
       if (fromEnv.length < 16 || fromEnv === SERVER_TOKEN) {
-        process.stderr.write('squadra-server: SQUADRA_JOIN_TOKEN must be at least 16 chars and differ from the server token\n')
+        process.stderr.write('pisha-server: PISHA_JOIN_TOKEN must be at least 16 chars and differ from the server token\n')
         process.exit(1)
       }
-      return { token: fromEnv, source: 'env SQUADRA_JOIN_TOKEN' }
+      return { token: fromEnv, source: 'env PISHA_JOIN_TOKEN' }
     }
     try {
       const saved = readFileSync(JOIN_TOKEN_FILE, 'utf8').trim()
@@ -139,11 +139,11 @@ export function openCompanyCredentials(dir, { SERVER_TOKEN }, { credentialPrefix
   // A new join token: machines configured with the old one can no longer
   // register new names (their existing identities keep working).
   function rotateJoinToken() {
-    if (FROM_ENV) throw new ApiError(409, 'Conflict: the join token comes from SQUADRA_JOIN_TOKEN; change it there')
+    if (FROM_ENV) throw new ApiError(409, 'Conflict: the join token comes from PISHA_JOIN_TOKEN; change it there')
     JOIN_TOKEN = `sj_${credentialPrefix}${randomBytes(24).toString('hex')}`
     JOIN_TOKEN_SOURCE = JOIN_TOKEN_FILE
     writeFileSync(JOIN_TOKEN_FILE, JOIN_TOKEN + '\n', { mode: 0o600 })
-    process.stderr.write(`squadra-server: ${credentialPrefix && `[${credentialPrefix.slice(0, -1)}] `}join token rotated\n`)
+    process.stderr.write(`pisha-server: ${credentialPrefix && `[${credentialPrefix.slice(0, -1)}] `}join token rotated\n`)
     return { join_token: JOIN_TOKEN }
   }
 

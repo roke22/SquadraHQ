@@ -24,7 +24,7 @@ import { createGithubSync } from './sync.js'
 // the same board (its card, status and who has it), up to 8 levels deep.
 
 // Sent by the server itself: no session can have this name (see NAME_RE).
-export const BOARD_SENDER = 'squadra:board'
+export const BOARD_SENDER = 'pisha:board'
 export const CATEGORIES = ['backlog', 'unstarted', 'started', 'review', 'done', 'closed']
 export const COLORS = ['gray', 'blue', 'green', 'yellow', 'orange', 'red', 'purple', 'pink']
 // Where a task waits to be worked on: notifying a team of it makes sense.

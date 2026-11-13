@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * squadra-server — the "Telegram" for Squadra.
+ * pisha-server — the "Telegram" for Pisha.
  *
- * A small subset of the Telegram Bot API, shaped closely enough that Squadra
+ * A small subset of the Telegram Bot API, shaped closely enough that Pisha
  * plugin is a near-copy of the official Telegram channel plugin. Every Claude
  * Code session is an identity (a "bot" that also acts as a "user" for others).
  *
  * Auth:
  *   - Server token (admin): the dashboard, /admin/* and rotating identities.
  *   - Join token: registers new names, nothing else.
- *   - Machine secret: squadra-host's link (/host/connect).
+ *   - Machine secret: pisha-host's link (/host/connect).
  *   - Identity secret: returned once by /register; every other call uses it.
  *     The sender of a message is always derived from the secret, never from
  *     a request field: sending as another name takes that name's secret (and,
@@ -52,11 +52,11 @@ serving = true
 let stopping = false
 function shutdown(signal) {
   if (stopping) {
-    process.stderr.write('squadra-server: forced exit\n')
+    process.stderr.write('pisha-server: forced exit\n')
     process.exit(1)
   }
   stopping = true
-  process.stderr.write(`\nsquadra-server: ${signal} received, shutting down…\n`)
+  process.stderr.write(`\npisha-server: ${signal} received, shutting down…\n`)
   companies.close()
   for (const srv of servers) { srv.close(); srv.closeAllConnections?.() }
   process.exit(0)

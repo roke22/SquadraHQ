@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t">
+  <title id="t">Pisha</title>
+  <!-- Monochrome: the wink alone, in currentColor (set it with CSS `color`). -->
+  <circle cx="22.5" cy="25" r="4.8" fill="currentColor"/>
+  <path d="M35 26.5q5.5-5 11 0" fill="none" stroke="currentColor" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M19 37q13 14 26 0" fill="none" stroke="currentColor" stroke-width="4.6" stroke-linecap="round"/>
+</svg>

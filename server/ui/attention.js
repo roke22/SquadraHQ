@@ -8,7 +8,7 @@ import { state } from './state.js'
 // like) while the dashboard is not in view. Only while it is open somewhere:
 // with the browser closed, nothing (that would need push notifications).
 
-const BASE_TITLE = document.title || 'SquadraHQ'
+const BASE_TITLE = document.title || 'Pisha'
 let shownCount = -1
 
 // What waits on the user, as the sidebar counts it.
@@ -28,12 +28,12 @@ export function showCount() {
 // The user's choice, in this browser and for every company (it is about
 // this device): off, on, or on with a sound.
 export const NOTIFY = ['off', 'on', 'sound']
-export const notifyChoice = () => (NOTIFY.includes(store.get('squadraNotify')) ? store.get('squadraNotify') : 'off')
+export const notifyChoice = () => (NOTIFY.includes(store.get('pishaNotify')) ? store.get('pishaNotify') : 'off')
 export const notifySupported = () => typeof Notification === 'function'
 export async function setNotify(choice) {
   if (!NOTIFY.includes(choice)) return notifyChoice()
   if (choice !== 'off' && notifySupported() && Notification.permission === 'default') await Notification.requestPermission().catch(() => {})
-  store.set('squadraNotify', choice)
+  store.set('pishaNotify', choice)
   return choice
 }
 export const notifyBlocked = () => notifySupported() && Notification.permission === 'denied'
@@ -53,7 +53,7 @@ export function inboxArrived() {
   const title = i.kind === 'ask' ? T.notifyAsk(i.session) : T.notifyTell(i.session)
   const body = (i.text.replace(/\s+/g, ' ').slice(0, 160)) + (fresh.length > 1 ? `\n${T.notifyMore(fresh.length - 1)}` : '')
   try {
-    const n = new Notification(title, { body, tag: `squadra-${state.company}-inbox`, icon: '/icons/icon-192.png' })
+    const n = new Notification(title, { body, tag: `pisha-${state.company}-inbox`, icon: '/icons/icon-192.png' })
     n.onclick = () => { window.focus(); location.hash = `#/inbox/i${i.id}`; n.close() }
   } catch { /* (some phones only notify from a service worker) */ }
   if (notifyChoice() === 'sound') chime()

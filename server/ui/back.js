@@ -14,7 +14,7 @@ import { parseRoute } from './routes.js'
 // With nowhere it came from (opened from a link or a notification), back goes
 // one level up: a session to its team, a terminal to its machine.
 
-const KEY = 'squadraBack'
+const KEY = 'pishaBack'
 let stack = [location.hash] // the address of each step of this tab, by its index
 let at = 0
 

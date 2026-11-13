@@ -12,7 +12,7 @@ import { icon } from './icons.js'
 import { newSessionDialog, templatesDialog } from './squads.js'
 import { showLogin, serverVersion, olderThan } from './app.js'
 
-// machines (squadra-host): list, add, rename, disconnect, open and close sessions
+// machines (pisha-host): list, add, rename, disconnect, open and close sessions
 
 // The machine where a session runs, if it was opened from here.
 // Only on the machine the server opened it on (host_id): another machine
@@ -50,7 +50,7 @@ export function hostLine(h) {
 }
 
 // A machine's allowed folders: removable, and one more can be added, when
-// the machine lets the dashboard change them (squadra-host 0.0.3+).
+// the machine lets the dashboard change them (pisha-host 0.0.3+).
 export function folderChips(h) {
   const i = h.info ?? {}
   const editable = h.online && i.folders_from_dashboard === true
@@ -83,7 +83,7 @@ function overview(all) {
 }
 // A machine that stopped answering while sessions were open on it: what to check there.
 function trouble(h) {
-  const cmd = state.company && state.company !== 'default' ? `squadra-host-${state.company} status` : 'squadra-host status'
+  const cmd = state.company && state.company !== 'default' ? `pisha-host-${state.company} status` : 'pisha-host status'
   return `<section class="card mc-trouble"><h2>${esc(T.mcNotAnswering(h.name))}</h2><p>${esc(T.mcNotAnsweringHint)}</p>
       <div class="cmdrow"><pre class="cmd">${esc(cmd)}</pre><button type="button" class="btn" data-copy>${esc(T.copy)}</button></div></section>`
 }

@@ -1,5 +1,5 @@
 // What the dashboard's tests run against: a real server, sessions that keep
-// polling it as a plugin does, and a machine that answers like squadra-host.
+// polling it as a plugin does, and a machine that answers like pisha-host.
 
 import { spawn } from 'node:child_process'
 import { rmSync } from 'node:fs'
@@ -25,11 +25,11 @@ export const OWNER = { email: 'owner@example.com', name: 'The Owner', password: 
 export async function startServer({ tokenApi = true, env = {} } = {}) {
   const port = await freePort()
   const url = `http://127.0.0.1:${port}`
-  const dataDir = tempDir('squadra-ui-')
+  const dataDir = tempDir('pisha-ui-')
   let log = ''
   const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
     // (The token keeps working on /api: what these tests set up isn't the page.)
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: SERVER_TOKEN, SQUADRA_ALLOW_TOKEN_API: tokenApi ? '1' : '', ...env },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, PISHA_SERVER_TOKEN: SERVER_TOKEN, PISHA_ALLOW_TOKEN_API: tokenApi ? '1' : '', ...env },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   proc.stderr.on('data', d => { log += d })
@@ -46,7 +46,7 @@ export async function startServer({ tokenApi = true, env = {} } = {}) {
     async call(path, params = {}, { auth = SERVER_TOKEN, instance } = {}) {
       const res = await fetch(`${url}/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}`, ...(instance ? { 'X-Squadra-Instance': instance } : {}) },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}`, ...(instance ? { 'X-Pisha-Instance': instance } : {}) },
         body: JSON.stringify(params),
       })
       const body = await res.json()
@@ -95,7 +95,7 @@ export async function startSession(server, name, role, coordinator, secret, { ag
         const res = await fetch(`${server.url}/getUpdates`, {
           method: 'POST',
           signal: stop.signal,
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}`, 'X-Squadra-Instance': instance },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}`, 'X-Pisha-Instance': instance },
           body: JSON.stringify({ instance, offset, timeout: 5 }),
         })
         const { result } = await res.json()
@@ -123,7 +123,7 @@ export async function startMachine(server, name, terminal, { screens = {}, code:
   const answers = [] // what the inbox had it type, as { term, text }
   const identities = new Map() // the sessions it opened -> their secret
   const opened = [] // what it was asked to open, as the server sent it
-  const ws = new WebSocket(`${server.url.replace('http', 'ws')}/host/connect`, ['squadra', `auth.${secret}`])
+  const ws = new WebSocket(`${server.url.replace('http', 'ws')}/host/connect`, ['pisha', `auth.${secret}`])
   const send = m => ws.send(JSON.stringify(m))
   const b64 = text => Buffer.from(text).toString('base64')
   const info = {

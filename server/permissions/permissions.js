@@ -7,7 +7,7 @@ import { bad, now, oneLine, cleanText } from '../platform/index.js'
 // the dashboard (claude --settings). Claude Code enforces them, not the model;
 // what the user wrote in their own words goes to the session's system prompt
 // too, as the reason. Each machine decides how far the dashboard may go
-// ("permissions_from_dashboard" in its settings.json): squadra-host checks
+// ("permissions_from_dashboard" in its settings.json): pisha-host checks
 // every rule again and refuses what it doesn't take.
 //
 // A profile is a few capabilities, each allowed, always asked or forbidden

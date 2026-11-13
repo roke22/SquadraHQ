@@ -1,6 +1,6 @@
-# Squadra demo (Docker)
+# Pisha demo (Docker)
 
-The dashboard and one machine that runs Claude Code, in a single container: the quickest way to try Squadra on one computer. For real use, the dashboard and the machines run apart: see the [main README](../../README.md).
+The dashboard and one machine that runs Claude Code, in a single container: the quickest way to try Pisha on one computer. For real use, the dashboard and the machines run apart: see the [main README](../../README.md).
 
 ## Start it
 
@@ -8,27 +8,27 @@ From this folder (`deploy/demo`):
 
 ```bash
 docker-compose up -d               # or: docker compose up -d
-cat squadra/data/server-token      # the token that creates the first owner (once it has started, some 20 s)
+cat pisha/data/server-token      # the token that creates the first owner (once it has started, some 20 s)
 ```
 
-The token is also in the logs, in the *Squadra demo* box (`docker-compose logs`).
+The token is also in the logs, in the *Pisha demo* box (`docker-compose logs`).
 
 1. Open **http://localhost:7787** and create the first owner with that token. You will need an authenticator app for the codes.
-2. **+ New session**: folder `/squadra/projects/demo`, role *Coordinator*, persona `project-lead`.
+2. **+ New session**: folder `/pisha/projects/demo`, role *Coordinator*, persona `project-lead`.
 3. The first time, Claude Code asks in the session's terminal for its theme, your Claude login (`/login`: open the link, paste the code back) and whether you trust the folder. The login is kept for every later session.
 4. From the squad (👥), **+ Worker**: one with the persona `developer`, another with `designer`. Then ask the coordinator for something small.
 
 ## Where everything is
 
-All of it lives in `deploy/demo/squadra/`, owned by you:
+All of it lives in `deploy/demo/pisha/`, owned by you:
 
 | Folder | What |
 |---|---|
 | `data/` | The dashboard: its tokens, sessions, messages and templates |
-| `home/` | The container's home: Claude Code's login and settings, the Squadra plugin, the machine's credential |
+| `home/` | The container's home: Claude Code's login and settings, the Pisha plugin, the machine's credential |
 | `projects/` | Where sessions can be opened. `demo/` is an example project with three personas in `.claude/skills/` |
 
-Put your own projects in `projects/` (or mount another folder there). Delete `deploy/demo/squadra/` to start from scratch.
+Put your own projects in `projects/` (or mount another folder there). Delete `deploy/demo/pisha/` to start from scratch.
 
 ## Good to know
 

@@ -1,22 +1,22 @@
 {
-  "name": "squadra-server",
+  "name": "pisha-server",
   "version": "0.0.10",
-  "description": "Message server for Squadra: a small Telegram-Bot-API-shaped relay between Claude Code sessions",
+  "description": "Message server for Pisha: a small Telegram-Bot-API-shaped relay between Claude Code sessions",
   "type": "module",
   "license": "MIT",
   "engines": {
     "node": ">=22.13"
   },
   "bin": {
-    "squadra-server": "./server.js"
+    "pisha-server": "./server.js"
   },
   "scripts": {
     "start": "node server.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roke22/SquadraHQ.git",
+    "url": "git+https://github.com/roke22/pisha.git",
     "directory": "server"
   },
-  "homepage": "https://github.com/roke22/SquadraHQ"
+  "homepage": "https://github.com/roke22/pisha"
 }

@@ -14,14 +14,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 let server, gh, URL_
 before(async () => {
   gh = await startFakeGithub()
-  server = await startServer({ env: { SQUADRA_GITHUB_API: gh.url, SQUADRA_GITHUB_FRESH_MS: '6000' } })
+  server = await startServer({ env: { PISHA_GITHUB_API: gh.url, PISHA_GITHUB_FRESH_MS: '6000' } })
   URL_ = server.url
 })
 after(async () => { if (process.env.DEBUG) process.stderr.write(server?.log() ?? ''); await server?.stop(); await gh?.stop() })
 
 const api = async (method, params, secret, instance) => (await fetch(`${URL_}/${method}`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}`, ...(instance ? { 'X-Squadra-Instance': instance } : {}) },
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}`, ...(instance ? { 'X-Pisha-Instance': instance } : {}) },
   body: JSON.stringify(params),
 })).json()
 const get = async path => (await fetch(`${URL_}/api/${path}`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json()
@@ -35,7 +35,7 @@ async function session(name, role, coordinator) {
     board: async params => (await api('board', params, secret, instance)).result,
     notices: async () => {
       const u = await api('getUpdates', { offset: 0, timeout: 0, instance }, secret, instance)
-      return (u.result ?? []).map(x => x.message).filter(m => m?.from?.id === 'squadra:board')
+      return (u.result ?? []).map(x => x.message).filter(m => m?.from?.id === 'pisha:board')
     },
   }
 }
@@ -111,7 +111,7 @@ test('github: a board in step with a project, both ways, and nobody told by it',
   assert.equal(gh.look.issue('Pricing: annual plan').parent, iPricing.id)
   assert.ok(gh.calls.includes('ItemOf')) // (GitHub had put it in the project by itself)
   assert.deepEqual((await task(sub.seq)).github?.number, gh.look.issue('Pricing: annual plan').number)
-  assert.match(iPricing.comments.at(-1).body, /^\*\*.+\*\* \(SquadraHQ\):\n\nPrices are in the sheet$/)
+  assert.match(iPricing.comments.at(-1).body, /^\*\*.+\*\* \(Pisha\):\n\nPrices are in the sheet$/)
   // Done here: closed there, as completed, in its column.
   await post('tasks/update', { id: tLogin.seq, status: st('Done') })
   await sync(board.id)

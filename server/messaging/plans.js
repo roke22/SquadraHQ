@@ -2,7 +2,7 @@ import { now, cleanText, bad, ApiError } from '../platform/index.js'
 
 // A coordinator's plan: the tasks it is working through, as it tells them,
 // for the user and the team's page. The whole list each time (it replaces the
-// last); Squadra checks its shape and keeps it, and says whose word it is.
+// last); Pisha checks its shape and keeps it, and says whose word it is.
 const STATES = ['todo', 'doing', 'done', 'blocked', 'waiting']
 const MAX_TASKS = 100
 const MAX_TITLE = 160

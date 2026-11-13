@@ -4,6 +4,7 @@
 .login-card { width: min(420px, 100%); padding: 32px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--shadow-pop); }
 .login-card .brand { gap: 10px; margin-bottom: 8px; font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.015em; }
 .login-card .brand .logo { width: 30px; height: 30px; }
+.login-card .brand .wordmark { font-size: 26px; }
 .login-card > p { margin: 4px 0 20px; color: var(--muted); line-height: 1.55; }
 .login-card .field { margin-bottom: 12px; }
 .login-card .field input { height: 38px; font-family: var(--sans); }

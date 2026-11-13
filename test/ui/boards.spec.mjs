@@ -21,7 +21,7 @@ const shot = name => (process.env.SHOTS ? { path: `${process.env.SHOTS}/${name}.
 
 test.beforeAll(async () => {
   gh = await startFakeGithub()
-  server = await startServer({ env: { SQUADRA_GITHUB_API: gh.url } })
+  server = await startServer({ env: { PISHA_GITHUB_API: gh.url } })
   await startSession(server, 'lead', 'coordinator')
   await startSession(server, 'writer', 'worker', 'lead')
   await startSession(server, 'editor', 'worker', 'lead')
@@ -38,7 +38,7 @@ async function signIn(page, hash = '') {
 // What the board told a coordinator (the server's messages to it).
 async function boardNotices(name) {
   const r = await fetch(`${server.url}/api/messages?session=${name}`, { headers: { Authorization: `Bearer ${SERVER_TOKEN}` } }).then(x => x.json())
-  return r.result.filter(m => m.from === 'squadra:board' || m.from_name === 'squadra:board' || m.from?.id === 'squadra:board').map(m => m.text)
+  return r.result.filter(m => m.from === 'pisha:board' || m.from_name === 'pisha:board' || m.from?.id === 'pisha:board').map(m => m.text)
 }
 
 test('a board: handed out quietly, the team told when the person says so, moved, commented', async ({ page }) => {

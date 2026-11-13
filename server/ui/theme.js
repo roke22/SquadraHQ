@@ -11,8 +11,8 @@ export const themeChoice = () => document.documentElement.dataset.theme || 'syst
 export const themeNow = () => document.documentElement.dataset.theme || (darkQuery.matches ? 'dark' : 'light')
 
 export function setTheme(choice) {
-  if (choice === 'light' || choice === 'dark') { document.documentElement.dataset.theme = choice; store.set('squadraTheme', choice) }
-  else { delete document.documentElement.dataset.theme; store.del('squadraTheme') }
+  if (choice === 'light' || choice === 'dark') { document.documentElement.dataset.theme = choice; store.set('pishaTheme', choice) }
+  else { delete document.documentElement.dataset.theme; store.del('pishaTheme') }
   for (const f of listeners) f()
 }
 export const toggleTheme = () => setTheme(themeNow() === 'dark' ? 'light' : 'dark')

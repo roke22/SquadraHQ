@@ -83,7 +83,7 @@ function mountSessionTerm(host, name) {
   if (state.termView?.host === host && state.termView.term === name && state.timeline) return
   state.termView?.destroy()
   state.timeline?.destroy()
-  const kept = store.get(companyPref('squadraTlFolded'))
+  const kept = store.get(companyPref('pishaTlFolded'))
   const folded = kept ? kept === '1' : matchMedia('(max-width: 900px)').matches
   $('terminal').innerHTML = `<div class="tv${folded ? ' folded' : ''}"><div class="tv-term"></div><aside class="tv-aside" aria-label="${esc(T.tlAside(name))}"><button type="button" class="icon-btn tv-fold" data-tvfold aria-expanded="${!folded}" aria-label="${esc(folded ? T.tlShow : T.tlHide)}" title="${esc(folded ? T.tlShow : T.tlHide)}">${icon('chevron', folded ? 'flip' : '')}</button><div class="tv-body"></div></aside></div>`
   state.termView = new TermView(host, name, $('terminal').querySelector('.tv-term'))
@@ -95,7 +95,7 @@ export function route() {
   closeMenu()
   // Going to a worker unfolds its squad in the sidebar, so it shows where you are.
   const c = r.view === 'session' && sessions.get(r.name)?.role === 'worker' ? sessions.get(r.name).coordinator : null
-  if (c && squadOpen[c] === false) { squadOpen[c] = true; store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen)) }
+  if (c && squadOpen[c] === false) { squadOpen[c] = true; store.set(companyPref('pishaSquads'), JSON.stringify(squadOpen)) }
   $('archived').hidden = r.view !== 'archived'
   $('inbox').hidden = r.view !== 'inbox'
   $('teams').hidden = r.view !== 'teams'

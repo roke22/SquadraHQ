@@ -34,7 +34,7 @@ let detail = null            // the open task, whole: { seq, task, dirty }
 let shownKey = null          // what the board's frame was drawn for
 let startAt = false          // (to scroll to where work waits, once it is drawn)
 
-const mode = () => (store.get(companyPref('squadraBoardMode')) === 'list' ? 'list' : 'cols')
+const mode = () => (store.get(companyPref('pishaBoardMode')) === 'list' ? 'list' : 'cols')
 const boardOf = id => state.boards.find(b => b.id === Number(id)) ?? null
 const statusOf = (b, id) => b?.statuses.find(s => s.id === id) ?? null
 const categoryOf = (b, t) => statusOf(b, t.status)?.category ?? 'unstarted'
@@ -893,7 +893,7 @@ export function boardsTopClick(e) {
   if (e.target.closest('[data-newboard]')) { newBoardDialog(); return true }
   const b = boardOf(currentRoute().board)
   const m = e.target.closest('[data-bmode]')
-  if (m) { store.set(companyPref('squadraBoardMode'), m.dataset.bmode); soon(renderBoard); soon(renderTop); return true }
+  if (m) { store.set(companyPref('pishaBoardMode'), m.dataset.bmode); soon(renderBoard); soon(renderTop); return true }
   if (!b) return false
   if (e.target.closest('[data-bnotify]')) { void loadTasks(b.id).then(() => notifyDialog(b)); return true }
   if (e.target.closest('[data-bsettings]')) { void loadPeople().then(() => settingsDialog(b)); return true }

@@ -6,7 +6,7 @@ import {
 export function createSessions(platform) {
   const { db, bus, readLimit, allow, takeChallenge, proofIsGood, quota, companyId, credentialPrefix, every } = platform
 
-  const MAX_UPDATES = Number(process.env.SQUADRA_MAX_UPDATES ?? 500_000)       // undelivered updates kept, in all
+  const MAX_UPDATES = Number(process.env.PISHA_MAX_UPDATES ?? 500_000)       // undelivered updates kept, in all
   const MAX_UPDATES_PER_SESSION = 10_000                                        // undelivered updates kept, per recipient
   const UPDATE_TTL_MS = 24 * 60 * 60 * 1000  // like Telegram: unconfirmed updates kept 24h
   const POLL_MAX_TIMEOUT_S = 50
@@ -15,7 +15,7 @@ export function createSessions(platform) {
   // A session that stops polling (lost network, its machine asleep) is announced
   // DOWN only after this long: a short network cut doesn't wake its coordinator
   // twice (DOWN, then back online) nor drop what was waiting for it.
-  const LOST_GRACE_MS = Number(process.env.SQUADRA_LOST_GRACE_MS ?? 2 * 60_000)
+  const LOST_GRACE_MS = Number(process.env.PISHA_LOST_GRACE_MS ?? 2 * 60_000)
   const NAME_RE = /^[A-Za-z0-9_-]{1,32}$/
 
   // The persona a session says it follows (at login): what its kind and name
@@ -71,10 +71,10 @@ export function createSessions(platform) {
     db.prepare('UPDATE identities SET last_seen_at = ? WHERE name = ?').run(t, name)
   }
 
-  // squadra_identity: which registration of that name it is (sessions pin it:
+  // pisha_identity: which registration of that name it is (sessions pin it:
   // a name deleted and registered again by someone else is told apart).
   const epochOf = name => db.prepare('SELECT epoch FROM identities WHERE name = ?').get(name)?.epoch ?? undefined
-  const userObj = name => ({ id: name, is_bot: false, first_name: name, username: name, squadra_identity: epochOf(name) })
+  const userObj = name => ({ id: name, is_bot: false, first_name: name, username: name, pisha_identity: epochOf(name) })
   const linkKey = (x, y) => (x < y ? [x, y] : [y, x])
   const linked = (x, y) => !!db.prepare('SELECT 1 FROM squad_links WHERE a = ? AND b = ?').get(...linkKey(x, y))
   const linksOf = name => db.prepare('SELECT a, b FROM squad_links WHERE a = ? OR b = ? ORDER BY a, b').all(name, name).map(r => (r.a === name ? r.b : r.a))
@@ -86,7 +86,7 @@ export function createSessions(platform) {
 
   const waiters = new Map() // name -> { res, timer, offset, limit }
 
-  const conflict = () => new ApiError(409, 'Conflict: terminated by other getUpdates request; make sure that only one squadra plugin instance is running for this name')
+  const conflict = () => new ApiError(409, 'Conflict: terminated by other getUpdates request; make sure that only one pisha plugin instance is running for this name')
 
   const pushCount = new Map()
   const MAX_UPDATES_PER_SENDER = 500 // undelivered, per sender and recipient
@@ -151,7 +151,7 @@ export function createSessions(platform) {
     const instance = params.instance != null ? String(params.instance) : ''
     if (instance && !/^[A-Za-z0-9_-]{8,64}$/.test(instance)) throw bad('invalid instance')
     if (instance) checkLease(name, instance)
-    else if (leases.has(name)) throw new ApiError(409, `Conflict: "${name}" is held by a Squadra session`, { parameters: { reason: 'name_in_use' } })
+    else if (leases.has(name)) throw new ApiError(409, `Conflict: "${name}" is held by a Pisha session`, { parameters: { reason: 'name_in_use' } })
     if (timeout === 0) readLimit(name) // after the checks: a refused caller doesn't use the holder's budget
 
     // Asking again for updates already handed out (offset at or below what was
@@ -388,7 +388,7 @@ export function createSessions(platform) {
     const coordRows = coord ? db.prepare('SELECT payload FROM updates WHERE recipient = ? AND sender = ? ORDER BY update_id LIMIT 11').all(worker, coord) : []
     const coordCount = coord ? db.prepare('SELECT COUNT(*) AS n FROM updates WHERE recipient = ? AND sender = ?').get(worker, coord).n : 0
     db.prepare('DELETE FROM updates WHERE recipient = ?').run(worker)
-    const fromCoord = coordRows.map(u => JSON.parse(u.payload).message).filter(m => m && !m.squadra_notice && m.chat?.type === 'private')
+    const fromCoord = coordRows.map(u => JSON.parse(u.payload).message).filter(m => m && !m.pisha_notice && m.chat?.type === 'private')
     const msgs = { length: total }
     const others = total - coordCount
     // Quoted as data: this text was written by the sender, not by the server.
@@ -397,7 +397,7 @@ export function createSessions(platform) {
     if (coordCount > 10) lost.push(`and ${coordCount - 10} more of yours`)
     if (others) lost.push(`and ${others} from other sessions or groups`)
     const what = {
-      logout: `🔌 ${worker} left Squadra (logout).`,
+      logout: `🔌 ${worker} left Pisha (logout).`,
       exit: `🔌 ${worker} disconnected: its Claude Code session was closed.`,
       lost: `⚠️ ${worker} is DOWN: it stopped responding (lost connection or its machine went down).`,
     }[reason]
@@ -492,7 +492,7 @@ export function createSessions(platform) {
   function sessionKeyProved(name, instance, p) {
     const known = db.prepare('SELECT public_key FROM identities WHERE name = ?').get(name)?.public_key ?? null
     if (p.signing_key == null) {
-      if (known) throw keyRefused(`the session "${name}" has a key, and this login doesn't prove it: update the Squadra plugin (0.0.7 or later) on that machine`)
+      if (known) throw keyRefused(`the session "${name}" has a key, and this login doesn't prove it: update the Pisha plugin (0.0.7 or later) on that machine`)
       return null
     }
     const offered = String(p.signing_key)
@@ -506,14 +506,14 @@ export function createSessions(platform) {
   // all it is most likely a plugin older than 0.0.2: said so.
   const notHolder = (name, inst) => inst
     ? new ApiError(409, `Conflict: "${name}" is connected from another session`, { parameters: { reason: 'name_in_use' } })
-    : new ApiError(409, `Conflict: "${name}" is connected, and this request has no session id: update the Squadra plugin (0.0.2 or later) on that machine`, { parameters: { reason: 'plugin_outdated' } })
+    : new ApiError(409, `Conflict: "${name}" is connected, and this request has no session id: update the Pisha plugin (0.0.2 or later) on that machine`, { parameters: { reason: 'plugin_outdated' } })
   // A session's requests still sending their body: at most 8 at a time. While
   // a session holds the name, requests without its session id (a copy of the
   // secret) have their own 2, so they can never use up the holder's.
   const bodiesInFlight = new Map()
   async function readParamsAs(name, req, url) {
     const lease = leases.get(name)
-    const other = lease && String(req.headers['x-squadra-instance'] ?? '') !== lease.instance
+    const other = lease && String(req.headers['x-pisha-instance'] ?? '') !== lease.instance
     const key = other ? `${name}\0other` : name
     const n = bodiesInFlight.get(key) ?? 0
     if (n >= (other ? 2 : 8)) throw new ApiError(429, 'Too Many Requests: too many requests still sending their body')

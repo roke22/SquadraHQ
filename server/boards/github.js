@@ -1,9 +1,9 @@
 // GitHub's GraphQL API, as the boards use it: a project (Projects v2) with its
 // Status, Agent and Type fields, its items and their issues, sub-issues and
 // comments; and the repository's pull requests. Only what the sync needs; every call is named, so a test can
-// answer it (SQUADRA_GITHUB_API points elsewhere).
+// answer it (PISHA_GITHUB_API points elsewhere).
 
-const API = () => process.env.SQUADRA_GITHUB_API || 'https://api.github.com/graphql'
+const API = () => process.env.PISHA_GITHUB_API || 'https://api.github.com/graphql'
 
 export class GithubError extends Error {
   constructor(message, { status = 0, auth = false, notFound = false, transient = false } = {}) { super(message); Object.assign(this, { status, auth, notFound, transient }) }
@@ -53,7 +53,7 @@ export function githubClient(token) {
     try {
       r = await fetch(API(), {
         method: 'POST',
-        headers: { Authorization: `bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'SquadraHQ', 'GraphQL-Features': 'sub_issues' },
+        headers: { Authorization: `bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'Pisha', 'GraphQL-Features': 'sub_issues' },
         body: JSON.stringify({ operationName: name, query, variables }),
         signal: AbortSignal.timeout(30_000),
       })

@@ -88,7 +88,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   }))
 
   const dashboardReads = {
-    // One session's history for the chat view: its events and Squadra
+    // One session's history for the chat view: its events and Pisha
     // messages it sent or received, merged by time, newest page first. Paginate
     // backwards with ?before=<next_before>. The cursor is exact (time, type, id),
     // so items sharing a millisecond are never skipped or repeated.
@@ -195,7 +195,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     },
   }
 
-  // Clear a session's chat: its own activity is deleted; squadra messages stay
+  // Clear a session's chat: its own activity is deleted; pisha messages stay
   // (they're also part of the other side's chat) but are hidden from this one.
   function clearChat(name) {
     if (!identityExists(name)) throw bad('session not found')

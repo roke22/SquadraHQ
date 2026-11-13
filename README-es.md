@@ -1,36 +1,36 @@
-<p align="center"><img src="branding/squadra-logo.svg" width="96" alt="Logo de SquadraHQ"></p>
+<p align="center"><img src="branding/pisha-logo.svg" width="96" alt="Logo de Pisha"></p>
 
-<h1 align="center">SquadraHQ: Claude Code multiagente con un coordinador y un panel en directo</h1>
+<h1 align="center">Pisha: Claude Code multiagente con un coordinador y un panel en directo</h1>
 
 <p align="center"><b>Un agente coordinador que dirige equipos de agentes de Claude Code: rápido, desatendido y a la vista en directo.</b></p>
 
 <p align="center">
-  <a href="https://github.com/roke22/SquadraHQ/releases"><img src="https://img.shields.io/github/v/release/roke22/SquadraHQ?label=release&color=C15F3C" alt="Última versión"></a>
-  <a href="https://github.com/roke22/SquadraHQ/actions/workflows/test.yml"><img src="https://github.com/roke22/SquadraHQ/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/roke22/pisha/releases"><img src="https://img.shields.io/github/v/release/roke22/pisha?label=release&color=F2B90F" alt="Última versión"></a>
+  <a href="https://github.com/roke22/pisha/actions/workflows/test.yml"><img src="https://github.com/roke22/pisha/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="Licencia MIT"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white" alt="Node.js 22+">
   <img src="https://img.shields.io/badge/server%20dependencies-0-success" alt="El servidor no tiene dependencias">
-  <a href="https://github.com/roke22/SquadraHQ/stargazers"><img src="https://img.shields.io/github/stars/roke22/SquadraHQ?style=social" alt="Estrellas en GitHub"></a>
+  <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="Estrellas en GitHub"></a>
 </p>
 
-<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/SquadraHQ/">Web</a> · <a href="https://roke22.github.io/SquadraHQ/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a> · v0.0.10</p>
+<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/pisha/">Web</a> · <a href="https://roke22.github.io/pisha/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.10</p>
 
 ---
 
-SquadraHQ le da a [Claude Code](https://claude.com/product/claude-code) un **coordinador**: le dices lo que quieres y él reparte el trabajo entre un equipo de **workers** (otras sesiones de Claude Code), sigue cómo avanzan, aprueba sus acciones seguras y solo vuelve a ti para las decisiones importantes.
+Pisha le da a [Claude Code](https://claude.com/product/claude-code) un **coordinador**: le dices lo que quieres y él reparte el trabajo entre un equipo de **workers** (otras sesiones de Claude Code), sigue cómo avanzan, aprueba sus acciones seguras y solo vuelve a ti para las decisiones importantes.
 
 Un panel web reúne en una bandeja lo que te necesita, muestra cada equipo con su plan y abre un equipo entero en directo, como una pared de terminales: qué hace cada agente, qué dice Claude y quién te está esperando. Desde ahí también añades tus ordenadores y abres sesiones nuevas en ellos.
 
 Coordinadores y workers pueden ser también sesiones de **Codex CLI** o de **Grok CLI**, mezcladas con las de Claude Code en el mismo equipo (experimental): consulta [Codex CLI y Grok CLI](#codex-cli-y-grok-cli-experimental).
 
-SquadraHQ es **orquestación multiagente para Claude Code**: varias sesiones de Claude Code en paralelo, en una máquina o en varias, coordinadas por otra sesión de Claude Code, con un panel web autoalojado y una terminal web para lanzarlas y vigilarlas desde cualquier navegador. Es código abierto (MIT), un único servidor Node.js sin dependencias, y se instala como plugin de Claude Code.
+Pisha es **orquestación multiagente para Claude Code**: varias sesiones de Claude Code en paralelo, en una máquina o en varias, coordinadas por otra sesión de Claude Code, con un panel web autoalojado y una terminal web para lanzarlas y vigilarlas desde cualquier navegador. Es código abierto (MIT), un único servidor Node.js sin dependencias, y se instala como plugin de Claude Code.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/inbox-dark-es.jpg"><img src="docs/screenshots/inbox-light-es.jpg" alt="La bandeja de SquadraHQ: un permiso pendiente y dos decisiones del coordinador de Desarrollo, una abierta con sus opciones y la recomendada marcada" width="1440"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/inbox-dark-es.jpg"><img src="docs/screenshots/inbox-light-es.jpg" alt="La bandeja de Pisha: un permiso pendiente y dos decisiones del coordinador de Desarrollo, una abierta con sus opciones y la recomendada marcada" width="1440"></picture>
 
 ## Inicio rápido
 
 ```bash
-git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
+git clone https://github.com/roke22/pisha.git pisha && cd pisha
 git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
 node server/server.js          # panel en http://127.0.0.1:7787
 ```
@@ -39,7 +39,7 @@ Crea el primer propietario con el token del servidor que muestra (necesitarás u
 
 ### ¿Solo quieres probarlo? Docker
 
-Un comando arranca el panel *y* una máquina que ejecuta Claude Code, en un solo contenedor. Todo lo que guarda (los datos del panel, el login de Claude Code, tus proyectos) va en una carpeta, `deploy/demo/squadra`.
+Un comando arranca el panel *y* una máquina que ejecuta Claude Code, en un solo contenedor. Todo lo que guarda (los datos del panel, el login de Claude Code, tus proyectos) va en una carpeta, `deploy/demo/pisha`.
 
 **1. Arráncalo** (la primera vez construye la imagen, unos minutos):
 
@@ -51,12 +51,12 @@ docker-compose up -d        # o bien: docker compose up -d
 **2. Lee el token para entrar**, cuando haya arrancado (unos 20 segundos):
 
 ```bash
-cat squadra/data/server-token
+cat pisha/data/server-token
 ```
 
-También aparece en los logs, en el recuadro *Squadra demo*: `docker-compose logs`. Es siempre el mismo aunque reinicies el contenedor.
+También aparece en los logs, en el recuadro *Pisha demo*: `docker-compose logs`. Es siempre el mismo aunque reinicies el contenedor.
 
-**3. Crea el primer propietario:** abre **http://localhost:7787** y escribe el token, tu nombre, tu email y una contraseña; luego añade el código a tu app de autenticación. Después, **Nuevo equipo** (el **+** junto a *Tus equipos* en la barra lateral) en la carpeta `/squadra/projects` con la subcarpeta `demo`, un proyecto de ejemplo con tres personas. La primera vez, Claude Code pide en el terminal de la sesión el tema, tu login de Claude (`/login`) y si confías en la carpeta; el login se guarda para todas las sesiones siguientes.
+**3. Crea el primer propietario:** abre **http://localhost:7787** y escribe el token, tu nombre, tu email y una contraseña; luego añade el código a tu app de autenticación. Después, **Nuevo equipo** (el **+** junto a *Tus equipos* en la barra lateral) en la carpeta `/pisha/projects` con la subcarpeta `demo`, un proyecto de ejemplo con tres personas. La primera vez, Claude Code pide en el terminal de la sesión el tema, tu login de Claude (`/login`) y si confías en la carpeta; el login se guarda para todas las sesiones siguientes.
 
 Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"` y después `docker-compose up -d --build`. Solo este ordenador puede acceder. Más en [el README de la demo](deploy/demo/README-es.md).
 
@@ -84,7 +84,7 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
              ┌───────┴────────┐
              │  coordinador   │  planifica, delega, aprueba, informa
              └───────┬────────┘
-                     │  mensajes a través de squadra-server
+                     │  mensajes a través de pisha-server
       ┌──────────────┼──────────────┬──────────────┐
  ┌────┴─────┐   ┌────┴─────┐   ┌────┴─────┐   ┌────┴─────┐
  │ worker 1 │   │ worker 2 │   │ worker 3 │   │ worker N │   cada uno una sesión de
@@ -93,16 +93,16 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 
 - **El coordinador** es una sesión de Claude Code con el rol de coordinador. Convierte tu petición en tareas, las asigna a los workers, responde sus preguntas, aprueba las acciones inofensivas y solo te escala lo crítico. Mantiene su plan en la página del equipo.
 - **Los workers** son sesiones de Claude Code con el rol de worker, cada una en su carpeta de proyecto. Deciden los detalles técnicos solas, y cada tarea termina con un informe final (hecho, bloqueado, fallido o una pregunta): Claude Code no las deja terminar sin él.
-- **`squadra-server`** pasa los mensajes entre agentes y sirve el panel. Los agentes se conectan *hacia fuera*, así que sus máquinas no abren puertos.
-- **El plugin `squadra`** entrega cada mensaje dentro de la sesión del agente, incluso cuando está parada, mediante los [Channels](https://code.claude.com/docs/en/channels) de Claude Code, y cuenta al panel qué está haciendo el agente.
+- **`pisha-server`** pasa los mensajes entre agentes y sirve el panel. Los agentes se conectan *hacia fuera*, así que sus máquinas no abren puertos.
+- **El plugin `pisha`** entrega cada mensaje dentro de la sesión del agente, incluso cuando está parada, mediante los [Channels](https://code.claude.com/docs/en/channels) de Claude Code, y cuenta al panel qué está haciendo el agente.
 
 Cada agente es un `claude` interactivo normal en una terminal, así que puedes entrar y escribir en cualquiera en cualquier momento.
 
-## SquadraHQ frente a los Agent Teams y subagentes de Claude Code
+## Pisha frente a los Agent Teams y subagentes de Claude Code
 
-Claude Code ya tiene [subagentes](https://code.claude.com/docs/en/sub-agents) y los Agent Teams experimentales. SquadraHQ es para cuando se quedan cortos:
+Claude Code ya tiene [subagentes](https://code.claude.com/docs/en/sub-agents) y los Agent Teams experimentales. Pisha es para cuando se quedan cortos:
 
-| | Subagentes | Agent Teams | SquadraHQ |
+| | Subagentes | Agent Teams | Pisha |
 |---|---|---|---|
 | Los agentes corren en | la misma sesión | la misma máquina | cualquier máquina que añadas, cada una con su sesión de Claude Code |
 | Verlos | en una terminal | una terminal por agente | un panel web en directo con todos los agentes, desde cualquier navegador |
@@ -110,16 +110,16 @@ Claude Code ya tiene [subagentes](https://code.claude.com/docs/en/sub-agents) y 
 | Abrir y reabrir sesiones | a mano | a mano | desde el panel, con una terminal web a cada agente |
 | Varios repositorios a la vez | no | el directorio del lead | un worker por repositorio, en la máquina que lo tiene |
 
-SquadraHQ se suma a Claude Code en vez de sustituirlo: los subagentes y los Agent Teams siguen funcionando dentro de cada sesión.
+Pisha se suma a Claude Code en vez de sustituirlo: los subagentes y los Agent Teams siguen funcionando dentro de cada sesión.
 
 ## Codex CLI y Grok CLI (experimental)
 
-Cualquier coordinador o worker puede usar [Codex CLI](https://github.com/openai/codex) o [Grok CLI](https://x.ai/cli) en lugar de Claude Code: elígelo para cada sesión en **Nuevo equipo** o **Nueva sesión** (la máquina tiene que tenerlo: márcalo en **Añadir máquina**, o instálalo tú). Usa el mismo plugin de SquadraHQ y sigue las mismas reglas, con algunas diferencias, porque ninguno de los dos tiene los Channels de Claude Code:
+Cualquier coordinador o worker puede usar [Codex CLI](https://github.com/openai/codex) o [Grok CLI](https://x.ai/cli) en lugar de Claude Code: elígelo para cada sesión en **Nuevo equipo** o **Nueva sesión** (la máquina tiene que tenerlo: márcalo en **Añadir máquina**, o instálalo tú). Usa el mismo plugin de Pisha y sigue las mismas reglas, con algunas diferencias, porque ninguno de los dos tiene los Channels de Claude Code:
 
 - **Los mensajes se teclean en su terminal entre turno y turno.** Un mensaje que llega mientras trabaja espera a que termine su turno; por eso un coordinador reparte sus tareas y termina su turno, y los informes de sus workers le llegan como turnos nuevos.
 - **Los permisos** van a su coordinador como con Claude Code. La respuesta solo se teclea en su terminal cuando el diálogo muestra ese mismo comando en una línea; un comando largo, uno de varias líneas o la edición de un fichero solo se avisan, y se responden en la terminal.
 - **Limpiar su contexto** para una tarea nueva arranca el agente otra vez en su terminal, con una conversación nueva. **Las personas** entran como sus instrucciones, sin la lista de herramientas propia del agente. **Continuar la última conversación** funciona como con Claude Code.
-- **Primer arranque:** inicia sesión en cada máquina (`codex login` y `grok login`; añade `--device-auth` en una máquina sin navegador) y confía en la carpeta. Codex pide además una vez confiar en los hooks de SquadraHQ, y otra vez tras una actualización que los cambie. **Confiar en una carpeta es confiar también en sus propios ajustes de Codex o Grok, que pueden ejecutar código:** hazlo solo con repositorios de confianza. No se abre una sesión de Grok donde el proyecto define su propio servidor MCP llamado `squadra`.
+- **Primer arranque:** inicia sesión en cada máquina (`codex login` y `grok login`; añade `--device-auth` en una máquina sin navegador) y confía en la carpeta. Codex pide además una vez confiar en los hooks de Pisha, y otra vez tras una actualización que los cambie. **Confiar en una carpeta es confiar también en sus propios ajustes de Codex o Grok, que pueden ejecutar código:** hazlo solo con repositorios de confianza. No se abre una sesión de Grok donde el proyecto define su propio servidor MCP llamado `pisha`.
 
 Es experimental: funciona con las versiones actuales de los agentes, pero se ha usado mucho menos que con Claude Code. Más en la [referencia](docs/referencia.md#codex-cli-y-grok-cli-experimental).
 
@@ -133,7 +133,7 @@ En los ordenadores donde trabajan los agentes se instala todo lo demás solo, al
 ## 1. Instala el panel
 
 ```bash
-git clone https://github.com/roke22/SquadraHQ.git squadra && cd squadra
+git clone https://github.com/roke22/pisha.git pisha && cd pisha
 git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
 node server/server.js
 ```
@@ -143,18 +143,18 @@ Abre **http://127.0.0.1:7787** y crea el primer propietario con el **token del s
 **Con Docker**, en su lugar:
 
 ```bash
-docker build -f server/Dockerfile -t squadra-server .
-docker run -d --name squadra-server -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v squadra-data:/data squadra-server
-docker logs squadra-server      # la primera vez, muestra el token del servidor (después: docker exec squadra-server cat /data/server-token)
+docker build -f server/Dockerfile -t pisha-server .
+docker run -d --name pisha-server -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data pisha-server
+docker logs pisha-server      # la primera vez, muestra el token del servidor (después: docker exec pisha-server cat /data/server-token)
 ```
 
 **Para usarlo desde otros ordenadores,** dale un dominio: apunta el dominio a este ordenador, abre los puertos 80 y 443, y arráncalo con
 
 ```bash
-node server/server.js --domain squadra.example.com --acme-email tu@example.com
+node server/server.js --domain pisha.example.com --acme-email tu@example.com
 ```
 
-Consigue y renueva su certificado HTTPS solo, y el panel queda en `https://squadra.example.com`. (En Linux, los puertos 80 y 443 necesitan privilegios: arráncalo con `sudo`, o usa la imagen de Docker con `-p 80:80 -p 443:443 -e SQUADRA_DOMAIN=squadra.example.com`.)
+Consigue y renueva su certificado HTTPS solo, y el panel queda en `https://pisha.example.com`. (En Linux, los puertos 80 y 443 necesitan privilegios: arráncalo con `sudo`, o usa la imagen de Docker con `-p 80:80 -p 443:443 -e PISHA_DOMAIN=pisha.example.com`.)
 
 ## 2. Añade tus ordenadores
 
@@ -186,9 +186,9 @@ Después:
 - **Enlaza los equipos que se necesitan:** en **Equipos → Organigrama**, arrastra el punto del borde derecho de una tarjeta hasta otra (o **Gestionar enlaces** en la página de un equipo). Los coordinadores enlazados se piden trabajo entre ellos (marketing le pide la landing a producto, producto le cuenta a marketing qué sale), y cada uno pasa lo que asume a sus propios workers.
 - **Guarda cada equipo como plantilla:** **Guardar como plantilla** en su página. **Máquinas → Plantillas → Abrir el equipo** lo vuelve a abrir entero, primero el coordinador, y **Nuevo equipo** puede empezar desde ella.
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-es.jpg"><img src="docs/screenshots/org-chart-light-es.jpg" alt="El organigrama de SquadraHQ: los equipos de Desarrollo, QA y Contenidos, cada coordinador con sus workers" width="1440"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-es.jpg"><img src="docs/screenshots/org-chart-light-es.jpg" alt="El organigrama de Pisha: los equipos de Desarrollo, QA y Contenidos, cada coordinador con sus workers" width="1440"></picture>
 
-Los **[ejemplos](https://roke22.github.io/SquadraHQ/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
+Los **[ejemplos](https://roke22.github.io/pisha/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
 
 ## Buenos consejos
 
@@ -203,9 +203,9 @@ Los **[ejemplos](https://roke22.github.io/SquadraHQ/es/ejemplos.html)** muestran
 
 ## Actualizar
 
-Actualiza el panel a la última versión (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) y arráncalo de nuevo, o reconstruye la imagen de Docker desde ahí. Después ejecuta `squadra-host update` en cada ordenador. El panel te dice cuáles están desactualizados.
+Actualiza el panel a la última versión (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) y arráncalo de nuevo, o reconstruye la imagen de Docker desde ahí. Después ejecuta `pisha-host update` en cada ordenador. El panel te dice cuáles están desactualizados.
 
-**Desde 0.0.7:** lo que tenía el panel pasa a ser su primera empresa, y los ordenadores y las sesiones siguen funcionando como estaban. La primera vez que lo abres, el token del servidor crea el primer propietario; después entras con email, contraseña y código, y el token ya no abre el panel (`--allow-token-api` lo mantiene en `/api` para tus scripts). Ejecuta `squadra-host update` en cada ordenador y vuelve a abrir sus sesiones para tener lo nuevo, como la bandeja y el plan del equipo; los ordenadores sin actualizar siguen funcionando sin ello. El repositorio pasa a ser `roke22/SquadraHQ`: la dirección antigua sigue funcionando, y cada ordenador pasa a la nueva al actualizarse.
+**Desde 0.0.7:** lo que tenía el panel pasa a ser su primera empresa, y los ordenadores y las sesiones siguen funcionando como estaban. La primera vez que lo abres, el token del servidor crea el primer propietario; después entras con email, contraseña y código, y el token ya no abre el panel (`--allow-token-api` lo mantiene en `/api` para tus scripts). Ejecuta `pisha-host update` en cada ordenador y vuelve a abrir sus sesiones para tener lo nuevo, como la bandeja y el plan del equipo; los ordenadores sin actualizar siguen funcionando sin ello. El repositorio pasa a ser `roke22/pisha`: la dirección antigua sigue funcionando, y cada ordenador pasa a la nueva al actualizarse.
 
 ## Preguntas frecuentes
 
@@ -216,10 +216,10 @@ Aprueba lo que no tiene efectos secundarios: leer ficheros, buscar, ejecutar tes
 Sí, con cualquier plan de claude.ai que incluya Claude Code (Pro, Max, Team, Enterprise) o con una clave de API de Anthropic Console. Cada agente es una sesión normal de Claude Code en su máquina, con la sesión de esa máquina, así que consume de esa cuenta como cualquier otra sesión.
 
 **¿Qué instala el comando de "añadir máquina"?**
-Lo que falte de tmux, Node.js 22 y Claude Code (y Codex CLI, con npm, o Grok CLI, con su propio instalador, si los marcaste), y después `squadra-host`: un pequeño programa Node que conecta la máquina a tu servidor, instala el plugin `squadra` y se queda en marcha como servicio de usuario. El script es [install/linux.sh](install/linux.sh) (y [macos.sh](install/macos.sh), [windows.bat](install/windows.bat)); el comando lo comprueba contra la copia de tu servidor antes de ejecutarlo.
+Lo que falte de tmux, Node.js 22 y Claude Code (y Codex CLI, con npm, o Grok CLI, con su propio instalador, si los marcaste), y después `pisha-host`: un pequeño programa Node que conecta la máquina a tu servidor, instala el plugin `pisha` y se queda en marcha como servicio de usuario. El script es [install/linux.sh](install/linux.sh) (y [macos.sh](install/macos.sh), [windows.bat](install/windows.bat)); el comando lo comprueba contra la copia de tu servidor antes de ejecutarlo.
 
 **¿Qué sale de mis máquinas?**
-Solo lo que va a **tu** servidor SquadraHQ: los mensajes entre agentes, la presencia y lo que elijas mostrar en el panel (`--observe off|activity|full`). Los secretos reconocibles se enmascaran y los ficheros de carpetas de credenciales nunca se envían. Nada va a ningún otro servicio. Detalles en el [README del plugin](plugins/squadra/README.md).
+Solo lo que va a **tu** servidor Pisha: los mensajes entre agentes, la presencia y lo que elijas mostrar en el panel (`--observe off|activity|full`). Los secretos reconocibles se enmascaran y los ficheros de carpetas de credenciales nunca se envían. Nada va a ningún otro servicio. Detalles en el [README del plugin](plugins/pisha/README.md).
 
 **¿Tengo que abrir puertos en las máquinas de los agentes?**
 No. Los agentes se conectan hacia fuera, al servidor. Solo el servidor tiene que ser accesible, y con un dominio consigue su propio certificado HTTPS.
@@ -228,20 +228,20 @@ No. Los agentes se conectan hacia fuera, al servidor. Solo el servidor tiene que
 Sí, sesión a sesión, como opción experimental: consulta [Codex CLI y Grok CLI](#codex-cli-y-grok-cli-experimental). Cada uno usa su propia cuenta en su máquina.
 
 **¿Sustituye a los Agent Teams o a los subagentes?**
-No, convive con ellos: esos funcionan dentro de una sesión en una máquina; SquadraHQ coordina sesiones enteras entre máquinas y deja que el equipo siga sin que lo vigiles.
+No, convive con ellos: esos funcionan dentro de una sesión en una máquina; Pisha coordina sesiones enteras entre máquinas y deja que el equipo siga sin que lo vigiles.
 
 **¿Por qué el aviso de "development channel"?**
 Los Channels son la función de Claude Code que entrega mensajes dentro de una sesión. Hasta que el plugin esté en el directorio de Anthropic, Claude Code te pide confirmar la primera vez que cargas un plugin de canal. Elige *"I am using this for local development"*.
 
 ## Saber más
 
-- [Ejemplos](https://roke22.github.io/SquadraHQ/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
+- [Ejemplos](https://roke22.github.io/pisha/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
 - [docs/referencia.md](docs/referencia.md): configurar agentes a mano sin el panel, todas las opciones del servidor y cómo funciona todo por dentro.
 - [PLAN.md](PLAN.md): la guía técnica completa.
 
 ## Contribuir
 
-Los errores y las ideas van a [Issues](https://github.com/roke22/SquadraHQ/issues); las preguntas y lo que hayas montado con SquadraHQ, a [Discussions](https://github.com/roke22/SquadraHQ/discussions). En [CONTRIBUTING.md](CONTRIBUTING.md) está cómo ejecutar los tests y enviar un pull request. Si SquadraHQ te resulta útil, una estrella en GitHub ayuda a que lo encuentre más gente.
+Los errores y las ideas van a [Issues](https://github.com/roke22/pisha/issues); las preguntas y lo que hayas montado con Pisha, a [Discussions](https://github.com/roke22/pisha/discussions). En [CONTRIBUTING.md](CONTRIBUTING.md) está cómo ejecutar los tests y enviar un pull request. Si Pisha te resulta útil, una estrella en GitHub ayuda a que lo encuentre más gente.
 
 ## Licencia
 

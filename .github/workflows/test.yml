@@ -45,7 +45,7 @@ jobs:
       - run: npm run test:ui
 
   # A release must be signed: a machine won't install one that isn't. (Only for
-  # a release: between them, squadra-host can change without being signed yet.)
+  # a release: between them, pisha-host can change without being signed yet.)
   release:
     if: github.ref_type == 'tag' || startsWith(github.head_ref, 'release-')
     runs-on: ubuntu-latest

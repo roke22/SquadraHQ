@@ -54,8 +54,8 @@ export function sendJson(res, status, body) {
 let errorsDropped = 0
 export function logError(text) {
   if (!allowServerWide('error-log', 'all', 60)) { errorsDropped++; return }
-  if (errorsDropped) { process.stderr.write(`squadra-server: (${errorsDropped} more errors not logged)\n`); errorsDropped = 0 }
-  process.stderr.write(`squadra-server: ${text}\n`)
+  if (errorsDropped) { process.stderr.write(`pisha-server: (${errorsDropped} more errors not logged)\n`); errorsDropped = 0 }
+  process.stderr.write(`pisha-server: ${text}\n`)
 }
 export function sendError(res, err) {
   if (err instanceof ApiError) {

@@ -29,7 +29,7 @@ import { githubClient, parseProjectUrl, parseRepo, GithubError } from './github.
 // side differs from it changed; if both did, the later change wins. Nothing
 // that comes from GitHub tells an agent: it waits for a person to say so.
 
-const FRESH = Number(process.env.SQUADRA_GITHUB_FRESH_MS) || 180_000 // (a board or task in use is read again after this; tests make it short)
+const FRESH = Number(process.env.PISHA_GITHUB_FRESH_MS) || 180_000 // (a board or task in use is read again after this; tests make it short)
 const SLACK = FRESH / 9  // (so that a dashboard asking every 3 minutes is never just too early)
 const OPENED = FRESH / 6 // (just opened: read, unless someone did a moment ago; a task, half that)
 const SOON = 3_000    // (a change here goes there this soon, with the others made meanwhile)
@@ -40,7 +40,7 @@ const ACTIVE = ['unstarted', 'started', 'review']
 const OPTION_COLOR = { backlog: 'GRAY', unstarted: 'BLUE', started: 'YELLOW', review: 'PURPLE', done: 'GREEN', closed: 'RED' }
 const LABEL_HEX = { gray: '8c959f', blue: '0969da', green: '1a7f37', yellow: 'bf8700', orange: 'bc4c00', red: 'cf222e', purple: '8250df', pink: 'bf3989' }
 // (Found by any of these names; made with the first GitHub takes: it keeps «Type» for its own issue types.)
-const AGENT_FIELD = ['Agent', 'Agente', 'Squadra agent'], TYPE_FIELD = ['Task type', 'Tipo de tarea', 'Tipo', 'Squadra type']
+const AGENT_FIELD = ['Agent', 'Agente', 'Pisha agent'], TYPE_FIELD = ['Task type', 'Tipo de tarea', 'Tipo', 'Pisha type']
 
 // What a column of GitHub's is, by its name, until a person says otherwise.
 export function guessCategory(name) {
@@ -855,7 +855,7 @@ export function createGithubSync(ctx) {
 
   // Comments: GitHub's that are new here, and ours that aren't there yet.
   // What a comment says, as GitHub has it (ours without the signature they were sent with).
-  const SIGNED = /^\*\*[^*\n]{1,200}\*\* \(SquadraHQ\):\n\n/
+  const SIGNED = /^\*\*[^*\n]{1,200}\*\* \(Pisha\):\n\n/
   const textOf = cm => cleanText(String(cm.body ?? '').replace(/\r\n/g, '\n').replace(SIGNED, '')).trim().slice(0, MAX.comment)
   // GitHub's comments on the issue: new ones here, edited ones edited, deleted ones no longer shown.
   function commentsChanged(link, list) {
@@ -891,7 +891,7 @@ export function createGithubSync(ctx) {
     }
     for (const cm of unsent(link.task_seq)) {
       const author = JSON.parse(cm.author)
-      const id = await gh.comment(link.issue_id, `**${author.kind === 'session' ? author.id : author.name}** (SquadraHQ):\n\n${cm.text}`)
+      const id = await gh.comment(link.issue_id, `**${author.kind === 'session' ? author.id : author.name}** (Pisha):\n\n${cm.text}`)
       db.prepare('UPDATE task_comments SET gh_id = ? WHERE id = ?').run(id, cm.id)
     }
   }

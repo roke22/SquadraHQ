@@ -58,9 +58,9 @@ function screens(d) {
   return {
     'coord-dev': term([acc('╭─────────────────────────────────────────────────╮'), `${acc('│')} ${acc('✻')} ${b('Claude Code')}  ${dim('/srv/shop')}                       ${acc('│')}`, acc('╰─────────────────────────────────────────────────╯'), '',
       `${dim('>')} ${d.order.slice(0, 60)}…`, '', `${ok('⏺')} ${d.said.slice(0, 70)}…`, '',
-      `${ok('⏺')} ${b('squadra - reply')} ${dim('(MCP)')}(chat_id: "web", text: "GH-18…")`, `  ${dim('⎿')}  sent (id: 41)`, '',
-      `${ok('⏺')} ${b('squadra - update_plan')} ${dim('(MCP)')}(title: "${d.plan[0].slice(0, 28)}…")`, `  ${dim('⎿')}  Plan updated: 3 of 7 done, 1 in progress, 1 blocked, 1 waiting on the user.`, '',
-      `${ok('⏺')} ${b('squadra - ask_user')} ${dim('(MCP)')}(text: "${d.asks[0][0].slice(0, 34)}…")`, `  ${dim('⎿')}  It is in the user's inbox (#1).`, '',
+      `${ok('⏺')} ${b('pisha - reply')} ${dim('(MCP)')}(chat_id: "web", text: "GH-18…")`, `  ${dim('⎿')}  sent (id: 41)`, '',
+      `${ok('⏺')} ${b('pisha - update_plan')} ${dim('(MCP)')}(title: "${d.plan[0].slice(0, 28)}…")`, `  ${dim('⎿')}  Plan updated: 3 of 7 done, 1 in progress, 1 blocked, 1 waiting on the user.`, '',
+      `${ok('⏺')} ${b('pisha - ask_user')} ${dim('(MCP)')}(text: "${d.asks[0][0].slice(0, 34)}…")`, `  ${dim('⎿')}  It is in the user's inbox (#1).`, '',
       `${acc('✻')} ${dim('Waiting for the workers’ reports…')}`, '', dim('─'.repeat(60)), `${dim('>')} `]),
     web: term([`${dim('>')} ${d.webPrompt}`, '', `${ok('⏺')} ${b('Read')}(src/checkout.js)`, `  ${dim('⎿')}  Read 214 lines`, '',
       `${ok('⏺')} ${b('Update')}(src/checkout.js)`, `  ${dim('⎿')}  Updated with 6 additions and 1 removal`, `     ${dim('118')} ${ok('+    const total = round(lines.reduce(sum, 0))')}`, '',
@@ -104,7 +104,7 @@ async function company(lang) {
   await dev.call('setPlan', { title: d.plan[0], tasks: d.plan[1].map(([title, state, who, ref, note]) => ({ title, state, ...(who ? { who } : {}), ref, ...(note ? { note } : {}) })) })
   for (const [text, options, recommended, ref] of d.asks) await dev.call('askUser', { text, options, recommended, ref })
   await qa.call('tellUser', { text: d.tell })
-  for (const [from, report, text] of d.reports) await (from === 'web' ? web : api).call('sendMessage', { chat_id: 'coord-dev', text, squadra_report: report })
+  for (const [from, report, text] of d.reports) await (from === 'web' ? web : api).call('sendMessage', { chat_id: 'coord-dev', text, pisha_report: report })
   return server
 }
 
@@ -133,7 +133,7 @@ for (const lang of ['en', 'es']) {
       test(`${lang} ${scheme}`, async ({ browser }) => {
         for (const [name, hash, ready, phone] of SHOTS) {
           const ctx = await browser.newContext({ colorScheme: scheme, locale: lang === 'es' ? 'es-ES' : 'en-GB', viewport: phone ? { width: 390, height: 844 } : { width: 1440, height: 900 }, deviceScaleFactor: 2 })
-          await ctx.addInitScript(l => { try { localStorage.setItem('squadraLang', l) } catch {} }, lang)
+          await ctx.addInitScript(l => { try { localStorage.setItem('pishaLang', l) } catch {} }, lang)
           const page = await ctx.newPage()
           const [n, v] = (await server.ownerCookie()).split('=')
           await ctx.addCookies([{ name: n, value: v, url: server.url }])

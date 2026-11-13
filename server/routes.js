@@ -9,7 +9,7 @@ import {
   INSTALLERS, installer, hostScript, hostSignature, checkEnrollRate, enrollmentKey, offeredCredential,
 } from './machines/index.js'
 
-const MAX_IDENTITIES = Number(process.env.SQUADRA_MAX_SESSIONS ?? 500)
+const MAX_IDENTITIES = Number(process.env.PISHA_MAX_SESSIONS ?? 500)
 
 export function createRoutes(server, companies, accounts) {
   const { isServerToken, serverIdentity } = server
@@ -192,16 +192,16 @@ export function createRoutes(server, companies, accounts) {
         return res.end(f.body)
       }
 
-      // squadra-host: the program itself (public, like the dashboard page) and enrollment.
-      if (req.method === 'GET' && path === '/host/squadra-host.mjs') {
+      // pisha-host: the program itself (public, like the dashboard page) and enrollment.
+      if (req.method === 'GET' && path === '/host/pisha-host.mjs') {
         const f = hostScript()
         if (!f) throw new ApiError(404, 'Not Found')
         res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Content-Length': f.body.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
         return res.end(f.body)
       }
-      // Its release signature, checked by squadra-host update with the key it
+      // Its release signature, checked by pisha-host update with the key it
       // already has: a server can't hand a machine a program of its own.
-      if (req.method === 'GET' && path === '/host/squadra-host.mjs.sig') {
+      if (req.method === 'GET' && path === '/host/pisha-host.mjs.sig') {
         const f = hostSignature()
         if (!f) throw new ApiError(404, 'Not Found')
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': f.body.length, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -276,7 +276,7 @@ export function createRoutes(server, companies, accounts) {
         const roomForOne = () => {
           if (!admin && joining.platform.db.prepare('SELECT COUNT(*) AS n FROM identities').get().n >= joining.platform.quota('max_sessions', MAX_IDENTITIES)) {
             const max = joining.platform.quota('max_sessions', MAX_IDENTITIES)
-            throw new ApiError(403, `Forbidden: this server already has ${max} sessions; delete some in the dashboard (or raise SQUADRA_MAX_SESSIONS)`)
+            throw new ApiError(403, `Forbidden: this server already has ${max} sessions; delete some in the dashboard (or raise PISHA_MAX_SESSIONS)`)
           }
         }
         roomForOne()
@@ -318,14 +318,14 @@ export function createRoutes(server, companies, accounts) {
       const lease = leases.get(name)
       // (claim, poll and release check the instance themselves.)
       if (lease && path !== '/claimSession' && path !== '/getUpdates' && path !== '/releaseSession') {
-        const inst = String(req.headers['x-squadra-instance'] ?? '')
+        const inst = String(req.headers['x-pisha-instance'] ?? '')
         if (inst !== lease.instance) throw notHolder(name, inst)
       }
       // A session with a key acts only from the session id that proved it: its
       // secret alone (a copy in a log, say) does nothing, connected or not.
       const keyed = db.prepare('SELECT public_key, proven_instance FROM identities WHERE name = ?').get(name)
       if (keyed?.public_key && path !== '/claimSession') {
-        const inst = String(req.headers['x-squadra-instance'] ?? '')
+        const inst = String(req.headers['x-pisha-instance'] ?? '')
         if (inst !== keyed.proven_instance) throw notHolder(name, inst)
       }
       touch(name)
@@ -356,8 +356,8 @@ export function createRoutes(server, companies, accounts) {
         if (identityFromSecret(token) !== name) throw new ApiError(401, 'Unauthorized')
         const l = leases.get(name)
         if (l && path !== '/claimSession' && path !== '/getUpdates' && path !== '/releaseSession' &&
-          String(req.headers['x-squadra-instance'] ?? '') !== l.instance) {
-          throw notHolder(name, String(req.headers['x-squadra-instance'] ?? ''))
+          String(req.headers['x-pisha-instance'] ?? '') !== l.instance) {
+          throw notHolder(name, String(req.headers['x-pisha-instance'] ?? ''))
         }
       }
       const method = path.slice(1)
@@ -378,8 +378,8 @@ export function createRoutes(server, companies, accounts) {
       // A claim comes with its session id in the header too, like every later
       // request: a plugin that doesn't send it (older than 0.0.2) would claim
       // the name and then fail at everything — it is told now instead.
-      if (method === 'claimSession' && String(req.headers['x-squadra-instance'] ?? '') !== String(params.instance ?? '')) {
-        throw notHolder(name, String(req.headers['x-squadra-instance'] ?? ''))
+      if (method === 'claimSession' && String(req.headers['x-pisha-instance'] ?? '') !== String(params.instance ?? '')) {
+        throw notHolder(name, String(req.headers['x-pisha-instance'] ?? ''))
       }
       return sendJson(res, 200, { ok: true, result: await fn(name, params) })
     } catch (err) {

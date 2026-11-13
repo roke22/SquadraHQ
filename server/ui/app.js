@@ -57,13 +57,13 @@ function enter(me) {
       show('app')
       return openSettings()
     }
-    store.set('squadraCompany', first.id)
+    store.set('pishaCompany', first.id)
     location.replace(`?company=${encodeURIComponent(first.id)}${location.hash}`)
     return
   }
   state.me = me
   state.role = here.role
-  store.set('squadraCompany', here.id)
+  store.set('pishaCompany', here.id)
   document.body.dataset.role = here.role
   // The company: a choice when there are several, its name otherwise.
   const select = $('companySelect')
@@ -80,7 +80,7 @@ $('companySelect').addEventListener('change', e => switchCompany(e.target.value)
 
 export async function logOut() {
   await signOut()
-  store.set('squadraSignedOut', String(Date.now()))
+  store.set('pishaSignedOut', String(Date.now()))
   showLogin()
 }
 $('settingsBtn').addEventListener('click', () => openSettings())
@@ -110,7 +110,7 @@ onTheme(themeButtons)
 themeButtons()
 for (const b of document.querySelectorAll('[data-lang]')) {
   b.classList.toggle('on', b.dataset.lang === LANG)
-  b.addEventListener('click', () => { store.set('squadraLang', b.dataset.lang); location.reload() })
+  b.addEventListener('click', () => { store.set('pishaLang', b.dataset.lang); location.reload() })
 }
 
 // Ctrl+K (⌘K on a Mac) from anywhere in the dashboard.
@@ -135,9 +135,9 @@ export function setVersion(v) {
 fetch('/health').then(r => r.json()).then(j => { if (j.version) setVersion(j.version) }).catch(() => {})
 
 // Logged out in another tab of this browser: this one too.
-window.addEventListener('storage', e => { if (e.key === 'squadraSignedOut' && state.me) showLogin() })
+window.addEventListener('storage', e => { if (e.key === 'pishaSignedOut' && state.me) showLogin() })
 
 // boot (what older versions kept in this browser goes: it was the server token)
-store.del('squadraToken'); store.del('swarmToken')
+store.del('pishaToken'); store.del('swarmToken')
 show('splash')
 begin(enter).then(() => { if (!state.me && $('app').hidden) show('login') }, err => { show('login'); loginScreen(T.cannotConnect(err.message)) })

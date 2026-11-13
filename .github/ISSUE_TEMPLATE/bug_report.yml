@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Squadra does not work as described
+description: Something in Pisha does not work as described
 labels: [bug]
 body:
   - type: textarea
@@ -13,12 +13,12 @@ body:
     id: logs
     attributes:
       label: Output
-      description: Relevant lines from squadra-server, squadra-host or the Claude Code session. Remove tokens.
+      description: Relevant lines from pisha-server, pisha-host or the Claude Code session. Remove tokens.
       render: shell
   - type: input
     id: version
     attributes:
-      label: Squadra version
+      label: Pisha version
       placeholder: v0.0.10 (git describe --tags)
     validations:
       required: true

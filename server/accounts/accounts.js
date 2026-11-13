@@ -8,7 +8,7 @@ import {
 import { NOBODY, checkNewPassword, hashPassword, passwordMatches } from './passwords.js'
 import { checkTotp, newTotpSecret, openSecret, sealSecret } from './totp.js'
 
-const COOKIE = 'squadra_session'
+const COOKIE = 'pisha_session'
 const SESSION_MS = 7 * 24 * 3600_000  // however much it is used
 const IDLE_MS = 24 * 3600_000         // without being used
 const INVITE_MS = 7 * 24 * 3600_000
@@ -152,8 +152,8 @@ export function createAccounts(server, { control, companyName, companyStatus, dr
   function setUpTotp(user) {
     const secret = newTotpSecret()
     q('UPDATE users SET totp_secret_enc = ?, totp_last_step = NULL WHERE id = ?').run(sealSecret(totpKey, user.id, secret), user.id)
-    const label = encodeURIComponent(`Squadra:${user.email}`)
-    return { secret, uri: `otpauth://totp/${label}?secret=${secret}&issuer=Squadra&algorithm=SHA1&digits=6&period=30` }
+    const label = encodeURIComponent(`Pisha:${user.email}`)
+    return { secret, uri: `otpauth://totp/${label}?secret=${secret}&issuer=Pisha&algorithm=SHA1&digits=6&period=30` }
   }
 
   // Wrong codes: 5 every 5 minutes per person, however many sessions try.

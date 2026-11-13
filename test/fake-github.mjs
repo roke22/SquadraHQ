@@ -109,7 +109,7 @@ export async function startFakeGithub({ token = 'ghp_test_token_0123456789' } = 
     AddSubIssue: ({ input }) => { const i = issues.get(input.subIssueId); i.parent = input.issueId; i.updatedAt = at(); return { addSubIssue: { issue: { id: input.issueId } } } },
     RemoveSubIssue: ({ input }) => { const i = issues.get(input.subIssueId); i.parent = null; i.updatedAt = at(); return { removeSubIssue: { issue: { id: input.issueId } } } },
     AddComment: ({ input }) => {
-      const c = { id: id('IC'), body: input.body, createdAt: at(), login: 'squadra-bot' }
+      const c = { id: id('IC'), body: input.body, createdAt: at(), login: 'pisha-bot' }
       issues.get(input.subjectId).comments.push(c)
       return { addComment: { commentEdge: { node: { id: c.id } } } }
     },

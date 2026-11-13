@@ -27,4 +27,4 @@ const PATHS = {
 export const icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${PATHS[name] ?? ''}</svg>`
 
 // The logo, drawn from the symbol in the page.
-export const logo = (cls = 'logo') => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#squadra-logo"/></svg>`
+export const logo = (cls = 'logo') => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#pisha-logo"/></svg>`

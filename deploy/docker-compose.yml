@@ -1,33 +1,33 @@
-# squadra-server behind Caddy (HTTPS) on your own domain.
+# pisha-server behind Caddy (HTTPS) on your own domain.
 #
-#   cp .env.example .env      # set SQUADRA_DOMAIN
+#   cp .env.example .env      # set PISHA_DOMAIN
 #   docker compose up -d
-#   docker compose logs squadra-server   # the first time: the server token and the /squadra:configure command
-#   (later: docker compose exec squadra-server cat /data/server-token /data/join-token)
+#   docker compose logs pisha-server   # the first time: the server token and the /pisha:configure command
+#   (later: docker compose exec pisha-server cat /data/server-token /data/join-token)
 #
-# Only Caddy publishes ports; squadra-server is reachable only through it.
+# Only Caddy publishes ports; pisha-server is reachable only through it.
 
 services:
-  squadra-server:
+  pisha-server:
     build:
       context: ..
       dockerfile: server/Dockerfile
     restart: unless-stopped
     environment:
-      PUBLIC_URL: https://${SQUADRA_DOMAIN:?set SQUADRA_DOMAIN in .env}
+      PUBLIC_URL: https://${PISHA_DOMAIN:?set PISHA_DOMAIN in .env}
       # Caddy sets X-Forwarded-For: rate limits then see each client's address.
       TRUST_PROXY: "1"
     volumes:
-      - squadra-data:/data
+      - pisha-data:/data
 
   caddy:
     # (Fixed by digest, here and in the Dockerfiles: to update, change both the tag and the digest.)
     image: caddy:2.11.9@sha256:0c2243efcf437ab7f7a978f1027fcf0d4f9be8a75df27b1b3fbc5dbe0ffa8cf0
     restart: unless-stopped
     depends_on:
-      - squadra-server
+      - pisha-server
     environment:
-      SQUADRA_DOMAIN: ${SQUADRA_DOMAIN:?set SQUADRA_DOMAIN in .env}
+      PISHA_DOMAIN: ${PISHA_DOMAIN:?set PISHA_DOMAIN in .env}
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -38,6 +38,6 @@ services:
       - caddy-config:/config
 
 volumes:
-  squadra-data:
+  pisha-data:
   caddy-data:
   caddy-config:

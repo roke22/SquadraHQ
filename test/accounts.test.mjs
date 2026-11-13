@@ -19,7 +19,7 @@ const ADMIN = 'accounts-admin-token-0123456789'
 const PORT = 26000 + Math.floor(Math.random() * 2000)
 const URL_ = `http://127.0.0.1:${PORT}`
 const ORIGIN = URL_
-const dataDir = tempDir('squadra-accounts-')
+const dataDir = tempDir('pisha-accounts-')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const PASSWORD = 'correct horse battery'
 let server
@@ -75,7 +75,7 @@ function nextCode(secret) {
 
 async function setUpCodes(b) {
   const { secret, uri } = ok(await b.post('auth/totp/setup'))
-  assert.match(uri, /^otpauth:\/\/totp\/Squadra%3A/)
+  assert.match(uri, /^otpauth:\/\/totp\/Pisha%3A/)
   const done = ok(await b.post('auth/totp/enable', { code: nextCode(secret) }))
   assert.equal(done.stage, 'ok')
   return { secret, recovery: done.recovery_codes }
@@ -96,7 +96,7 @@ let owner, ownerCodes, ownerId
 
 before(async () => {
   server = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: ADMIN, TRUST_PROXY: '1' },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, PISHA_SERVER_TOKEN: ADMIN, TRUST_PROXY: '1' },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   server.stderr.on('data', d => { if (process.env.DEBUG) process.stderr.write(d) })
@@ -186,11 +186,11 @@ test('over https the cookie has a name only this host can set, and the plain nam
   const https = { 'X-Forwarded-Proto': 'https' }
   const answer = await fetch(`${URL_}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN, 'X-Forwarded-For': '10.9.9.9', ...https }, body: JSON.stringify({ email: 'owner@example.com', password: PASSWORD }) })
   const set = answer.headers.get('set-cookie')
-  assert.match(set, /^__Host-squadra_session=[^;]+; HttpOnly; SameSite=Strict; Path=\/; Max-Age=\d+; Secure$/)
+  assert.match(set, /^__Host-pisha_session=[^;]+; HttpOnly; SameSite=Strict; Path=\/; Max-Age=\d+; Secure$/)
   const token = set.split(';')[0].split('=')[1]
   const stage = cookie => fetch(`${URL_}/api/me`, { headers: { Cookie: cookie, ...https } }).then(r => r.json()).then(j => j.result?.stage ?? j.error_code)
-  assert.equal(await stage(`__Host-squadra_session=${token}`), 'totp')
-  assert.equal(await stage(`squadra_session=${token}`), 401)
+  assert.equal(await stage(`__Host-pisha_session=${token}`), 'totp')
+  assert.equal(await stage(`pisha_session=${token}`), 401)
 })
 
 test('signing in takes the password and the code, and neither can be tried for ever', async () => {
@@ -304,7 +304,7 @@ test('losing access closes what is open, at once', async () => {
   }
   const socket = async () => {
     const { ticket } = ok(await op.b.post(`${path}/terminal/ticket`))
-    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/api/terminal`, ['squadra', `auth.${ticket}`])
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/api/terminal`, ['pisha', `auth.${ticket}`])
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('no socket')) })
     return { ended: new Promise(res => { ws.onclose = e => res(e.code) }) }
   }
@@ -416,12 +416,12 @@ test('a terminal ticket says who asked for it, and only reaches that company', a
   const en = ok(await owner.post(`api/c/${co.id}/hosts/enroll`, { name: 'm' }))
   const host = ok(await fetch(`${URL_}/host/enroll`, { method: 'POST', body: JSON.stringify({ code: en.code, company: co.id, info: { hostname: 'm' } }) }).then(r => r.json()))
   const hostTicket = ok(await bearer('host/ticket', host.secret, {})).ticket
-  const machine = new WebSocket(`ws://127.0.0.1:${PORT}/host/connect`, ['squadra', `auth.${hostTicket}`])
+  const machine = new WebSocket(`ws://127.0.0.1:${PORT}/host/connect`, ['pisha', `auth.${hostTicket}`])
   await new Promise(res => { machine.onopen = res })
   machine.send(JSON.stringify({ t: 'hello', info: { hostname: 'm', terminals: [] } }))
   await sleep(100)
   const { ticket } = ok(await owner.post(`api/c/${co.id}/terminal/ticket`))
-  const viewer = new WebSocket(`ws://127.0.0.1:${PORT}/api/terminal`, ['squadra', `auth.${ticket}`])
+  const viewer = new WebSocket(`ws://127.0.0.1:${PORT}/api/terminal`, ['pisha', `auth.${ticket}`])
   await new Promise(res => { viewer.onopen = res })
   viewer.send(JSON.stringify({ t: 'attach', host: host.id, term: 'someone', cols: 80, rows: 24 }))
   await sleep(100)
@@ -465,7 +465,7 @@ test('signing in is limited per address and per email, also for an email nobody 
 test('the server token stays on /api only if the server was started to keep it', async () => {
   const port = PORT + 3000
   const proc = spawn(process.execPath, [join(ROOT, 'server/server.js'), '--allow-token-api'], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: tempDir('squadra-accounts-'), SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore',
+    env: { ...process.env, PORT: String(port), DATA_DIR: tempDir('pisha-accounts-'), PISHA_SERVER_TOKEN: ADMIN }, stdio: 'ignore',
   })
   try {
     const at = `http://127.0.0.1:${port}`
@@ -482,7 +482,7 @@ test('nobody keeps a way back: tickets and invitations made before losing access
   ok(await owner.post('api/companies/join', { company: co.id }))
   const manager = await member(owner, path, 'leaver@example.com', 'manager')
   const socketOpens = ticket => new Promise(res => {
-    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/api/terminal`, ['squadra', `auth.${ticket}`])
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/api/terminal`, ['pisha', `auth.${ticket}`])
     ws.onopen = () => { ws.close(); res(true) }
     ws.onerror = () => res(false)
   })

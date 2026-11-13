@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://roke22.github.io/SquadraHQ/sitemap.xml
+Sitemap: https://roke22.github.io/pisha/sitemap.xml

@@ -155,7 +155,7 @@ document.addEventListener('click', e => {
   const tv = b?.closest('.tv')
   if (!tv) return
   const folded = tv.classList.toggle('folded')
-  store.set(companyPref('squadraTlFolded'), folded ? '1' : '0')
+  store.set(companyPref('pishaTlFolded'), folded ? '1' : '0')
   b.setAttribute('aria-expanded', String(!folded))
   b.setAttribute('aria-label', folded ? T.tlShow : T.tlHide)
   b.title = folded ? T.tlShow : T.tlHide

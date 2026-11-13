@@ -133,7 +133,7 @@ $('nav').addEventListener('click', e => {
   if (fold) {
     const name = fold.dataset.squad
     squadOpen[name] = !fold.closest('.rail-team').classList.contains('open')
-    store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen))
+    store.set(companyPref('pishaSquads'), JSON.stringify(squadOpen))
     return renderNav()
   }
   if (e.target.closest('#addHostBtn')) return addMachineDialog()

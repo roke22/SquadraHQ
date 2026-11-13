@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Prepares a release: the new version everywhere it is written, squadra-host
+// Prepares a release: the new version everywhere it is written, pisha-host
 // signed, the tests run. Commits, tags and pushes nothing: that is left to you,
 // and the key stays on this computer. See RELEASE.md.
 //
@@ -13,17 +13,17 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const DEFAULT_KEY = join(homedir(), '.config', 'squadra-release', 'release-key.pem')
+const DEFAULT_KEY = join(homedir(), '.config', 'pisha-release', 'release-key.pem')
 const die = text => { process.stderr.write(`${text}\n`); process.exit(1) }
 
 const packageVersion = v => `"version": "${v}"`
 const SPOTS = [
   ['package.json', packageVersion],
   ['server/package.json', packageVersion],
-  ['plugins/squadra/package.json', packageVersion],
-  ['plugins/squadra/.claude-plugin/plugin.json', packageVersion],
+  ['plugins/pisha/package.json', packageVersion],
+  ['plugins/pisha/.claude-plugin/plugin.json', packageVersion],
   ['.claude-plugin/marketplace.json', packageVersion],
-  ['host/squadra-host.mjs', v => `const VERSION = '${v}'`],
+  ['host/pisha-host.mjs', v => `const VERSION = '${v}'`],
   ['.github/ISSUE_TEMPLATE/bug_report.yml', v => `placeholder: v${v} `],
   ['README.md', v => `· v${v}</p>`],
   ['README-es.md', v => `· v${v}</p>`],
@@ -100,7 +100,7 @@ function prepare(version, keyFile = DEFAULT_KEY, previousKeyFile) {
   } catch {
     die(`the tests failed. The files say ${version} already: fix them and run this again with the same version`)
   }
-  process.stdout.write(`\nReady, nothing committed. Review it and go on with RELEASE.md:\n  git add host/squadra-host.mjs.sig && git commit -am "Squadra ${version}"\n  git push -u origin HEAD      # and open the pull request to main\nOnce it is merged, on main:\n  node scripts/release.mjs check ${version}\n  git tag -s v${version} -m "Squadra ${version}" && git push origin v${version}\n`)
+  process.stdout.write(`\nReady, nothing committed. Review it and go on with RELEASE.md:\n  git add host/pisha-host.mjs.sig && git commit -am "Pisha ${version}"\n  git push -u origin HEAD      # and open the pull request to main\nOnce it is merged, on main:\n  node scripts/release.mjs check ${version}\n  git tag -s v${version} -m "Pisha ${version}" && git push origin v${version}\n`)
 }
 
 const [first, ...rest] = process.argv.slice(2)

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Squadra: prepare this machine (Linux, or Ubuntu on WSL) and join it to a
-# Squadra server. The dashboard gives you the exact command, with your code. It
+# Pisha: prepare this machine (Linux, or Ubuntu on WSL) and join it to a
+# Pisha server. The dashboard gives you the exact command, with your code. It
 # downloads this script, checks it, and leaves the code in a file for it:
 #
 #   bash install.sh https://your-server --code-file code [options]
 #
 # It installs what is missing (tmux, Node.js 22, and the agents chosen: Claude
 # Code unless --no-claude, Codex CLI with --codex, Grok CLI with --grok), then
-# squadra-host, which joins the machine, sets Squadra up in each agent, and
-# installs the "squadra-host" command and a service that keeps it running.
-# Options are passed to squadra-host: --allow-home, --insecure, --no-service.
+# pisha-host, which joins the machine, sets Pisha up in each agent, and
+# installs the "pisha-host" command and a service that keeps it running.
+# Options are passed to pisha-host: --allow-home, --insecure, --no-service.
 # --allow-root: install and run it as root (sessions then have full control
 # of this machine, to change the operating system).
 set -eu
@@ -148,24 +148,24 @@ main() {
     curl -fsSL https://x.ai/cli/install.sh | bash
   fi
 
-  # New terminals find the agents and "squadra-host" in ~/.local/bin.
+  # New terminals find the agents and "pisha-host" in ~/.local/bin.
   for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
     if [ -f "$rc" ] && ! grep -q '\.local/bin' "$rc"; then
       # (Managed elsewhere and read-only, as with home-manager: not worth stopping for.)
-      { printf '\n# Added by the Squadra installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"; } 2>/dev/null || echo "Could not add ~/.local/bin to $rc: add it to your PATH yourself." >&2
+      { printf '\n# Added by the Pisha installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"; } 2>/dev/null || echo "Could not add ~/.local/bin to $rc: add it to your PATH yourself." >&2
     fi
   done
 
-  # 4. squadra-host: downloaded into a new private folder, checked, and run.
+  # 4. pisha-host: downloaded into a new private folder, checked, and run.
   say "Joining this machine to $SERVER"
   DIR="$(mktemp -d)"
   cd "$DIR"
-  curl -fsSLo squadra-host.mjs "${SERVER%/}/host/squadra-host.mjs"
+  curl -fsSLo pisha-host.mjs "${SERVER%/}/host/pisha-host.mjs"
   if [ -n "$SHA" ]; then
-    echo "$SHA  squadra-host.mjs" | sha256sum -c - >/dev/null || { echo "squadra-host.mjs does not match the dashboard's checksum: stopped." >&2; exit 1; }
+    echo "$SHA  pisha-host.mjs" | sha256sum -c - >/dev/null || { echo "pisha-host.mjs does not match the dashboard's checksum: stopped." >&2; exit 1; }
   fi
   printf %s "$CODE" > code
-  node squadra-host.mjs enroll "$SERVER" --code-file=code ${ARGS[@]+"${ARGS[@]}"}
+  node pisha-host.mjs enroll "$SERVER" --code-file=code ${ARGS[@]+"${ARGS[@]}"}
 
   say "Done"
   case " ${ARGS[*]-} " in

@@ -1,0 +1,23 @@
+{
+  "name": "pisha",
+  "description": "Pisha channel — lets Claude Code sessions message each other through a Pisha server, with one session acting as coordinator. Built-in access control: manage pairing, allowlists and policy via /pisha:access.",
+  "version": "0.0.10",
+  "author": {
+    "name": "Jose J. Anton",
+    "url": "https://github.com/roke22"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pisha",
+    "claude-code",
+    "multi-agent",
+    "agents",
+    "coordinator",
+    "orchestration",
+    "channel",
+    "dashboard",
+    "mcp"
+  ],
+  "homepage": "https://github.com/roke22/pisha",
+  "repository": "https://github.com/roke22/pisha"
+}

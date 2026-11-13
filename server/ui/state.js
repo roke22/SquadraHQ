@@ -5,12 +5,12 @@ export const state = {
   me: null, // who signed in, once it is finished (see /api/me)
   // The company shown: from the address, or the last one in this browser. Changing
   // it loads the page again, so nothing of another stays in memory.
-  company: new URLSearchParams(location.search).get('company') ?? store.get('squadraCompany'),
+  company: new URLSearchParams(location.search).get('company') ?? store.get('pishaCompany'),
   role: null, // what this user is in it
   // 'auto' (fit the screen) or a fixed number of columns
-  cols: store.get('squadraCols') || store.get('swarmCols') || 'auto',
+  cols: store.get('pishaCols') || store.get('swarmCols') || 'auto',
   // The mosaic shows each session's live terminal (when it has one) or its chat.
-  mosaicMode: store.get('squadraMosaicMode') === 'chats' ? 'chats' : 'terms',
+  mosaicMode: store.get('pishaMosaicMode') === 'chats' ? 'chats' : 'terms',
   mosaicKey: null, // what the panes on screen were built for
   groups: [], // [{id, members}]
   templates: [], // squad templates [{name, host, coordinator, workers}]
@@ -42,7 +42,7 @@ const ROLES = ['observer', 'operator', 'manager', 'owner']
 export const can = needed => ROLES.indexOf(state.role) >= ROLES.indexOf(needed)
 
 export const sessions = new Map()      // name -> session view (from server)
-export const hosts = new Map()         // host id -> host view (machines running squadra-host)
+export const hosts = new Map()         // host id -> host view (machines running pisha-host)
 export const templateListeners = new Set()
 export const profileListeners = new Set() // (the permission profiles changed)
 export const linkListeners = new Set()
@@ -54,6 +54,6 @@ export const hostListeners = new Set()
 
 // To another of the user's companies: the page loads again in it.
 export function switchCompany(id) {
-  store.set('squadraCompany', id)
+  store.set('pishaCompany', id)
   location.href = `?company=${encodeURIComponent(id)}`
 }

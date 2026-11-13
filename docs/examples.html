@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SquadraHQ examples: teams of Claude Code agents for marketing, social media and software</title>
-<meta name="description" content="Whole organisations built with SquadraHQ: a marketing agency, a personal brand on social media, a software company and a product launch, each with its teams of Claude Code agents, their personas, the links between teams and the first prompt to give them.">
-<link rel="canonical" href="https://roke22.github.io/SquadraHQ/examples.html">
-<link rel="alternate" hreflang="en" href="https://roke22.github.io/SquadraHQ/examples.html">
-<link rel="alternate" hreflang="es" href="https://roke22.github.io/SquadraHQ/es/ejemplos.html">
-<link rel="alternate" hreflang="x-default" href="https://roke22.github.io/SquadraHQ/examples.html">
-<link rel="icon" href="squadra-logo.svg" type="image/svg+xml">
+<title>Pisha examples: teams of Claude Code agents for marketing, social media and software</title>
+<meta name="description" content="Whole organisations built with Pisha: a marketing agency, a personal brand on social media, a software company and a product launch, each with its teams of Claude Code agents, their personas, the links between teams and the first prompt to give them.">
+<link rel="canonical" href="https://roke22.github.io/pisha/examples.html">
+<link rel="alternate" hreflang="en" href="https://roke22.github.io/pisha/examples.html">
+<link rel="alternate" hreflang="es" href="https://roke22.github.io/pisha/es/ejemplos.html">
+<link rel="alternate" hreflang="x-default" href="https://roke22.github.io/pisha/examples.html">
+<link rel="icon" href="pisha-logo.svg" type="image/svg+xml">
 <meta property="og:type" content="article">
-<meta property="og:title" content="SquadraHQ examples: departments of Claude Code agents that work together">
+<meta property="og:title" content="Pisha examples: departments of Claude Code agents that work together">
 <meta property="og:description" content="A marketing agency, a personal brand, a software company and a product launch, built as linked teams of Claude Code agents.">
-<meta property="og:url" content="https://roke22.github.io/SquadraHQ/examples.html">
-<meta property="og:image" content="https://roke22.github.io/SquadraHQ/social-preview.png">
+<meta property="og:url" content="https://roke22.github.io/pisha/examples.html">
+<meta property="og:image" content="https://roke22.github.io/pisha/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preload" href="fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="site.css">
@@ -23,8 +23,8 @@
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./"><img src="squadra-logo.svg" alt="" width="26" height="26">SquadraHQ</a>
-    <nav aria-label="Sections"><a href="./">Home</a><a href="./#start">Get started</a><a href="https://github.com/roke22/SquadraHQ/blob/main/docs/reference.md">Docs</a><a href="https://github.com/roke22/SquadraHQ">GitHub</a></nav>
+    <a class="brand" href="./"><img src="pisha-logo.svg" alt="" width="26" height="26"><span class="wordmark">pisha</span></a>
+    <nav aria-label="Sections"><a href="./">Home</a><a href="./#start">Get started</a><a href="https://github.com/roke22/pisha/blob/main/docs/reference.md">Docs</a><a href="https://github.com/roke22/pisha">GitHub</a></nav>
     <a class="lang" href="es/ejemplos.html" hreflang="es" lang="es">Español</a>
   </div>
 </header>
@@ -32,7 +32,7 @@
 
 <header>
   <h1>Examples: departments of Claude Code agents that work together</h1>
-  <p class="lead">Each example is a whole organisation built with SquadraHQ: its teams (a coordinator and its workers), the persona each agent follows, the links between teams and the first message to give each coordinator. Copy the one closest to yours and adapt it.</p>
+  <p class="lead">Each example is a whole organisation built with Pisha: its teams (a coordinator and its workers), the persona each agent follows, the links between teams and the first message to give each coordinator. Copy the one closest to yours and adapt it.</p>
   <ul class="toc">
     <li><a href="#agency">Marketing agency</a></li>
     <li><a href="#brand">Personal brand on social media</a></li>
@@ -42,7 +42,7 @@
   </ul>
 </header>
 
-<div class="window"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="screenshots/org-chart-dark-en.jpg" media="(prefers-color-scheme: dark)"><img src="screenshots/org-chart-light-en.jpg" alt="The SquadraHQ org chart: the Development, QA and Content teams, each coordinator with its workers" width="2880" height="1800" loading="lazy"></picture></div>
+<div class="window"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="screenshots/org-chart-dark-en.jpg" media="(prefers-color-scheme: dark)"><img src="screenshots/org-chart-light-en.jpg" alt="The Pisha org chart: the Development, QA and Content teams, each coordinator with its workers" width="2880" height="1800" loading="lazy"></picture></div>
 <p class="caption">The org chart: each team a card with its coordinator and its workers; linked teams are joined by a line. Each example below lists its own teams the same way.</p>
 
 <div class="note"><b>How the pieces fit.</b> Each agent is a Claude Code session in its own folder, with a <b>persona</b>: a skill (<code>.claude/skills/&lt;name&gt;/SKILL.md</code>) or an agent (<code>.claude/agents/&lt;name&gt;.md</code>) from that folder. Workers only talk to their own coordinator; <b>linked coordinators</b> ask each other for work, and each hands what it takes on to its own workers. A team's <b>goal</b> is told to its coordinator, which puts its effort there.</div>
@@ -112,7 +112,7 @@ pick. Writer drafts the posts and newsletter in drafts/ following voice.md, vide
 writes the short's script, visuals the carousel for Tuesday. Show me each day's
 drafts together; I approve, and only approved ones go to approved/.</code></pre>
 
-<div class="note">Agents write drafts in files. <b>Publishing is up to you</b>, or to a tool you give them (an MCP server or CLI for your scheduler): SquadraHQ's coordinator asks you before anything is published, and the agents only see the analytics you export into <code>audience/exports/</code>.</div>
+<div class="note">Agents write drafts in files. <b>Publishing is up to you</b>, or to a tool you give them (an MCP server or CLI for your scheduler): Pisha's coordinator asks you before anything is published, and the agents only see the analytics you export into <code>audience/exports/</code>.</div>
 
 <!-- ============================================================== -->
 <h2 id="software">Software company</h2>
@@ -180,7 +180,7 @@ To brand-lead: Two weeks of posts building up to the launch on the 15th: the sto
               from Marketing.</code></pre>
 
 <!-- ============================================================== -->
-<h2 id="build">How to build one in SquadraHQ</h2>
+<h2 id="build">How to build one in Pisha</h2>
 <ol class="steps">
   <li><b>Write the personas</b> in each folder, one skill per role (below). The dashboard lists them in the session dialog.</li>
   <li><b>🏢 Org chart → + Team</b> for each team: the machine and folder, the coordinator's name, the team's <b>name</b> and <b>goal</b>, and its persona.</li>
@@ -189,7 +189,7 @@ To brand-lead: Two weeks of posts building up to the launch on the 15th: the sto
   <li><b>Save each team as a template</b> (its ⋯ menu), to open it again in one click from <b>🖥️ Machines → Templates</b>.</li>
   <li><b>Talk to each coordinator</b> in its terminal, with the first messages above.</li>
 </ol>
-<p>The step-by-step with screenshots is in the <a href="https://github.com/roke22/SquadraHQ#3-build-your-teams">README</a>, and every option is in the <a href="https://github.com/roke22/SquadraHQ/blob/main/docs/reference.md#org-chart">reference</a>.</p>
+<p>The step-by-step with screenshots is in the <a href="https://github.com/roke22/pisha#3-build-your-teams">README</a>, and every option is in the <a href="https://github.com/roke22/pisha/blob/main/docs/reference.md#org-chart">reference</a>.</p>
 
 <details>
 <summary>A persona: <code>content/.claude/skills/copywriter/SKILL.md</code></summary>
@@ -230,8 +230,8 @@ You run client accounts.
 
 <footer>
   <div class="wrap">
-    <nav aria-label="More"><a href="./">Home</a><a href="https://github.com/roke22/SquadraHQ">GitHub</a><a href="https://github.com/roke22/SquadraHQ/blob/main/docs/reference.md">Reference</a><a href="https://github.com/roke22/SquadraHQ/discussions">Discussions</a></nav>
-    <p>SquadraHQ is open source under the MIT license, by <a href="https://github.com/roke22">Jose J. Anton</a>. Claude and Claude Code are trademarks of Anthropic; SquadraHQ is an independent project.</p>
+    <nav aria-label="More"><a href="./">Home</a><a href="https://github.com/roke22/pisha">GitHub</a><a href="https://github.com/roke22/pisha/blob/main/docs/reference.md">Reference</a><a href="https://github.com/roke22/pisha/discussions">Discussions</a></nav>
+    <p>Pisha is open source under the MIT license, by <a href="https://github.com/roke22">Jose J. Anton</a>. Claude and Claude Code are trademarks of Anthropic; Pisha is an independent project.</p>
   </div>
 </footer>
 </body>

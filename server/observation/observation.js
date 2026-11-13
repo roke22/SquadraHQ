@@ -4,7 +4,7 @@ export function createObservation(platform) {
   const { db, inTx, bus, broadcast, spendStorage, ensureRoom, quota } = platform
   const eventKeptMs = () => quota('event_hours', Number(process.env.OBSERVE_TTL_HOURS ?? 24)) * 60 * 60 * 1000
 
-  const MAX_EVENTS = Number(process.env.SQUADRA_MAX_EVENTS ?? 1_000_000)       // observation events kept, in all
+  const MAX_EVENTS = Number(process.env.PISHA_MAX_EVENTS ?? 1_000_000)       // observation events kept, in all
 
   // Each session's plugin posts what it's doing (hook events + transcript). The
   // server keeps 24h of events, derives a current state per session, and pushes
@@ -173,7 +173,7 @@ export function createObservation(platform) {
   // Tell a worker's coordinator when its context is nearly full (once per fill-up)
   // and when it compacts. Only live events, never the startup replay.
   const CONTEXT_WARN_PCT = 80
-  const NOTICE_COOLDOWN_MS = Number(process.env.SQUADRA_NOTICE_COOLDOWN_MS ?? 5 * 60_000) // per worker, per kind
+  const NOTICE_COOLDOWN_MS = Number(process.env.PISHA_NOTICE_COOLDOWN_MS ?? 5 * 60_000) // per worker, per kind
   function contextNotices(name, ev, wasWarned) {
     const a = activityOf(name)
     if (ev.kind === 'usage' && ev.context_pct != null && ev.context_pct >= CONTEXT_WARN_PCT && !wasWarned) {
@@ -188,7 +188,7 @@ export function createObservation(platform) {
       // usage/compacted events must not flood the coordinator.
       if (now() - (a.compact_notice_at ?? 0) < NOTICE_COOLDOWN_MS) return
       a.compact_notice_at = now()
-      bus.emit('notice', name, `🗜️ ${name} compacted its context (${ev.trigger === 'manual' ? 'manual' : 'automatic'}). Its Squadra role and the latest messages it received were restored; if its task depends on details only you know, send them to it again.`)
+      bus.emit('notice', name, `🗜️ ${name} compacted its context (${ev.trigger === 'manual' ? 'manual' : 'automatic'}). Its Pisha role and the latest messages it received were restored; if its task depends on details only you know, send them to it again.`)
     }
   }
 

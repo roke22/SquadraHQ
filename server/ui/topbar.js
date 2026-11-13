@@ -18,7 +18,7 @@ import { boardsHead, boardsTopClick } from './boards.js'
 // (An observer has no terminals: its chat instead.)
 export const sessionTerm = r => (r.view === 'session' && !r.chat && state.role !== 'observer' ? terminalOf(r.name) : null)
 
-// The Squadra session behind a machine's terminal: only one that machine
+// The Pisha session behind a machine's terminal: only one that machine
 // opened (a machine could list any name; it can't make it its own).
 export function sessionOn(hostId, term) {
   const s = sessions.get(term)
@@ -175,11 +175,11 @@ function renderHead() {
 $('topRight').addEventListener('click', e => {
   if (boardsTopClick(e)) return
   const c = e.target.closest('[data-c]')
-  if (c) { state.cols = c.dataset.c; store.set('squadraCols', state.cols); applyCols(); renderTop() }
+  if (c) { state.cols = c.dataset.c; store.set('pishaCols', state.cols); applyCols(); renderTop() }
   const ro = e.target.closest('[data-reopen]')
   if (ro) return reopen(ro.dataset.reopen)
   const md = e.target.closest('[data-mode]')
-  if (md) { state.mosaicMode = md.dataset.mode === 'chats' ? 'chats' : 'terms'; store.set('squadraMosaicMode', state.mosaicMode); buildMosaic(); renderTop() }
+  if (md) { state.mosaicMode = md.dataset.mode === 'chats' ? 'chats' : 'terms'; store.set('pishaMosaicMode', state.mosaicMode); buildMosaic(); renderTop() }
   const go = e.target.closest('[data-go]')
   if (go) location.hash = go.dataset.go
   const act = e.target.closest('[data-act]')

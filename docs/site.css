@@ -1,12 +1,15 @@
-/* SquadraHQ's website: the dashboard's own look (its colours, type and shapes). */
+/* Pisha's website: the dashboard's own look (its colours, type and shapes). */
 
 @font-face { font-family: InterVariable; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/InterVariable.woff2") format("woff2"); }
+/* Space Grotesk Bold, for the name in the logo only (SIL Open Font License, fonts/). */
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/space-grotesk-latin-700-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/space-grotesk-latin-ext-700-normal.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
 :root {
   --sans: InterVariable, Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   --bg: #f6f6f7; --panel: #ffffff; --raised: #eef0f2; --line: #e2e4e8; --line-2: #cfd2d8;
-  --text: #15171b; --muted: #5a606c; --accent: #a9553a; --on-accent: #ffffff;
+  --text: #15171b; --muted: #5a606c; --accent: #a9553a; --on-accent: #ffffff; --brand-ink: #14213d;
   --ok: #1a7a4d; --warn: #855b06; --err: #b0342a; --info: #2c5f96; --coord: #5a4b9e; --worker: #1b6a79;
   --term: #15171b; --shadow: 0 1px 2px rgba(15, 17, 20, .06), 0 24px 64px rgba(15, 17, 20, .14);
   --wrap: 1120px;
@@ -15,7 +18,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0f1114; --panel: #15181c; --raised: #1c2025; --line: #262a30; --line-2: #343941;
-    --text: #e9ebee; --muted: #a0a6b1; --accent: #d98563; --on-accent: #17120f;
+    --text: #e9ebee; --muted: #a0a6b1; --accent: #d98563; --on-accent: #17120f; --brand-ink: #ffffff;
     --ok: #4cbb87; --warn: #d6a243; --err: #ee7b70; --info: #7eb0e8; --coord: #b1a5e6; --worker: #6bbccb;
     --term: #0a0b0d; --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 24px 72px rgba(0, 0, 0, .5);
     color-scheme: dark;
@@ -39,6 +42,7 @@ code { font-family: var(--mono); font-size: .88em; background: var(--raised); pa
 .top .wrap { display: flex; align-items: center; gap: 22px; min-height: 60px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; letter-spacing: -.01em; text-decoration: none; }
 .brand img { width: 26px; height: 26px; }
+.wordmark { font-family: "Space Grotesk", var(--sans); font-weight: 700; font-size: 21px; line-height: 1; letter-spacing: -.02em; color: var(--brand-ink); }
 .top nav { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
 .top nav a { text-decoration: none; color: var(--muted); }
 .top nav a:hover { color: var(--text); }
