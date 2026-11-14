@@ -423,6 +423,32 @@ Un **tablero** guarda las tareas de la empresa, para personas y agentes por igua
 - **Los agentes lo usan desde el plugin** (la herramienta `board`): un coordinador lista, lee, crea, cambia y reparte las tareas de su equipo o de nadie, y comenta en cualquiera de sus tableros; un worker solo ve sus tareas, las mueve como dice el paso de su columna (sin paso, como mucho a un estado de revisión) y comenta. Al leer una tarea, el agente ve su paso: qué hacer y a dónde moverla al terminar. Lo filtra el servidor: una sesión nunca ve un tablero que no se le ha dado a su equipo, ni un worker la tarea de otro. Lo que cambian los agentes no avisa a nadie, salvo mover una tarea a un paso, que se lo dice a quien lo atiende. Los coordinadores llaman a las ramas como la tarea (`sq-12-…`), y su plan puede apuntar a ella (`ref: "SQ-12"`).
 - **Quién puede hacer qué:** los observadores leen; los operadores crean, editan, mueven, asignan, comentan y avisan; los gestores crean y configuran tableros y borran tareas. Un tablero se archiva antes de poder borrarlo. Como mucho 5000 tareas por tablero y 300 cambios por hora para cada agente.
 
+### Consumo de tokens
+
+La pantalla **Consumo** (en el menú lateral, o en **Ir a → Consumo**) muestra los tokens que gastan los agentes. Los cuenta en cuatro tipos: la **entrada** que no viene de una caché, la **lectura de caché**, la **escritura de caché** y la **salida**.
+
+- **De dónde salen las cuentas.** El plugin de cada sesión las lee del propio registro del agente mientras trabaja:
+  - **Claude Code:** su transcript, una cuenta por respuesta, y el transcript de cada subagente al terminar.
+  - **Codex CLI:** los eventos `token_count` de su rollout.
+  - **Grok CLI:** el `usage.json` junto a su conversación, una cuenta por turno y modelo.
+
+  Solo se envían números, modelos y lo que empezó el turno, nunca lo que se dijo. Se cuentan siempre, también en una sesión con la observación en `off`, que no envía nada más.
+- **Lo que empezó el trabajo.** Cada turno se apunta a lo que lo inició:
+  - tus órdenes (escritas en su terminal), o tus respuestas desde la bandeja;
+  - los encargos de un coordinador a su worker, o el informe de un worker a su coordinador;
+  - un mensaje entre equipos enlazados;
+  - los avisos del tablero, o los del servidor;
+  - otro mensaje, o el trabajo por su cuenta (antes de cualquier prompt).
+
+  **Entre equipos enlazados** es lo que se cuestan unos departamentos a otros. Si el prompt nombra una tarea del tablero de la empresa (`SQ-12`), también se apunta a esa tarea.
+- **Qué se ve.**
+  - **Periodos:** hoy (por horas), 7, 30 o 90 días (por días).
+  - **Filtros:** equipo, agente y modelo.
+  - **Los totales**, con cuánto de la entrada vino de una caché, y el gasto en el tiempo.
+  - **Desgloses:** por equipo, por lo que empezó el trabajo, por tarea del tablero, por modelo y por sesión.
+  - **Exportar CSV** da el periodo por sesión.
+- **Se guarda** sumado por horas durante 400 días. El propietario de una empresa lo cambia en **Ajustes › Actividad y datos**. Lo ven los observadores y los demás roles.
+
 ### Perfiles de permisos
 
 Un **perfil de permisos** dice lo que los agentes de un equipo pueden hacer sin preguntar: editar los ficheros de su carpeta, ejecutar tests, instalar dependencias, hacer commit, push, reescribir la historia, borrar ficheros, consultar la web, usar Docker o sudo. Cada cosa está **Permitida**, se **Pregunta siempre**, está **Prohibida** o la decide Claude Code (como sin perfil), y un perfil puede añadir reglas de permiso de Claude Code propias (`Bash(make deploy *)`, `Edit(./docs/**)`, `WebFetch(domain:example.com)`, `mcp__github__create_issue`).

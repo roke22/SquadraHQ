@@ -58,9 +58,8 @@ code { font-family: var(--mono); font-size: .88em; background: var(--raised); pa
 
 /* --- hero --- */
 .hero { padding: 88px 0 24px; text-align: center; }
-.hero:has(.hero-video) { padding-top: 40px; }
-/* The video first: what Pisha does, playing (muted) as the page opens. */
-.hero-video { max-width: 1100px; margin: 0 auto 56px; border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; background: #101726; box-shadow: var(--shadow); }
+/* The video, under who it works with: what Pisha does, playing (muted) as the page opens. */
+.hero-video { margin: 56px auto 0; border: 1px solid var(--line-2); border-radius: 14px; overflow: hidden; background: #101726; box-shadow: var(--shadow); }
 .hero-video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #101726; }
 .hero-video video::cue { font-size: 1.05em; background: rgba(16, 23, 38, .82); }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 22px; padding: 5px 12px 5px 8px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 14px; color: var(--muted); }
@@ -147,8 +146,7 @@ footer a:hover { color: var(--text); }
   .top nav { display: none; }
   .top .lang { margin-left: auto; }
   .hero { padding-top: 56px; }
-  .hero:has(.hero-video) { padding-top: 24px; }
-  .hero-video { margin-bottom: 40px; border-radius: 10px; }
+  .hero-video { margin-top: 40px; border-radius: 10px; }
   section { padding-top: 88px; }
   .split, .split.rev { grid-template-columns: 1fr; gap: 36px; }
   .split.rev > :first-child { order: 0; }
@@ -164,12 +162,8 @@ pre.code code { background: none; padding: 0; font-size: inherit; }
 .eyebrow b { padding: 5px 8px; }
 .top .lang { padding: 8px 11px; }
 
-/* A phone: the hero shows the phone's own inbox, in a phone's frame. */
 @media (max-width: 700px) {
   .eyebrow { font-size: 13px; }
   .eyebrow .long { display: none; }
-  .hero .window { width: min(300px, 82%); margin: 44px auto 0; border-radius: 34px; padding: 9px; }
-  .hero .window .bar { display: none; }
-  .hero .window img { border-radius: 25px; }
 }
 @media (min-width: 701px) { .eyebrow .short { display: none; } }

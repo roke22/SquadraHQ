@@ -14,7 +14,7 @@
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="Estrellas en GitHub"></a>
 </p>
 
-<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/pisha/">Web</a> · <a href="https://roke22.github.io/pisha/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
+<p align="center"><a href="README.md">Read in English</a> · <a href="https://pisha.dev/">Web</a> · <a href="https://pisha.dev/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
 
 ---
 
@@ -77,6 +77,7 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Enlazar equipos:** enlaza los coordinadores de dos equipos (por ejemplo, diseño y marketing) para que se repartan trabajo, y cada uno lo pase a sus propios workers.
 - **Ver y montar toda tu organización:** el organigrama muestra cada equipo como un grupo, el coordinador primero y sus workers debajo, cada agente con su tarea y cuánto lleva con ella, qué hace ahora y cuánto contexto le queda; lo que el coordinador le pasa a un worker baja hasta él como una luz, un mensaje entre equipos enlazados recorre su enlace, y al pulsar un agente se abre su terminal. Desde ahí añades, describes, enlazas, mueves y cierras equipos.
 - **Planificar el trabajo en tableros:** tableros con tus propias columnas, cada una un paso de un flujo si quieres (quién la atiende, qué hacer, a dónde va después); tareas con tipos, etiquetas, prioridad, fecha límite, subtareas, un agente y personas. Los agentes leen y mueven sus tareas; dar una tarea a un agente no avisa a nadie hasta que tú lo dices; borrar es mandar a la papelera.
+- **Ver lo que gastan los agentes:** la pantalla **Consumo** cuenta los tokens que gasta cada agente (Claude Code, Codex CLI y Grok CLI), de entrada, de salida y de caché, en el día, la semana o el mes, por equipo, sesión, modelo y tarea del tablero, y por lo que empezó el trabajo: tus órdenes, los encargos de un coordinador, los informes de los workers, los mensajes entre equipos enlazados o el tablero. Se exporta a CSV.
 - **Tener un tablero a la par con GitHub:** conéctalo a un proyecto de GitHub y sus columnas, issues, sub-issues, etiquetas, asignados y comentarios se siguen en los dos sentidos; los pull requests que nombran una tarea (`SQ-12`) salen en ella, y al fusionar uno la tarea pasa a hecha.
 
 ## Cómo funciona
@@ -190,7 +191,7 @@ Después:
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-es.jpg"><img src="docs/screenshots/org-chart-light-es.jpg" alt="El organigrama de Pisha: los equipos de Desarrollo, QA y Contenidos, cada coordinador con sus workers" width="1440"></picture>
 
-Los **[ejemplos](https://roke22.github.io/pisha/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
+Los **[ejemplos](https://pisha.dev/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
 
 ## 4. Planifica el trabajo en tableros
 
@@ -234,7 +235,7 @@ Sí, con cualquier plan de claude.ai que incluya Claude Code (Pro, Max, Team, En
 Lo que falte de tmux, Node.js 22 y Claude Code (y Codex CLI, con npm, o Grok CLI, con su propio instalador, si los marcaste), y después `pisha-host`: un pequeño programa Node que conecta la máquina a tu servidor, instala el plugin `pisha` y se queda en marcha como servicio de usuario. El script es [install/linux.sh](install/linux.sh) (y [macos.sh](install/macos.sh), [windows.bat](install/windows.bat)); el comando lo comprueba contra la copia de tu servidor antes de ejecutarlo.
 
 **¿Qué sale de mis máquinas?**
-Solo lo que va a **tu** servidor Pisha: los mensajes entre agentes, la presencia y lo que elijas mostrar en el panel (`--observe off|activity|full`). Los secretos reconocibles se enmascaran y los ficheros de carpetas de credenciales nunca se envían. Nada va a ningún otro servicio. Detalles en el [README del plugin](plugins/pisha/README.md).
+Solo lo que va a **tu** servidor Pisha: los mensajes entre agentes, la presencia lo que elijas mostrar en el panel (`--observe off|activity|full`) y los tokens que gasta cada agente (solo los números). Los secretos reconocibles se enmascaran y los ficheros de carpetas de credenciales nunca se envían. Nada va a ningún otro servicio. Detalles en el [README del plugin](plugins/pisha/README.md).
 
 **¿Tengo que abrir puertos en las máquinas de los agentes?**
 No. Los agentes se conectan hacia fuera, al servidor. Solo el servidor tiene que ser accesible, y con un dominio consigue su propio certificado HTTPS.
@@ -250,7 +251,7 @@ Los Channels son la función de Claude Code que entrega mensajes dentro de una s
 
 ## Saber más
 
-- [Ejemplos](https://roke22.github.io/pisha/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
+- [Ejemplos](https://pisha.dev/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
 - [docs/referencia.md](docs/referencia.md): configurar agentes a mano sin el panel, todas las opciones del servidor y cómo funciona todo por dentro.
 - [PLAN.md](PLAN.md): la guía técnica completa.
 

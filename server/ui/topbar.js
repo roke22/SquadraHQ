@@ -13,6 +13,7 @@ import { orgSquads, orgZoom, linksDialog } from './org.js'
 import { renderBack } from './back.js'
 import { voiceButton } from './voice.js'
 import { boardsHead, boardsTopClick } from './boards.js'
+import { usageHead } from './usage.js'
 
 // The terminal a session view shows (null: its chat).
 // (An observer has no terminals: its chat instead.)
@@ -61,6 +62,11 @@ function renderHead() {
     setHtml($('topTitle'), esc(T.inbox))
     // (Hands-free: what waits on you, read aloud and answered by voice.)
     setHtml($('topRight'), voiceButton())
+    return
+  }
+  if (r.view === 'usage') {
+    const h = usageHead()
+    setHtml($('topTitle'), h.title); setHtml($('topTabs'), h.tabs); setHtml($('topRight'), h.right)
     return
   }
   if (r.view === 'boards' || r.view === 'board') {

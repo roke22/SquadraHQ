@@ -14,7 +14,7 @@
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="GitHub stars"></a>
 </p>
 
-<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://roke22.github.io/pisha/">Website</a> · <a href="https://roke22.github.io/pisha/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
+<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://pisha.dev/">Website</a> · <a href="https://pisha.dev/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
 
 ---
 
@@ -77,6 +77,7 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Link teams:** link the coordinators of two teams (design and marketing, say) so they share work, each handing what it takes on to its own workers.
 - **See and shape your whole organisation:** the org chart shows each team as one group, its coordinator first and its workers below, each agent with what it is on and for how long, what it does now and how full its context is; something handed to a worker runs down to it as a light, a message between linked teams runs along their link, and pressing an agent opens its terminal. Add, describe, link, move and close teams from there.
 - **Plan the work on task boards:** boards with your own columns, each one a step of a flow if you want (who handles it, what to do, where next); tasks with types, labels, priority, due dates, subtasks, an agent and people. Agents read and move their own tasks; giving one a task tells nobody until you say so; deleting goes to a trash.
+- **See what the agents spend:** the **Usage** screen counts the tokens every agent spends (Claude Code, Codex CLI and Grok CLI), as input, output and cache, over the day, the week or the month, by team, session, model and board task, and by what started the work: your orders, a coordinator's tasks, workers' reports, messages between linked teams or the board. Export it as CSV.
 - **Keep a board in step with GitHub:** connect it to a GitHub project and its columns, issues, sub-issues, labels, assignees and comments follow each other both ways; the pull requests that name a task (`SQ-12`) show on it, and merging one takes the task to done.
 
 ## How it works
@@ -190,7 +191,7 @@ Then:
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-en.jpg"><img src="docs/screenshots/org-chart-light-en.jpg" alt="The Pisha org chart: the Development, QA and Content teams, each coordinator with its workers" width="1440"></picture>
 
-The **[examples](https://roke22.github.io/pisha/examples.html)** show whole organisations built this way: a marketing agency, a personal brand on social media, a software company and a product launch, with the teams, personas, links and first message for each. Everything the org chart does is in the [reference](docs/reference.md#org-chart).
+The **[examples](https://pisha.dev/examples.html)** show whole organisations built this way: a marketing agency, a personal brand on social media, a software company and a product launch, with the teams, personas, links and first message for each. Everything the org chart does is in the [reference](docs/reference.md#org-chart).
 
 ## 4. Plan the work on boards
 
@@ -234,7 +235,7 @@ Yes, with any claude.ai plan that includes Claude Code (Pro, Max, Team, Enterpri
 What is missing among tmux, Node.js 22 and Claude Code (and Codex CLI, with npm, or Grok CLI, with its own installer, if you ticked them), then `pisha-host`: a small Node program that connects the machine to your server, installs the `pisha` plugin and stays running as a user service. The script is [install/linux.sh](install/linux.sh) (and [macos.sh](install/macos.sh), [windows.bat](install/windows.bat)); the command checks it against your server's copy before running it.
 
 **What leaves my machines?**
-Only what goes to **your** Pisha server: messages between agents, presence, and what you choose to show in the dashboard (`--observe off|activity|full`). Recognisable secrets are masked, and files from credentials folders are never sent. Nothing goes to any other service. Details in the [plugin README](plugins/pisha/README.md).
+Only what goes to **your** Pisha server: messages between agents, presence, what you choose to show in the dashboard (`--observe off|activity|full`), and the tokens each agent spends (counts only). Recognisable secrets are masked, and files from credentials folders are never sent. Nothing goes to any other service. Details in the [plugin README](plugins/pisha/README.md).
 
 **Do I need to open ports on the machines where agents run?**
 No. Agents connect out to the server. Only the server needs to be reachable, and with a domain it gets its own HTTPS certificate.
@@ -250,7 +251,7 @@ Channels are the Claude Code feature that delivers messages into a session. Unti
 
 ## Learn more
 
-- [Examples](https://roke22.github.io/pisha/examples.html): marketing, social media, software and launch organisations, team by team.
+- [Examples](https://pisha.dev/examples.html): marketing, social media, software and launch organisations, team by team.
 - [docs/reference.md](docs/reference.md): setting agents up by hand without the dashboard, every server option, and how it all works.
 - [PLAN.md](PLAN.md): the full technical guide (Spanish).
 

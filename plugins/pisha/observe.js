@@ -8,7 +8,8 @@
  *    token usage. One entry per completed assistant message.
  *
  * Levels:
- *  - off:       nothing is sent.
+ *  - off:       nothing but the tokens spent (counts, model and what started
+ *               the turn): those are always counted.
  *  - activity:  what the session is doing (tool names and short arguments,
  *               state changes, context size). No Claude text, no tool output.
  *  - full:      plus Claude's text, prompts in full, tool inputs and outputs
@@ -17,8 +18,8 @@
  */
 
 import { createServer } from 'node:net'
-import { mkdirSync, rmSync, statSync, openSync, readSync, closeSync, existsSync } from 'node:fs'
-import { relative, isAbsolute, dirname } from 'node:path'
+import { mkdirSync, rmSync, statSync, openSync, readSync, closeSync, existsSync, readFileSync } from 'node:fs'
+import { relative, isAbsolute, dirname, join, basename } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 
 export const LEVELS = ['off', 'activity', 'full']
@@ -35,7 +36,7 @@ export function normalizeLevel(v) {
 const LIMITS = {
   activity: { summary: 200, prompt: 200, detail: 0, text: 0 },
   full: { summary: 400, prompt: 4000, detail: 2000, text: 8000 },
-  off: { summary: 0, prompt: 0, detail: 0, text: 0 }, // (nothing is sent; this only keeps the handlers from throwing)
+  off: { summary: 0, prompt: 0, detail: 0, text: 0 }, // (only the tokens spent are sent; this keeps the handlers from throwing)
 }
 
 // --- redaction ----------------------------------------------------------------
@@ -302,6 +303,75 @@ export function compactPointFor(model, env = process.env) {
   return { window, point }
 }
 
+// --- tokens -------------------------------------------------------------------
+
+// What the agent spent, from its own record, as four counts: input not served
+// from a cache, input read from a cache, input written to one, and output.
+// (Only counts and the model: nothing of what was said.)
+const N = v => (Number.isFinite(v) && v > 0 ? Math.round(v) : 0)
+const spent = t => t.input + t.cache_read + t.cache_write + t.output > 0
+
+// Claude Code: one per response, in its transcript. A response is written as
+// several lines with the same id and the same usage: count the id once.
+export function claudeTokens(e) {
+  if (e?.type !== 'assistant' || !e.message?.usage || typeof e.message.usage !== 'object') return null
+  const u = e.message.usage
+  const t = { id: typeof e.message.id === 'string' ? e.message.id : null, model: String(e.message.model ?? ''), input: N(u.input_tokens), cache_read: N(u.cache_read_input_tokens), cache_write: N(u.cache_creation_input_tokens), output: N(u.output_tokens) }
+  return spent(t) ? t : null
+}
+
+// Codex CLI: a "token_count" event in its rollout after each model call, with
+// that call's usage (its input counts what was cached too). Repeated events
+// don't move the running total: those are skipped. state: { total, model }.
+export function codexTokens(e, state) {
+  if (e?.type === 'turn_context' && typeof e.payload?.model === 'string') { state.model = e.payload.model; return null }
+  if (e?.type !== 'event_msg' || e.payload?.type !== 'token_count') return null
+  const info = e.payload.info, last = info?.last_token_usage, total = info?.total_token_usage?.total_tokens
+  if (!last || !Number.isFinite(total) || total <= (state.total ?? -1)) return null
+  state.total = total
+  const cached = N(last.cached_input_tokens)
+  const t = { model: state.model ?? '', input: Math.max(0, N(last.input_tokens) - cached), cache_read: cached, cache_write: N(last.cache_write_input_tokens), output: N(last.output_tokens) }
+  return spent(t) ? t : null
+}
+
+// Grok CLI: usage.json beside its conversation, each turn with its usage by
+// model (input counting what was cached). Turns ended since the observer
+// started and not counted yet. state: { since, turn }.
+export function grokTokens(json, state) {
+  const out = []
+  for (const turn of Array.isArray(json?.turns) ? json.turns : []) {
+    const n = Number(turn?.turnNumber)
+    if (!Number.isFinite(n) || n <= (state.turn ?? 0) || !(Date.parse(turn.endedAt) >= (state.since ?? 0))) continue
+    state.turn = n
+    const models = turn.modelUsage && typeof turn.modelUsage === 'object' ? Object.entries(turn.modelUsage) : [[turn.primaryModelId ?? '', turn]]
+    for (const [model, u] of models) {
+      const cr = N(u?.cachedReadTokens), cw = N(u?.cacheCreationTokens)
+      const t = { model: String(model), input: Math.max(0, N(u?.inputTokens) - cr - cw), cache_read: cr, cache_write: cw, output: N(u?.outputTokens), calls: N(u?.modelCalls) || 1, ts: Date.parse(turn.endedAt) }
+      if (spent(t)) out.push(t)
+    }
+  }
+  return out
+}
+
+// What started a turn, from its prompt: a message (by its id), a board or
+// server notice, an answer from the user's inbox, or the user in its terminal;
+// and the first task id it names (the server keeps it only if it is one).
+export function promptCause(prompt) {
+  const p = String(prompt ?? '')
+  const task = /\b[A-Z][A-Z0-9]{0,5}-\d{1,9}\b/.exec(p.slice(0, 20_000))?.[0]
+  const t = task ? { task } : {}
+  const tag = /^\s*<channel\b([^>]{0,2000})>/.exec(p)
+  if (tag) {
+    const kind = /\bkind="([a-z_]{1,40})"/.exec(tag[1])?.[1]
+    if (kind === 'pisha_board') return { cause: 'board', ...t }
+    if (kind === 'pisha_notice') return { cause: 'notice', ...t }
+    const id = Number(/\bmessage_id="(\d{1,15})"/.exec(tag[1])?.[1])
+    return { cause: 'message', ...(Number.isSafeInteger(id) && id > 0 ? { msg: id } : {}), ...t }
+  }
+  if (/^\s*Inbox #\d+ \(/.test(p)) return { cause: 'inbox', ...t }
+  return { cause: 'user', ...t }
+}
+
 // --- observer -----------------------------------------------------------------
 
 const MAX_HOOK_BYTES = 64 * 1024 * 1024
@@ -341,9 +411,16 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   // Tool calls started and not finished yet (tool_use_id -> { tool, input, at }).
   const running = new Map()
   let askedAt = 0 // the last PermissionRequest hook
+  // Tokens: what started the turn going on, the responses counted (by id),
+  // where Codex's running total is, and the Grok turns counted.
+  let cause = { cause: 'self' }
+  const counted = new Set(), countedOrder = []
+  const codexState = {}
+  const grokState = { since: Date.now(), turn: 0 }
+  let grokSeen = 0
 
   const push = ev => {
-    if (stopped || level === 'off') return
+    if (stopped || (level === 'off' && ev.kind !== 'tokens')) return
     outbox.push(ev)
     if (outbox.length > 2000) outbox = outbox.slice(-2000) // server unreachable for long: keep the latest
   }
@@ -362,6 +439,39 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
     }
   }
 
+  // A model call's tokens (or a Grok turn's), with what started the turn.
+  function spend(t, extra = {}) {
+    if (t.id) {
+      if (counted.has(t.id)) return
+      counted.add(t.id); countedOrder.push(t.id)
+      if (countedOrder.length > 5000) counted.delete(countedOrder.shift())
+    }
+    push({ ts: t.ts || Date.now(), kind: 'tokens', model: t.model, input: t.input, cache_read: t.cache_read, cache_write: t.cache_write, output: t.output, calls: t.calls ?? 1, ...cause, ...extra })
+  }
+  // A Claude Code subagent's responses, from its own transcript when it ends.
+  function spendSubagent(path) {
+    if (typeof path !== 'string' || !path.endsWith('.jsonl')) return
+    let text
+    try { if (statSync(path).size > 64 * 1024 * 1024) return; text = readFileSync(path, 'utf8') } catch { return }
+    for (const line of text.split('\n')) {
+      if (!line.includes('"usage"')) continue
+      let e
+      try { e = JSON.parse(line) } catch { continue }
+      const t = claudeTokens(e)
+      if (t) spend({ ...t, ts: Date.parse(e.timestamp) }, { sub: true })
+    }
+  }
+  // Grok's usage.json, beside its conversation (updates.jsonl), when it changed.
+  function readGrokUsage() {
+    if (!tail || basename(tail.path) !== 'updates.jsonl') return
+    const file = join(dirname(tail.path), 'usage.json')
+    let mtime
+    try { mtime = statSync(file).mtimeMs } catch { return }
+    if (mtime === grokSeen) return
+    grokSeen = mtime
+    try { for (const t of grokTokens(JSON.parse(readFileSync(file, 'utf8')), grokState)) spend(t) } catch {}
+  }
+
   // --- transcript tail -------------------------------------------------------
 
   function setTranscript(path) {
@@ -376,6 +486,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   let lastText = ''
   function readTail() {
     if (!tail) return
+    readGrokUsage()
     let size
     try { size = statSync(tail.path).size } catch { return }
     if (size < tail.offset) { // rewritten: nothing pending from before is valid
@@ -405,6 +516,10 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
   }
 
   function onTranscriptEntry(e, line) {
+    const claude = claudeTokens(e)
+    if (claude) spend({ ...claude, ts: Date.parse(e.timestamp) }, e.isSidechain ? { sub: true } : {})
+    const codex = codexTokens(e, codexState)
+    if (codex) spend({ ...codex, ts: Date.parse(e.timestamp) })
     // Only what Claude was given: a prompt (user) or what was put into a turn
     // already going (attachment). A "queue-operation" line is a message
     // waiting in Claude Code's queue, with its whole text: Claude hasn't seen
@@ -460,6 +575,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
         return push({ ...base, kind: 'session_start', source: input.source, model: input.model, cwd })
       case 'UserPromptSubmit': {
         const prompt = String(input.prompt ?? '')
+        cause = promptCause(prompt)
         try { onPrompt?.(prompt) } catch (err) { log(`observe: prompt callback failed: ${err.message}`) }
         // A turn started by a channel message: the dashboard already shows the
         // message itself.
@@ -522,6 +638,7 @@ export function createObserver({ level = 'full', send, log = () => {}, contextPr
       case 'SubagentStart':
         return push({ ...base, kind: 'subagent_start', id: input.agent_id })
       case 'SubagentStop':
+        spendSubagent(input.agent_transcript_path)
         return push({
           ...base,
           kind: 'subagent_stop',

@@ -229,6 +229,7 @@ export function openSettings(start) {
       <div class="set-card"><form data-retention class="people-form"><label class="field"><span>${esc(T.retentionDays)}</span><input type="text" inputmode="numeric" name="retention_days" value="${esc(kept.retention_days)}"></label>
         <label class="field"><span>${esc(T.eventHours)}</span><input type="text" inputmode="numeric" name="event_hours" value="${esc(kept.event_hours)}"></label>
         <label class="field"><span>${esc(T.retentionInbox)}</span><input type="text" inputmode="numeric" name="inbox_days" value="${esc(kept.inbox_days ?? 90)}"></label>
+        <label class="field"><span>${esc(T.retentionUsage)}</span><input type="text" inputmode="numeric" name="usage_days" value="${esc(kept.usage_days ?? 400)}"></label>
         <button class="btn primary">${esc(T.save)}</button></form><p class="note" data-saved></p></div>
       <h4>${esc(T.exportTitle)}</h4><div class="set-card set-row"><p class="note">${esc(T.exportHint)}</p>
       <a class="btn" href="${esc(inCompany('/api/company/export'))}" download>${esc(T.exportBtn)}</a></div>
@@ -242,7 +243,7 @@ export function openSettings(start) {
         ok()
         const v = Object.fromEntries(new FormData(e.target))
         try {
-          await call(inCompany('/api/company/retention/set'), { retention_days: Number(v.retention_days), event_hours: Number(v.event_hours), inbox_days: Number(v.inbox_days) })
+          await call(inCompany('/api/company/retention/set'), { retention_days: Number(v.retention_days), event_hours: Number(v.event_hours), inbox_days: Number(v.inbox_days), usage_days: Number(v.usage_days) })
           body.querySelector('[data-saved]').textContent = T.saved
         } catch (err) { fail(err) }
       }

@@ -15,8 +15,8 @@ const COMPANY_NAME = /^[\p{L}\p{N} ._&-]{1,80}$/u
 const CREDENTIAL_COMPANY = /^s[qjh]_([a-z0-9]{8})_/
 
 // What a company may keep, when it isn't what the server starts with.
-const QUOTAS = ['max_sessions', 'max_messages', 'max_events', 'max_updates', 'max_files_gb', 'max_db_mb', 'stored_text_mb_hour', 'retention_days', 'event_hours', 'inbox_days']
-const RETENTION = ['retention_days', 'event_hours', 'inbox_days']
+const QUOTAS = ['max_sessions', 'max_messages', 'max_events', 'max_updates', 'max_files_gb', 'max_db_mb', 'stored_text_mb_hour', 'retention_days', 'event_hours', 'inbox_days', 'usage_days']
+const RETENTION = ['retention_days', 'event_hours', 'inbox_days', 'usage_days']
 
 // How long a company waits after being deleted, in case it was a mistake.
 const GRACE_MS = Number(process.env.PISHA_COMPANY_GRACE_MS ?? 30 * 24 * 3600_000)
@@ -226,17 +226,17 @@ export function createCompanies(server) {
     },
     'company/retention': {
       role: 'manager', method: 'GET',
-      run: ({ company }) => ({ retention_days: company.platform.quota('retention_days', 7), event_hours: company.platform.quota('event_hours', Number(process.env.OBSERVE_TTL_HOURS ?? 24)), inbox_days: company.platform.quota('inbox_days', 90) }),
+      run: ({ company }) => ({ retention_days: company.platform.quota('retention_days', 7), event_hours: company.platform.quota('event_hours', Number(process.env.OBSERVE_TTL_HOURS ?? 24)), inbox_days: company.platform.quota('inbox_days', 90), usage_days: company.platform.quota('usage_days', 400) }),
     },
     'company/retention/set': {
       role: 'owner', method: 'POST',
       run({ company, params }) {
         const wanted = Object.fromEntries(RETENTION.filter(k => params[k] != null).map(k => [k, params[k]]))
         const limits = { ...quotasOf(row(company.id)), ...cleanQuotas(wanted) }
-        if ((limits.retention_days ?? 0) > 3650 || (limits.event_hours ?? 0) > 8760 || (limits.inbox_days ?? 0) > 3650) throw bad('at most 3650 days of messages or of the inbox, and 8760 hours of activity')
+        if ((limits.retention_days ?? 0) > 3650 || (limits.event_hours ?? 0) > 8760 || (limits.inbox_days ?? 0) > 3650 || (limits.usage_days ?? 0) > 3650) throw bad('at most 3650 days of messages, of the inbox or of token usage, and 8760 hours of activity')
         control.prepare('UPDATE companies SET limits_json = ? WHERE id = ?').run(JSON.stringify(limits), company.id)
         company.platform.setQuotas(limits)
-        return { retention_days: limits.retention_days ?? 7, event_hours: limits.event_hours ?? null, inbox_days: limits.inbox_days ?? 90 }
+        return { retention_days: limits.retention_days ?? 7, event_hours: limits.event_hours ?? null, inbox_days: limits.inbox_days ?? 90, usage_days: limits.usage_days ?? 400 }
       },
     },
     // (It answers by itself: a whole company goes down the response as it is read.)

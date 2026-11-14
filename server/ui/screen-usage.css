@@ -1,0 +1,60 @@
+/* Usage: what the agents spent, in tokens. The four kinds keep one colour
+   each everywhere on the screen (tiles, chart, bars). */
+
+#usage { padding: 20px; }
+.u-wrap { display: flex; flex-direction: column; gap: 16px; max-width: 1400px; margin: 0 auto; }
+[data-k="input"] { --k: var(--info); }
+[data-k="cache_write"] { --k: var(--warn); }
+[data-k="cache_read"] { --k: color-mix(in srgb, var(--info) 38%, var(--panel)); }
+[data-k="output"] { --k: var(--coord); }
+
+.u-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.u-filter select { height: 34px; padding: 0 30px 0 12px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--panel); color: var(--text); font: inherit; font-size: var(--fs-md); }
+
+.u-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.u-tile { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: var(--shadow-card); }
+.u-tl { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: var(--fs-sm); }
+.u-tl i { width: 9px; height: 9px; border-radius: 3px; background: var(--k); }
+.u-tile b { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.u-tn { color: var(--muted); font-size: var(--fs-xs); }
+
+.u-card { padding: 14px 16px 16px; border-radius: 14px; }
+.u-ch { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.u-ch h2 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.u-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: var(--fs-sm); }
+.u-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.u-legend i { width: 9px; height: 9px; border-radius: 3px; background: var(--k); }
+
+.u-chart { position: relative; padding: 18px 0 22px; }
+.u-chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
+.u-chart rect[data-k] { fill: var(--k); }
+.u-chart .u-hit { fill: transparent; }
+.u-chart .u-bar:hover rect[data-k] { opacity: .8; }
+.u-max { position: absolute; top: 0; left: 0; color: var(--faint); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.u-axis { position: relative; height: 16px; margin-top: 6px; color: var(--muted); font-size: var(--fs-xs); }
+.u-axis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+.u-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 16px; align-items: start; }
+.u-card.wide { grid-column: 1 / -1; }
+.u-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.u-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+.u-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.u-name .agent { width: 20px; height: 20px; border-radius: 6px; font-size: 10px; flex: none; }
+.u-nt { display: flex; flex-direction: column; min-width: 0; }
+.u-nt b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-nt b a, .u-nt b .linkish { color: var(--text); text-decoration: none; font: inherit; }
+.u-nt b .linkish { padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
+.u-nt b a:hover, .u-nt b .linkish:hover { text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+.u-nt span { color: var(--muted); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-val { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.u-val small { margin-left: 6px; color: var(--muted); font-weight: 400; font-size: var(--fs-xs); }
+.u-stack { grid-column: 1 / -1; display: flex; height: 6px; border-radius: 4px; background: var(--tray); overflow: hidden; }
+.u-stack i { display: block; height: 100%; background: var(--k); }
+.u-empty { padding: 60px 20px; }
+
+@media (max-width: 900px) {
+  #usage { padding: 14px; }
+  .u-tiles { grid-template-columns: repeat(2, 1fr); }
+  .u-tiles > :first-child { grid-column: 1 / -1; }
+  .u-chart svg { height: 160px; }
+}

@@ -11,7 +11,7 @@ export function createObservation(platform) {
   // everything to dashboard clients as it happens.
   const EVENT_KINDS = new Set([
     'observe_start', 'session_start', 'prompt', 'tool_start', 'tool_end', 'text', 'usage',
-    'notification', 'subagent_start', 'subagent_stop', 'stop', 'compact', 'compacted', 'session_end',
+    'notification', 'subagent_start', 'subagent_stop', 'stop', 'compact', 'compacted', 'session_end', 'tokens',
   ])
   const MAX_EVENT_JSON = 20_000
   const activity = new Map() // name -> derived state
@@ -43,6 +43,9 @@ export function createObservation(platform) {
     compact: { trigger: STR(20) },
     compacted: { trigger: STR(20), summary: STR(20_000) },
     session_end: { reason: STR(100) },
+    // A model call's tokens (or a turn's, for an agent that keeps them by the
+    // turn): kept added up by the usage module, not as an event.
+    tokens: { model: STR(100), input: INT, cache_read: INT, cache_write: INT, output: INT, calls: INT, sub: BOOL, cause: STR(20), msg: INT, task: STR(40) },
   }
   function cleanEvent(kind, data) {
     const out = {}
@@ -149,13 +152,16 @@ export function createObservation(platform) {
     const insert = db.prepare('INSERT INTO events (session, ts, kind, data) VALUES (?, ?, ?, ?)')
     // The whole batch is checked first, then stored at once: all of it or none
     // (a refusal halfway would store part of it and the retry would repeat it).
-    const batch = []
+    const batch = [], tokens = []
     for (const ev of events) {
       if (!ev || typeof ev !== 'object' || !EVENT_KINDS.has(ev.kind)) continue
       // Whole milliseconds within the events' lifetime: the history cursor relies on it.
-      const ts = Number.isSafeInteger(ev.ts) ? Math.max(now() - eventKeptMs(), Math.min(ev.ts, now() + 5000)) : now()
+      // (Tokens are kept far longer than events: one reported late keeps its day, up to 30 back.)
+      const oldest = ev.kind === 'tokens' ? now() - 30 * 24 * 3600_000 : now() - eventKeptMs()
+      const ts = Number.isSafeInteger(ev.ts) ? Math.max(oldest, Math.min(ev.ts, now() + 5000)) : now()
       const kind = ev.kind
       const rest = cleanEvent(kind, ev)
+      if (kind === 'tokens') { tokens.push({ ...rest, ts }); continue }
       const data = JSON.stringify(rest)
       if (data.length > MAX_EVENT_JSON) continue
       batch.push({ ts, kind, rest, data })
@@ -176,7 +182,8 @@ export function createObservation(platform) {
       stored++
     } })
     if (stored) bus.emit('session-changed', name)
-    return { stored }
+    if (tokens.length) bus.emit('tokens', name, tokens)
+    return { stored: stored + tokens.length }
   }
 
   // Tell a worker's coordinator when its context is nearly full (once per fill-up)

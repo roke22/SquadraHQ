@@ -32,6 +32,7 @@
     "platform",
     "sessions",
     "ui",
+    "usage",
     "vendor",
     "install",
     "pisha-host.mjs",

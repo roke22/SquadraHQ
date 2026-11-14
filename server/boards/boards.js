@@ -108,6 +108,14 @@ export function createBoards(platform, { sessions, messaging, members }) {
 
   const prefix = () => db.prepare("SELECT v FROM board_settings WHERE k = 'prefix'").get()?.v ?? 'SQ'
   const taskId = seq => `${prefix()}-${seq}`
+  // The first of this company's tasks a text names ("SQ-12", with its prefix), or null.
+  function taskIn(text) {
+    const p = prefix()
+    for (const m of String(text ?? '').slice(0, 20_000).matchAll(/\b([A-Z][A-Z0-9]{0,5})-(\d{1,9})\b/g)) {
+      if (m[1] === p && db.prepare('SELECT 1 FROM tasks WHERE seq = ? AND deleted_at IS NULL').get(Number(m[2]))) return `${p}-${Number(m[2])}`
+    }
+    return null
+  }
   // "SQ-12", "sq-12", "#12" or 12.
   function seqOf(id) {
     const m = /^(?:[A-Za-z][A-Za-z0-9]{0,5}-|#)?(\d{1,9})$/.exec(String(id ?? '').trim())
@@ -1075,5 +1083,5 @@ export function createBoards(platform, { sessions, messaging, members }) {
     restore: t => restoreTasks(t, { by: FROM_GITHUB(), github: true }),
   })
 
-  return { boardReads, boardActions, boardMethods, boardList, forget, BOARD_SENDER }
+  return { boardReads, boardActions, boardMethods, boardList, forget, taskIn, BOARD_SENDER }
 }

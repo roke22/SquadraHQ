@@ -26,8 +26,9 @@ Everything goes to **one place: the Pisha server you configure** with `/pisha:co
 - **Observation for the live dashboard**, at the level you choose (`/pisha:login … --observe off|activity|full`, default `full`):
   - `activity`: hook events (prompt submitted, with its first 200 characters; tool started or finished, with short arguments and the first line of an error; waiting for permission; compaction), and token use;
   - `full`: also your prompts, Claude's text read from the session transcript, and tool input and output, trimmed;
-  - `off`: nothing.
+  - `off`: nothing of that.
   Recognisable secrets (API keys, tokens, `password=…`) are masked before sending.
+- **Tokens spent**, at every level: for each model call, how many input, output and cache tokens, the model, what started the turn (a message's id, a board notice, an inbox answer or a prompt typed in the terminal) and the board task its prompt names. Never what was said.
 - **Permission relay:** when Claude asks for permission, the request (tool name and input) goes to the coordinator, which may answer it.
 - **Attachments:** what other sessions send lands in the session's inbox, kept for 7 days and up to 1 GB.
 

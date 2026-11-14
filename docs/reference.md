@@ -425,6 +425,32 @@ A **board** keeps the company's tasks, for people and agents alike, in columns b
 - **Agents use it through the plugin** (the `board` tool): a coordinator lists, reads, creates, updates and hands out tasks that are its team's or nobody's, and comments on any of its boards; a worker sees only its own tasks, moves them as its column's step says (with no step, up to a review status at most) and comments. Reading a task, an agent sees its step: what to do and where to move it when done. The server filters it: a session never sees a board its team isn't given, or a worker another's task. What agents change tells nobody, except moving a task into a step, which tells whoever handles it. Coordinators name branches after the task (`sq-12-…`), and their plan can point to it (`ref: "SQ-12"`).
 - **Who may do what:** observers read; operators create, edit, move, assign, comment and notify; managers create and set up boards and delete tasks. A board is archived before it can be deleted. At most 5000 tasks a board, and 300 board changes an hour for each agent.
 
+### Token usage
+
+The **Usage** screen (in the sidebar, or **Go to → Usage**) shows the tokens the agents spend. It counts them in four kinds: **input** not served from a cache, **cache read**, **cache write** and **output**.
+
+- **Where the counts come from.** Each session's plugin reads them from the agent's own record as it works:
+  - **Claude Code:** its transcript, one count per response, and each subagent's transcript when it ends.
+  - **Codex CLI:** the `token_count` events of its rollout.
+  - **Grok CLI:** the `usage.json` beside its conversation, one count per turn and model.
+
+  Only counts, models and what started the turn are sent, never what was said. They are counted always, also for a session with observation `off`, which sends nothing else.
+- **What started the work.** Each turn is put down to what began it:
+  - your orders (typed in its terminal), or your answers from the inbox;
+  - a worker's tasks from its coordinator, or a worker's report to its coordinator;
+  - a message between linked teams;
+  - the board's notices, or the server's;
+  - another message, or work on its own (before any prompt).
+
+  **Between linked teams** is what departments cost each other. If the prompt names one of the company's board tasks (`SQ-12`), that task gets it too.
+- **What you see.**
+  - **Periods:** today (by the hour), 7, 30 or 90 days (by the day).
+  - **Filters:** team, agent and model.
+  - **Totals**, with how much of the input came from a cache, and the spending over time.
+  - **Breakdowns:** by team, by what started the work, by board task, by model and by session.
+  - **Export CSV** gives the period by session.
+- **Kept** added up by the hour for 400 days. A company's owner changes that in **Settings › Activity & data**. Observers and up can see it.
+
 ### Permission profiles
 
 A **permission profile** says what the agents of a team may do without asking: edit the files in their folder, run tests, install dependencies, commit, push, rewrite history, delete files, look things up on the web, use Docker or sudo. Each one is **Allowed**, **Always asked**, **Forbidden** or left to Claude Code (as without a profile), and a profile can add Claude Code permission rules of its own (`Bash(make deploy *)`, `Edit(./docs/**)`, `WebFetch(domain:example.com)`, `mcp__github__create_issue`).
