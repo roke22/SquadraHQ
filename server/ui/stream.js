@@ -103,6 +103,7 @@ function onStream(type, data) {
   if (type === 'plans') {
     state.plans = new Map((Array.isArray(data) ? data : []).map(p => [p.coordinator, p]))
     soon(refreshTeam); soon(refreshTeams); soon(refreshTimelines)
+    if (currentRoute().view === 'org') soon(renderOrg) // (what each agent is on comes from its coordinator's plan)
   }
   if (type === 'inbox') {
     state.inbox = Array.isArray(data) ? data : []

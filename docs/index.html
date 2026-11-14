@@ -58,7 +58,12 @@
 <main>
 <div class="hero">
   <div class="wrap">
-    <p class="eyebrow"><b>New</b><span class="long">An inbox for your decisions, and a plan for every team</span><span class="short">An inbox for your decisions</span></p>
+    <figure class="hero-video">
+      <video id="heroVideo" autoplay muted loop playsinline controls preload="auto" poster="video/pisha-factory.jpg" aria-label="A software company where every employee is an AI agent, built with Pisha in about 30 minutes of agent time">
+        <source src="video/pisha-factory.mp4" type="video/mp4">
+      </video>
+    </figure>
+    <p class="eyebrow"><b>New</b><span class="long">Task boards in step with GitHub, and teams that talk to each other</span><span class="short">Task boards in step with GitHub</span></p>
     <h1>Your AI agents, run as a team.</h1>
     <p class="lead">A coordinator splits the work among its workers, on any of your machines, and approves what is safe. What is yours to decide waits in your inbox, so you can be somewhere else.</p>
     <div class="cta">
@@ -206,5 +211,9 @@ docker run -d -p 127.0.0.1:7787:7787 -v pisha-data:/data ghcr.io/roke22/pisha</c
     <p>Pisha is open source under the MIT license, by <a href="https://github.com/roke22">Jose J. Anton</a>. Claude, Claude Code and their logo are trademarks of Anthropic; OpenAI, Codex and the OpenAI logo, of OpenAI; Grok and its logo, of xAI. They are shown only to say which agents Pisha works with: Pisha is an independent project, not affiliated with or endorsed by any of them.</p>
   </div>
 </footer>
+<script>
+  // (Asked for less motion: the video waits to be played.)
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { const v = document.getElementById('heroVideo'); v.removeAttribute('autoplay'); v.pause() }
+</script>
 </body>
 </html>

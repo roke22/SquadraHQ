@@ -1854,3 +1854,22 @@ test('Codex CLI and Grok CLI: an answer to a permission prompt is typed only for
     assert.equal(out.multiline, null)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('an answer typed in Claude Code landed: its end at the input, or the paste a long one is shown as', () => {
+  const line = 'Inbox #5 ("Check it on a phone?"), the user answers from their inbox: Checked on a 390 px phone: it fits'
+  const input = text => `● Done.\n────────\n❯ ${text}\n────────\n  ⏵⏵ auto mode on`
+  const cases = [
+    [input(line.slice(-60)), true], // its end
+    [input('[Pasted text #1 +3 lines]'), true], // a long one, as Claude Code shows it
+    [input('[Pasted text #12]'), true],
+    [input(''), false], // nothing reached it
+    [input('Checked on a 390 px phone: it'), false], // not all of it
+    [`[Pasted text #1 +3 lines] was here before\n${input('')}`, false], // a paste elsewhere on the screen
+  ]
+  const script = `
+    import { answerLanded } from ${JSON.stringify(join(ROOT, 'host/pisha-host.mjs'))}
+    process.stdout.write(JSON.stringify(${JSON.stringify(cases)}.map(([s]) => answerLanded(s, ${JSON.stringify(line)}))))`
+  const dir = tempDir('pisha-landed-')
+  const out = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, PISHA_HOST_DIR: join(dir, 'host') }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }))
+  assert.deepEqual(out, cases.map(c => c[1]))
+})

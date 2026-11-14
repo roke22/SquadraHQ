@@ -1310,8 +1310,14 @@ const clearContext = target => typeLine(target, '/clear', /(^|\s)\/clear\s*$/m)
 async function typeAnswer(target, text) {
   const line = String(text).replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim()
   if (!line || line.length > 2200) throw new Error('the answer must be one line of up to 2200 characters')
-  const end = line.split(' ').pop().slice(-20).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  await typeLine(target, line, new RegExp(`${end}\\s*│?\\s*$`, 'm'))
+  await typeLine(target, line, { test: screen => answerLanded(screen, line) })
+}
+
+// Whether a typed answer reached the input: its end is there, or the paste
+// Claude Code shows a long one as instead ("[Pasted text #1 +3 lines]").
+export function answerLanded(screen, line) {
+  const end = String(line).split(' ').pop().slice(-20).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(${end}|\\[Pasted text #\\d+[^\\]\\n]*\\])\\s*│?\\s*$`, 'm').test(screen)
 }
 
 const ASKING_ON_SCREEN = /^\s*❯\s*\d+\.\s|Esc to cancel|Enter to confirm/m

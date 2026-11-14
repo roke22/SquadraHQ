@@ -109,6 +109,18 @@ function orgLinkPath(p, q) {
   const d = Math.max(30, Math.abs(y2 - y1) / 2) * (down ? 1 : -1)
   return { d: `M${pc} ${y1} C${pc} ${y1 + d} ${qc} ${y2 - d} ${qc} ${y2}`, mx: (pc + qc) / 2, my: (y1 + y2) / 2 }
 }
+// A message between two linked coordinators: a light runs along their link,
+// from the one who wrote to the other, and its count pulses.
+const linkFlashes = new Map() // "from>to" -> when
+const LINK_FLASH = 1800
+export function flashLink(from, to) {
+  linkFlashes.set(`${from}>${to}`, now())
+  if (currentRoute().view !== 'org') return
+  soon(renderOrg)
+  setTimeout(() => { linkFlashes.delete(`${from}>${to}`); if (currentRoute().view === 'org') soon(renderOrg) }, LINK_FLASH + 100)
+}
+const flashing = (from, to) => now() - (linkFlashes.get(`${from}>${to}`) ?? 0) < LINK_FLASH
+
 function orgLinesHtml() {
   let paths = '', labels = ''
   for (const l of state.links) {
@@ -118,8 +130,9 @@ function orgLinesHtml() {
     const n = recentOf(l)
     // (Amber from three quarters of what two coordinators may send each other in an hour.)
     const cls = n >= 60 ? 'full' : n >= 45 ? 'warn' : ''
-    paths += `<path class="l ${cls}" d="${d}"/><path class="hit" d="${d}" data-la="${esc(l.a)}" data-lb="${esc(l.b)}"/>`
-    labels += `<button class="org-label ${cls}" style="left:${Math.round(mx)}px;top:${Math.round(my)}px" data-la="${esc(l.a)}" data-lb="${esc(l.b)}" title="${esc(T.orgLinkRecent(n))}">${n}</button>`
+    const runs = [[l.a, l.b, p, q], [l.b, l.a, q, p]].filter(([f, t]) => flashing(f, t)).map(([, , from, to]) => `<path class="run" pathLength="100" d="${orgLinkPath(from, to).d}"/>`).join('')
+    paths += `<path class="l ${cls}" d="${d}"/>${runs}<path class="hit" d="${d}" data-la="${esc(l.a)}" data-lb="${esc(l.b)}"/>`
+    labels += `<button class="org-label ${cls}${runs ? ' got' : ''}" style="left:${Math.round(mx)}px;top:${Math.round(my)}px" data-la="${esc(l.a)}" data-lb="${esc(l.b)}" title="${esc(T.orgLinkRecent(n))}">${n}</button>`
   }
   return { paths, labels }
 }
@@ -138,11 +151,14 @@ export function noteHandoff(m) {
   soon(renderOrg)
   setTimeout(() => { flashes.delete(m.target); if (currentRoute().view === 'org') soon(renderOrg) }, 2200)
 }
+// A plan task's ref as a short tag: the board task or issue it names (SQ-12,
+// #30), or none. A path or a link stays in the tooltip, not on the card.
+const refId = ref => String(ref ?? '').match(/\b[A-Z][A-Z0-9]{0,5}-\d{1,9}\b|#\d{1,9}\b/)?.[0] ?? ''
 function taskOf(s, kind) {
   const coord = kind === 'coord' ? s.name : orgCoordOf(s)
   const plan = coord ? state.plans.get(coord) : null
   const t = plan?.tasks.find(x => x.who === s.name && x.state === 'doing')
-  if (t) return { title: t.title, ref: t.ref, since: t.since }
+  if (t) return { title: t.title, ref: refId(t.ref), full: t.ref, since: t.since }
   const h = handed.get(s.name)
   if (h) return { title: h.text.replace(/\s+/g, ' '), from: h.from, since: h.at }
   if (kind === 'coord' && plan?.title) return { title: plan.title }
@@ -174,7 +190,7 @@ function orgAgent(s, kind) {
         <span class="oa-who"><span class="oa-nm"><b>${esc(s.name)}</b><span class="oa-st ${st.cls}">${st.cls === 'work' ? '<span class="oa-spin" aria-hidden="true"></span>' : st.cls ? '<span class="oa-pd" aria-hidden="true"></span>' : ''}${esc(st.label)}</span></span>
           ${model ? `<span class="oa-model">${esc(model)}</span>` : ''}${kind === 'coord' ? `<span class="oa-lead">${esc(T.roleName.coordinator)}</span>` : ''}</span>
         <button class="org-more" data-orgmenu="agent" data-name="${esc(s.name)}" aria-label="${esc(T.orgAgentMenu(s.name))}" aria-haspopup="menu">${icon('more')}</button></div>
-      <div class="oa-task${task ? '' : ' none'}" title="${esc(task?.title ?? '')}">${task?.from ? `<span class="oa-from">↳ ${esc(task.from)}</span>` : ''}${task?.ref ? `<span class="oa-ref">${esc(task.ref)}</span>` : ''}<span class="oa-tt">${esc(task?.title ?? T.orgNoTask)}</span>${clockHtml(task?.since)}</div>
+      <div class="oa-task${task ? '' : ' none'}" title="${esc([task?.title, task?.full].filter(Boolean).join(' · '))}">${task?.from ? `<span class="oa-from">↳ ${esc(task.from)}</span>` : ''}${task?.ref ? `<span class="oa-ref">${esc(task.ref)}</span>` : ''}<span class="oa-tt">${esc(task?.title ?? T.orgNoTask)}</span>${clockHtml(task?.since)}</div>
       <div class="oa-now">${esc(status(s).text)}</div>
       ${Number.isFinite(pct) ? `<div class="oa-ctx" title="${esc(T.contextPct(Math.round(pct)))}"><span class="oa-bar"><i class="${pct >= 95 ? 'hot' : pct >= 80 ? 'warm' : ''}" style="width:${Math.max(2, Math.min(100, pct))}%"></i></span>${a.context_tokens && window ? `${kTokens(a.context_tokens)} / ${kTokens(window)}` : `${Math.round(pct)}%`}</div>` : ''}
     </div>`

@@ -353,7 +353,7 @@ Each team works on its own, but two can share work: **link** their coordinators 
 
 **Org chart** (**Teams → Org chart**) shows how your teams are organised and lets you change it in one place.
 
-- **What you see:** each team is a card with its coordinator and its workers (their state, persona and context). The lines between cards are links between teams, with how many messages they sent each other in the last hour (amber near the limit of 60, red at it). Hovering a team shows its goal, its coordinator's persona and who it is linked with; hovering an agent, what it is for, what it is doing, its machine and folder. Sessions without a team and standalone sessions are listed below.
+- **What you see:** each team is a card with its coordinator and its workers (their state, persona and context). The lines between cards are links between teams, with how many messages they sent each other in the last hour (amber near the limit of 60, red at it); when one sends the other a message, a light runs along their line from the one who wrote it. Hovering a team shows its goal, its coordinator's persona and who it is linked with; hovering an agent, what it is for, what it is doing, its machine and folder. Sessions without a team and standalone sessions are listed below.
 - **Arrange it:** drag a card by its header; **Arrange** puts them all in columns again; − / + zoom. Positions are kept on the server, the same for every browser. On a phone it is a list.
 - **Link teams:** drag the dot on a card's right edge onto another card. Click a line's label to unlink.
 - **Describe:** a team's ⋯ → *Name and goal* (or **Edit** on the team's page); an agent's ⋯ → *Describe*. An agent with no description shows its persona's. Who is told:
