@@ -23,3 +23,6 @@ server/pisha-host.mjs
 server/pisha-host.mjs.sig
 server/install/
 server/LICENSE
+
+# The video manual: script, screenshots, clips and videos (published on the website or YouTube, not here)
+manual/
