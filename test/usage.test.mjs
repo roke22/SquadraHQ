@@ -117,7 +117,7 @@ test('the observer: each response once, with what started its turn, a subagent t
 // --- the server ------------------------------------------------------------------
 
 const TOKEN = 'test-server-token-usage-0123456789'
-const PORT = 20400 + Math.floor(Math.random() * 400)
+const PORT = 28000 + Math.floor(Math.random() * 400) // (a range no other test file uses: they run at once)
 const URL_ = `http://127.0.0.1:${PORT}`
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let server
