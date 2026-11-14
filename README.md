@@ -14,7 +14,7 @@
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="GitHub stars"></a>
 </p>
 
-<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://pisha.dev/">Website</a> · <a href="https://pisha.dev/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
+<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://pisha.dev/">Website</a> · <a href="https://pisha.dev/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.12</p>
 
 ---
 
