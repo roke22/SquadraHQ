@@ -58,12 +58,6 @@
 <main>
 <div class="hero">
   <div class="wrap">
-    <figure class="hero-video">
-      <video id="heroVideo" autoplay muted loop playsinline controls preload="auto" poster="../video/pisha-factory.jpg" aria-label="Una empresa de software en la que cada empleado es un agente de IA, montada con Pisha en unos 30 minutos de trabajo de los agentes">
-        <source src="../video/pisha-factory.mp4" type="video/mp4">
-        <track kind="subtitles" srclang="es" label="Español" src="../video/pisha-factory.es.vtt" default>
-      </video>
-    </figure>
     <p class="eyebrow"><b>Nuevo</b><span class="long">Tableros de tareas sincronizados con GitHub, y equipos que hablan entre sí</span><span class="short">Tableros sincronizados con GitHub</span></p>
     <h1>Tus agentes de IA, trabajando en equipo.</h1>
     <p class="lead">Un coordinador reparte el trabajo entre sus workers, en cualquiera de tus máquinas, y aprueba lo que es seguro. Lo que te toca decidir te espera en la bandeja, así que puedes estar en otra parte.</p>
@@ -73,12 +67,39 @@
     </div>
     <p class="note">Código abierto, MIT. Autoalojado: un servidor Node.js, sin dependencias.</p>
     <div class="agents"><span>Funciona con</span><span class="ag"><img class="logo" src="../brand/anthropic.svg" alt="" width="20" height="20">Claude Code</span><span class="ag"><picture><source srcset="../brand/OAI_OpenAI-Blossom_White.svg" media="(prefers-color-scheme: dark)"><img class="logo" src="../brand/OAI_OpenAI-Blossom_Black.svg" alt="" width="20" height="20" data-pad></picture>Codex CLI <small>experimental</small></span><span class="ag"><picture><source srcset="../brand/Grok_Logomark_Light.svg" media="(prefers-color-scheme: dark)"><img class="logo" src="../brand/Grok_Logomark_Dark.svg" alt="" width="20" height="20"></picture>Grok CLI <small>experimental</small></span></div>
-    <div class="window">
-      <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
-      <picture><source srcset="../screenshots/phone-inbox-dark-es.jpg" media="(max-width: 700px) and (prefers-color-scheme: dark)"><source srcset="../screenshots/phone-inbox-light-es.jpg" media="(max-width: 700px)"><source srcset="../screenshots/inbox-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/inbox-light-es.jpg" alt="La bandeja de Pisha: un permiso pendiente y dos decisiones del coordinador de Desarrollo, una abierta con sus opciones y la recomendada marcada" width="2880" height="1800" fetchpriority="high"></picture>
-    </div>
+    <figure class="hero-video">
+      <video id="heroVideo" autoplay muted loop playsinline controls preload="auto" poster="../video/pisha-factory.jpg" aria-label="Una empresa de software en la que cada empleado es un agente de IA, montada con Pisha en unos 30 minutos de trabajo de los agentes">
+        <source src="../video/pisha-factory.mp4" type="video/mp4">
+        <track kind="subtitles" srclang="es" label="Español" src="../video/pisha-factory.es.vtt" default>
+      </video>
+    </figure>
   </div>
 </div>
+
+<section id="departments">
+  <div class="wrap center">
+    <p class="kicker">Departamentos</p>
+    <h2>Tu empresa, departamento a departamento.</h2>
+    <p class="sub">Cada departamento es un equipo con su propio trabajo: Producto escribe los requisitos, Planificación planifica cada tarea, Desarrollo la construye, QA la prueba y Revisión la aprueba. Enlázalos en el organigrama y el trabajo pasa de uno a otro a través de sus coordinadores.</p>
+    <div class="window"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="../screenshots/departments-light-en.jpg" alt="El organigrama de una empresa de software: cinco departamentos enlazados, Producto, Planificación, Desarrollo, QA y Revisión, cada uno con su coordinador y sus workers" width="2880" height="1800" loading="lazy"></div>
+  </div>
+</section>
+
+<section id="usage">
+  <div class="wrap split rev">
+    <div>
+      <p class="kicker">Consumo</p>
+      <h2>Lo que gasta cada agente, en tokens.</h2>
+      <p class="sub">Cada llamada al modelo se cuenta al momento, igual para Claude Code, Codex CLI y Grok CLI: entrada, salida y caché, en el día, la semana o el mes.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Por lo que empezó el trabajo.</b> Tus órdenes, los encargos de un coordinador, los informes de los workers, los mensajes entre departamentos enlazados o el tablero: mira cuánto cuesta cada tipo de trabajo.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Por equipo, sesión, modelo y tarea.</b> Cuánto gastó un departamento, y cuánto costó cada tarea del tablero desde los requisitos hasta la revisión.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Solo números.</b> Cantidades y modelos, nunca lo que se dijo; se guarda por horas y se exporta a CSV.</span></li>
+      </ul>
+    </div>
+    <div class="window" style="margin: 0"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="../screenshots/usage-dark-es.jpg" media="(prefers-color-scheme: dark)"><img src="../screenshots/usage-light-es.jpg" alt="La pantalla Consumo: 11,9 millones de tokens en una semana, una barra por día con la entrada, la salida y la caché, y los tokens por equipo y por lo que empezó el trabajo" width="2880" height="1800" loading="lazy"></picture></div>
+  </div>
+</section>
 
 <section id="inbox">
   <div class="wrap split">

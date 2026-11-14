@@ -58,11 +58,6 @@
 <main>
 <div class="hero">
   <div class="wrap">
-    <figure class="hero-video">
-      <video id="heroVideo" autoplay muted loop playsinline controls preload="auto" poster="video/pisha-factory.jpg" aria-label="A software company where every employee is an AI agent, built with Pisha in about 30 minutes of agent time">
-        <source src="video/pisha-factory.mp4" type="video/mp4">
-      </video>
-    </figure>
     <p class="eyebrow"><b>New</b><span class="long">Task boards in step with GitHub, and teams that talk to each other</span><span class="short">Task boards in step with GitHub</span></p>
     <h1>Your AI agents, run as a team.</h1>
     <p class="lead">A coordinator splits the work among its workers, on any of your machines, and approves what is safe. What is yours to decide waits in your inbox, so you can be somewhere else.</p>
@@ -72,12 +67,38 @@
     </div>
     <p class="note">Open source, MIT. Self-hosted: one Node.js server, no dependencies.</p>
     <div class="agents"><span>Works with</span><span class="ag"><img class="logo" src="brand/anthropic.svg" alt="" width="20" height="20">Claude Code</span><span class="ag"><picture><source srcset="brand/OAI_OpenAI-Blossom_White.svg" media="(prefers-color-scheme: dark)"><img class="logo" src="brand/OAI_OpenAI-Blossom_Black.svg" alt="" width="20" height="20" data-pad></picture>Codex CLI <small>experimental</small></span><span class="ag"><picture><source srcset="brand/Grok_Logomark_Light.svg" media="(prefers-color-scheme: dark)"><img class="logo" src="brand/Grok_Logomark_Dark.svg" alt="" width="20" height="20"></picture>Grok CLI <small>experimental</small></span></div>
-    <div class="window">
-      <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
-      <picture><source srcset="screenshots/phone-inbox-dark-en.jpg" media="(max-width: 700px) and (prefers-color-scheme: dark)"><source srcset="screenshots/phone-inbox-light-en.jpg" media="(max-width: 700px)"><source srcset="screenshots/inbox-dark-en.jpg" media="(prefers-color-scheme: dark)"><img src="screenshots/inbox-light-en.jpg" alt="The Pisha inbox: a permission waiting and two decisions from the Development coordinator, one open with its options and the recommended one marked" width="2880" height="1800" fetchpriority="high"></picture>
-    </div>
+    <figure class="hero-video">
+      <video id="heroVideo" autoplay muted loop playsinline controls preload="auto" poster="video/pisha-factory.jpg" aria-label="A software company where every employee is an AI agent, built with Pisha in about 30 minutes of agent time">
+        <source src="video/pisha-factory.mp4" type="video/mp4">
+      </video>
+    </figure>
   </div>
 </div>
+
+<section id="departments">
+  <div class="wrap center">
+    <p class="kicker">Departments</p>
+    <h2>Your company, department by department.</h2>
+    <p class="sub">Each department is a team with its own job: Product writes the requirements, Planning plans each task, Development builds it, QA tests it and Review approves it. Link them in the org chart and the work flows from one to the next through their coordinators.</p>
+    <div class="window"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><img src="screenshots/departments-light-en.jpg" alt="The org chart of a software company: five linked departments, Product, Planning, Development, QA and Review, each with its coordinator and its workers" width="2880" height="1800" loading="lazy"></div>
+  </div>
+</section>
+
+<section id="usage">
+  <div class="wrap split rev">
+    <div>
+      <p class="kicker">Usage</p>
+      <h2>What every agent spends, in tokens.</h2>
+      <p class="sub">Every model call is counted as it happens, for Claude Code, Codex CLI and Grok CLI alike: input, output and cache, over the day, the week or the month.</p>
+      <ul class="points">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>By what started the work.</b> Your orders, a coordinator's tasks, workers' reports, messages between linked departments or the board: see what each kind of work costs.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>By team, session, model and task.</b> How much a department spent, and how much each board task took from requirements to review.</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg><span><b>Only numbers.</b> Counts and models, never what was said; kept by the hour, and exported as CSV.</span></li>
+      </ul>
+    </div>
+    <div class="window" style="margin: 0"><div class="bar" aria-hidden="true"><i></i><i></i><i></i></div><picture><source srcset="screenshots/usage-dark-en.jpg" media="(prefers-color-scheme: dark)"><img src="screenshots/usage-light-en.jpg" alt="The Usage screen: 11.9 million tokens in a week, a bar per day split into input, output and cache, and the tokens by team and by what started the work" width="2880" height="1800" loading="lazy"></picture></div>
+  </div>
+</section>
 
 <section id="inbox">
   <div class="wrap split">
