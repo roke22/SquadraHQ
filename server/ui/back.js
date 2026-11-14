@@ -59,6 +59,7 @@ export function parentOf(r) {
     case 'hosts': return r.host ? '#/hosts' : null
     case 'addmachine': return '#/hosts'
     case 'boards': return null
+    case 'usage': return null
     case 'board': return r.task ? `#/b/${r.board}` : '#/boards'
     case 'terminal': return `#/h/${enc(r.host)}`
     case 'session': {
@@ -90,6 +91,7 @@ export function placeName(hash) {
     case 'newteam': return T.newTeam
     case 'addmachine': return T.addTitle
     case 'boards': return T.boards
+    case 'usage': return T.usage
     case 'board': return state.boards.find(b => b.id === r.board)?.name ?? T.boards
     default: return T.leads
   }

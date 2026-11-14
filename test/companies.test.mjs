@@ -603,14 +603,17 @@ test('what is done in a company is written down in it: who, what and about what,
 
 test('retention: a company keeps messages and activity for as long as it says', async () => {
   const [a, b] = [await newCompany('Keep A'), await newCompany('Keep B')]
-  assert.deepEqual(await read(a, 'company/retention'), { retention_days: 7, event_hours: 24, inbox_days: 90 })
+  assert.deepEqual(await read(a, 'company/retention'), { retention_days: 7, event_hours: 24, inbox_days: 90, usage_days: 400 })
   assert.deepEqual(ok(await act(a, 'company/retention/set', { retention_days: 30 })).retention_days, 30)
   assert.equal((await read(a, 'company/retention')).retention_days, 30)
   assert.equal((await read(b, 'company/retention')).retention_days, 7)
   // (What is done in the inbox, too.)
   assert.equal(ok(await act(a, 'company/retention/set', { inbox_days: 365 })).inbox_days, 365)
   assert.equal((await read(a, 'company/retention')).inbox_days, 365)
-  for (const bad of [{ retention_days: 0 }, { retention_days: 4000 }, { event_hours: 'x' }, { inbox_days: 4000 }]) {
+  // (And what the agents spent.)
+  assert.equal(ok(await act(a, 'company/retention/set', { usage_days: 30 })).usage_days, 30)
+  assert.equal((await read(a, 'company/retention')).usage_days, 30)
+  for (const bad of [{ retention_days: 0 }, { retention_days: 4000 }, { event_hours: 'x' }, { inbox_days: 4000 }, { usage_days: 4000 }]) {
     assert.equal((await act(a, 'company/retention/set', bad)).error_code, 400)
   }
 })

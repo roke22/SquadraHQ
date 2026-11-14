@@ -7,6 +7,7 @@ import { createMachines } from './machines/index.js'
 import { createOrganization } from './organization/index.js'
 import { createDashboard } from './dashboard/index.js'
 import { createBoards } from './boards/index.js'
+import { createUsage } from './usage/index.js'
 import { upgradeStoredData } from './data-upgrade.js'
 import { cleanExports } from './company-export.js'
 
@@ -34,7 +35,8 @@ export function createCompany(server, options) {
   const machines = createMachines(platform, { sessions, observation, permissions })
   const organization = createOrganization(platform, { sessions, messaging, observation, machines })
   const boards = createBoards(platform, { sessions, messaging, members: options.members ?? (() => []) })
-  const dashboard = createDashboard(platform, { sessions, messaging, inbox, plans, observation, machines, organization, permissions, boards })
+  const usage = createUsage(platform, { sessions, boards })
+  const dashboard = createDashboard(platform, { sessions, messaging, inbox, plans, observation, machines, organization, permissions, boards, usage })
 
   // What a session can ask for, by its name in the request.
   const methods = {
@@ -47,6 +49,7 @@ export function createCompany(server, options) {
     inbox.cleanupInbox()
     sessions.cleanupUpdates()
     observation.cleanupEvents()
+    usage.cleanupUsage()
     platform.cleanupLimits()
     platform.cleanupAudit()
     platform.truncateLogHourly()

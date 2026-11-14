@@ -30,6 +30,7 @@ const DATA = {
     ],
     tell: 'The invoices page is done and tested: 11 tests pass, committed on release/1.3.0, not deployed.',
     reports: [['web', 'done', 'Invoices page done: 11 tests pass'], ['api', 'blocked', 'The supplier API key is missing: purchasing has it']],
+    boardName: 'Shop', boardTasks: ['Invoices page', 'Stock sync with the supplier', 'Round the cart total', 'Checkout tests on mobile'],
   },
   es: {
     teams: [['coord-dev', 'Desarrollo', 'La tienda: carrito y pagos'], ['coord-qa', 'QA', 'Probar lo que entrega Desarrollo'], ['editor', 'Contenidos', 'El centro de ayuda y las notas de versión']],
@@ -48,6 +49,7 @@ const DATA = {
     ],
     tell: 'La página de facturas está terminada y probada: pasan 11 pruebas, con commit en release/1.3.0, sin publicar.',
     reports: [['web', 'done', 'Página de facturas terminada: pasan 11 pruebas'], ['api', 'blocked', 'Falta la clave de la API del proveedor: la tiene compras']],
+    boardName: 'Tienda', boardTasks: ['Página de facturas', 'Sincronizar el stock con el proveedor', 'Redondear el total del carrito', 'Pruebas del pago en el móvil'],
   },
 }
 
@@ -108,6 +110,54 @@ async function company(lang) {
   return server
 }
 
+// A company of its own for the usage screen: linked teams that message each
+// other, a board with tasks, and a week of tokens spent on them, each turn
+// started by a real message (what started it is told from the message).
+async function usageCompany(lang) {
+  const d = DATA[lang]
+  const server = await startServer()
+  const machine = await startMachine(server, 'mac-mini', { id: 'api', role: 'worker', coordinator: 'coord-dev' }, { screens: {} })
+  const open = async (name, role, coordinator, agent) => {
+    await server.call('api/terminals/open', { host: machine.id, spec: { name, role, ...(coordinator ? { coordinator } : {}) } })
+    return startSession(server, name, role, coordinator, machine.identities.get(name), { agent })
+  }
+  const dev = await open('coord-dev', 'coordinator')
+  const web = await open('web', 'worker', 'coord-dev')
+  const api = await startSession(server, 'api', 'worker', 'coord-dev', undefined, { agent: 'codex' })
+  const qa = await open('coord-qa', 'coordinator')
+  const grok = await open('pruebas', 'worker', 'coord-qa', 'grok')
+  for (const [c, title, goal] of d.teams) if (c !== 'editor') await server.call('api/org/squad', { coordinator: c, title, goal })
+  await server.call('api/links/add', { a: 'coord-dev', b: 'coord-qa' })
+  const board = await server.call('api/boards/create', { name: d.boardName, teams: ['coord-dev', 'coord-qa'] })
+  for (const title of d.boardTasks) await server.call('api/tasks/create', { board: board.id, title })
+  const msg = async (from, to) => (await from.call('sendMessage', { chat_id: to, text: 'SQ-1' })).message_id
+  const ids = { toWeb: await msg(dev, 'web'), toApi: await msg(dev, 'api'), toGrok: await msg(qa, 'pruebas'), fromWeb: await msg(web, 'coord-dev'), fromApi: await msg(api, 'coord-dev'), fromGrok: await msg(grok, 'coord-qa'), toQa: await msg(dev, 'coord-qa'), toDev: await msg(qa, 'coord-dev') }
+  const t = Date.now()
+  let seed = 7
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  // [session, model, how much it spends, what starts its turns]
+  const spend = [
+    [dev, 'claude-opus-5-5', 0.9, [['user'], ['message', ids.fromWeb], ['message', ids.fromApi], ['message', ids.toDev], ['board']]],
+    [web, 'claude-opus-5-5', 1.3, [['message', ids.toWeb]]],
+    [api, 'gpt-5.5-codex', 0.8, [['message', ids.toApi]]],
+    [qa, 'claude-sonnet-5-5', 0.5, [['message', ids.toQa], ['message', ids.fromGrok], ['inbox']]],
+    [grok, 'grok-4.7', 0.6, [['message', ids.toGrok]]],
+  ]
+  for (let day = 6; day >= 0; day--) {
+    const busy = [0.6, 0.9, 0.4, 1.1, 1.0, 0.7, 0.8][day]
+    for (const [s, model, weight, causes] of spend) {
+      const events = []
+      for (let i = 0; i < 6; i++) {
+        const k = (40_000 + rnd() * 90_000) * weight * busy
+        const [cause, id] = causes[i % causes.length]
+        events.push({ kind: 'tokens', ts: t - day * 86400_000 - (2 + i * 1.3) * 3600_000, model, input: Math.round(k * 0.02), cache_read: Math.round(k * 0.82), cache_write: Math.round(k * 0.13), output: Math.round(k * 0.03), calls: 2 + Math.round(rnd() * 6), cause, ...(id ? { msg: id } : {}), task: `SQ-${1 + Math.floor(rnd() * d.boardTasks.length)}` })
+      }
+      await s.observe(events)
+    }
+  }
+  return server
+}
+
 const SHOTS = [
   // name, address, what to wait for, phone?
   ['inbox', '#/inbox/i1', '.ibx-opts'],
@@ -118,6 +168,7 @@ const SHOTS = [
   ['timeline', '#/s/web', '.tv-aside .tl-item'], // (the terminal with its timeline beside it: the website shows it)
   ['machines', '#/hosts', '.mc-table'],
   ['org-chart', '#/org', '.org-card'],
+  ['usage', '#/usage', '.u-tile', false, 'usage'],
   ['live', '#/q/coord-dev/live', '.pane'],
   ['new-team', '#/new', '.nt-member'],
   ['phone-inbox', '#/', '.ibx-item', true],
@@ -126,18 +177,19 @@ const SHOTS = [
 
 for (const lang of ['en', 'es']) {
   test.describe(lang, () => {
-    let server
-    test.beforeAll(async () => { server = await company(lang) })
-    test.afterAll(async () => { await server?.stop() })
+    let server, usage
+    test.beforeAll(async () => { server = await company(lang); usage = await usageCompany(lang) })
+    test.afterAll(async () => { await server?.stop(); await usage?.stop() })
     for (const scheme of ['dark', 'light']) {
       test(`${lang} ${scheme}`, async ({ browser }) => {
-        for (const [name, hash, ready, phone] of SHOTS) {
+        for (const [name, hash, ready, phone, which] of SHOTS) {
+          const server_ = which === 'usage' ? usage : server
           const ctx = await browser.newContext({ colorScheme: scheme, locale: lang === 'es' ? 'es-ES' : 'en-GB', viewport: phone ? { width: 390, height: 844 } : { width: 1440, height: 900 }, deviceScaleFactor: 2 })
           await ctx.addInitScript(l => { try { localStorage.setItem('pishaLang', l) } catch {} }, lang)
           const page = await ctx.newPage()
-          const [n, v] = (await server.ownerCookie()).split('=')
-          await ctx.addCookies([{ name: n, value: v, url: server.url }])
-          await page.goto(`${server.url}/?company=default${hash}`)
+          const [n, v] = (await server_.ownerCookie()).split('=')
+          await ctx.addCookies([{ name: n, value: v, url: server_.url }])
+          await page.goto(`${server_.url}/?company=default${hash}`)
           await expect(page.locator(ready).first()).toBeVisible()
           await page.evaluate(() => document.fonts.ready)
           await page.waitForTimeout(400)

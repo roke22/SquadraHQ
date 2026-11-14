@@ -22,7 +22,8 @@ const SERVER_MODULES = {
   machines: ['platform', 'sessions', 'observation', 'permissions'],
   organization: ['platform', 'sessions', 'messaging', 'observation', 'machines'],
   boards: ['platform', 'sessions', 'messaging'],
-  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions', 'boards'],
+  usage: ['platform', 'sessions', 'boards'],
+  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions', 'boards', 'usage'],
   ui: [],
 }
 const SERVER_OTHER_FOLDERS = ['vendor']

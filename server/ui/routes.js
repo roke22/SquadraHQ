@@ -19,6 +19,7 @@ export function parseRoute(hash) {
   if (hash === '#/teams') return { view: 'teams' }
   // The task boards; one of them, with a task open beside it (or a new one).
   if (hash === '#/boards') return { view: 'boards' }
+  if (hash === '#/usage') return { view: 'usage' }
   const bd = hash.match(/^#\/b\/(\d{1,9})(?:\/(new|[A-Za-z][A-Za-z0-9]{0,5}-\d{1,9}))?$/)
   if (bd) return { view: 'board', board: Number(bd[1]), ...(bd[2] ? { task: bd[2] } : {}) }
   if (hash === '#/new') return { view: 'newteam' }

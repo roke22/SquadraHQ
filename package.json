@@ -9,7 +9,7 @@
   },
   "scripts": {
     "server": "node server/server.js",
-    "test": "node --test test/modules.test.mjs test/e2e.test.mjs test/host.test.mjs test/security.test.mjs test/upgrade.test.mjs test/companies.test.mjs test/accounts.test.mjs test/boards.test.mjs test/github-sync.test.mjs test/package.test.mjs",
+    "test": "node --test test/modules.test.mjs test/e2e.test.mjs test/host.test.mjs test/security.test.mjs test/upgrade.test.mjs test/companies.test.mjs test/accounts.test.mjs test/boards.test.mjs test/github-sync.test.mjs test/usage.test.mjs test/package.test.mjs",
     "test:ui": "playwright test -c test/ui/playwright.config.mjs",
     "screenshots": "playwright test -c test/ui/screenshots.config.mjs"
   },

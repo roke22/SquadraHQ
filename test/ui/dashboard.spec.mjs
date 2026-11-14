@@ -984,3 +984,28 @@ test('the org chart: a message between linked teams runs along their link', asyn
   await expect(page.locator('.org-lines .run')).toHaveCount(0, { timeout: 4000 })
   await page.evaluate(() => import('/ui/machines.js').then(m => m.postJson('/api/links/delete', { a: 'coord', b: 'linkc' })))
 })
+
+test('usage: what the agents spent, in tokens, over a period and by what started it', async ({ page }) => {
+  const at = Date.now() - 60_000
+  await coord.call('observe', { events: [
+    { kind: 'tokens', ts: at, model: 'claude-opus-5-5', input: 120, cache_read: 9000, cache_write: 800, output: 400, cause: 'user' },
+    { kind: 'tokens', ts: at, model: 'claude-opus-5-5', input: 30, cache_read: 3000, cache_write: 0, output: 100, cause: 'board' },
+  ] })
+  await signIn(page, '#/')
+  await page.locator('#nav a[href="#/usage"]').click()
+  await expect(page).toHaveURL(/#\/usage$/)
+  const box = page.locator('#usage')
+  await expect(box.locator('.u-tile').first()).toContainText('13.5k')
+  await expect(box.locator('.u-tile[data-k="output"]')).toContainText('500')
+  await expect(box).toContainText('Your orders')
+  await expect(box).toContainText('Board notices')
+  await expect(box.locator('.u-chart rect[data-k]').first()).toBeVisible()
+  // Another period, and a team: drawn again from the server.
+  await page.locator('[data-urange="today"]').click()
+  await expect(page.locator('[data-urange="today"]')).toHaveClass(/on/)
+  await expect(box.locator('.u-tile').first()).toContainText('13.5k')
+  await box.locator('[data-ufilter="model"]').selectOption('claude-opus-5-5')
+  await expect(box.locator('.u-tile').first()).toContainText('13.5k')
+  await box.locator('[data-ufilter="team"]').selectOption({ index: 0 })
+  await expect(page.locator('[data-uexport]')).toBeVisible()
+})
