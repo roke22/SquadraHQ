@@ -87,7 +87,7 @@
 .oa-task { display: flex; align-items: baseline; gap: 6px; min-width: 0; color: var(--text); font-weight: 500; }
 .oa-task.none { color: var(--faint); font-weight: 400; }
 .oa-tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.oa-ref { flex: none; padding: 0 5px; border-radius: 5px; background: var(--tray); color: var(--muted); font: 500 11px/18px var(--mono); }
+.oa-ref { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 5px; border-radius: 5px; background: var(--tray); color: var(--muted); font: 500 11px/18px var(--mono); }
 .oa-from { flex: none; color: var(--muted); font: 500 12px var(--mono); }
 .oa-clock { flex: none; color: var(--muted); font: 500 var(--fs-sm)/1 var(--sans); font-variant-numeric: tabular-nums; }
 .oa-now { color: var(--muted); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

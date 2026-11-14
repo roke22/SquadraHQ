@@ -348,6 +348,13 @@ test('the org chart: a squad shows its coordinator and its worker', async ({ pag
   await page.waitForTimeout(2100)
   await coord.call('setPlan', plan)
   await expect(worker.locator('.oa-clock')).toHaveText(/^0:0[2-9]$/)
+  // A ref that is a path shows only the task it names; the title keeps its room.
+  await coord.call('setPlan', { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'doing', who: 'worker1', ref: 'docs/tasks/SQ-12/plan.md' }] })
+  await expect(worker.locator('.oa-ref')).toHaveText('SQ-12')
+  await expect(worker.locator('.oa-task')).toHaveAttribute('title', /docs\/tasks\/SQ-12\/plan\.md/)
+  await coord.call('setPlan', { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'doing', who: 'worker1', ref: 'https://example.com/notes' }] })
+  await expect(worker.locator('.oa-ref')).toHaveCount(0)
+  await expect(worker.locator('.oa-tt')).toHaveText('Round the total')
   await coord.call('setPlan', { tasks: [] })
   await worker.click({ position: { x: 120, y: 80 } })
   await expect(page).toHaveURL(/#\/s\/worker1$/)

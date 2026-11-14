@@ -172,7 +172,7 @@ export const TOOLS = [
               title: { type: 'string', description: 'The task, in a few words.' },
               state: { type: 'string', enum: ['todo', 'doing', 'done', 'blocked', 'waiting'], description: 'waiting: it waits on the user\'s decision.' },
               who: { type: 'string', description: 'The worker that has it, if any.' },
-              ref: { type: 'string', description: 'Where it comes from: a ticket, an issue, a path.' },
+              ref: { type: 'string', description: 'Where it comes from: the board task (SQ-12), an issue (#30), a path.' },
               note: { type: 'string', description: 'One line on how it went or what stops it.' },
             },
             required: ['title', 'state'],
