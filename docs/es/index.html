@@ -58,7 +58,13 @@
 <main>
 <div class="hero">
   <div class="wrap">
-    <p class="eyebrow"><b>Nuevo</b><span class="long">Una bandeja para tus decisiones, y un plan para cada equipo</span><span class="short">Una bandeja para tus decisiones</span></p>
+    <figure class="hero-video">
+      <video id="heroVideo" autoplay muted loop playsinline controls preload="auto" poster="../video/pisha-factory.jpg" aria-label="Una empresa de software en la que cada empleado es un agente de IA, montada con Pisha en unos 30 minutos de trabajo de los agentes">
+        <source src="../video/pisha-factory.mp4" type="video/mp4">
+        <track kind="subtitles" srclang="es" label="Español" src="../video/pisha-factory.es.vtt" default>
+      </video>
+    </figure>
+    <p class="eyebrow"><b>Nuevo</b><span class="long">Tableros de tareas sincronizados con GitHub, y equipos que hablan entre sí</span><span class="short">Tableros sincronizados con GitHub</span></p>
     <h1>Tus agentes de IA, trabajando en equipo.</h1>
     <p class="lead">Un coordinador reparte el trabajo entre sus workers, en cualquiera de tus máquinas, y aprueba lo que es seguro. Lo que te toca decidir te espera en la bandeja, así que puedes estar en otra parte.</p>
     <div class="cta">
@@ -206,5 +212,9 @@ docker run -d -p 127.0.0.1:7787:7787 -v pisha-data:/data ghcr.io/roke22/pisha</c
     <p>Pisha es código abierto con licencia MIT, de <a href="https://github.com/roke22">Jose J. Anton</a>. Claude, Claude Code y su logotipo son marcas de Anthropic; OpenAI, Codex y el logotipo de OpenAI, de OpenAI; Grok y su logotipo, de xAI. Se muestran solo para indicar con qué agentes funciona Pisha: Pisha es un proyecto independiente, sin afiliación ni respaldo de ninguno de ellos.</p>
   </div>
 </footer>
+<script>
+  // (Con menos movimiento pedido: el vídeo espera a que lo pongan.)
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { const v = document.getElementById('heroVideo'); v.removeAttribute('autoplay'); v.pause() }
+</script>
 </body>
 </html>
