@@ -30,10 +30,10 @@ Pisha is **multi-agent orchestration for Claude Code**: parallel Claude Code ses
 ## Quick start
 
 ```bash
-git clone https://github.com/roke22/pisha.git pisha && cd pisha
-git checkout "$(git tag --sort=-v:refname | head -1)"   # the latest release
-node server/server.js          # dashboard at http://127.0.0.1:7787
+npx pisha-server          # dashboard at http://127.0.0.1:7787
 ```
+
+Only [Node.js 22](https://nodejs.org) is needed. Or with Docker: `docker run -d -p 127.0.0.1:7787:7787 -v pisha-data:/data ghcr.io/roke22/pisha`.
 
 Create the first owner with the server token it prints (you will need an authenticator app for the codes), open **Machines → Add machine** and run the one command it shows on each computer where agents should work. That's it: the details, Docker and HTTPS are in [steps 1 and 2](#1-install-the-dashboard) below.
 
@@ -133,25 +133,24 @@ The computers where the agents run get everything else installed for them when y
 ## 1. Install the dashboard
 
 ```bash
-git clone https://github.com/roke22/pisha.git pisha && cd pisha
-git checkout "$(git tag --sort=-v:refname | head -1)"   # the latest release
-node server/server.js
+npx pisha-server
 ```
 
-Open **http://127.0.0.1:7787** and create the first owner with the **server token** it prints the first time it starts (it stays in `data/server-token`). From then on you sign in with your email, password and a code. From **Settings**, at the bottom of the sidebar, you can invite others and add companies: see [Companies and people](docs/reference.md#companies-and-people).
+Open **http://127.0.0.1:7787** and create the first owner with the **server token** it prints the first time it starts (it stays in `~/.pisha/server-token`). From then on you sign in with your email, password and a code. From **Settings**, at the bottom of the sidebar, you can invite others and add companies: see [Companies and people](docs/reference.md#companies-and-people).
+
+To keep it as a command, `npm install -g pisha-server` and then `pisha-server`. Everything it keeps is in `~/.pisha` (`--data-dir` for another folder).
 
 **With Docker** instead:
 
 ```bash
-docker build -f server/Dockerfile -t pisha-server .
-docker run -d --name pisha-server -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data pisha-server
-docker logs pisha-server      # the first time, shows the server token (then: docker exec pisha-server cat /data/server-token)
+docker run -d --name pisha -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data ghcr.io/roke22/pisha
+docker logs pisha      # the first time, shows the server token (then: docker exec pisha cat /data/server-token)
 ```
 
 **To use it from other computers,** give it a domain: point the domain to this computer, open ports 80 and 443, and start it with
 
 ```bash
-node server/server.js --domain pisha.example.com --acme-email you@example.com
+pisha-server --domain pisha.example.com --acme-email you@example.com
 ```
 
 It gets and renews its HTTPS certificate by itself, and the dashboard is at `https://pisha.example.com`. (On Linux, ports 80 and 443 need privileges: run it with `sudo`, or use the Docker image with `-p 80:80 -p 443:443 -e PISHA_DOMAIN=pisha.example.com`.)
@@ -203,9 +202,9 @@ The **[examples](https://roke22.github.io/pisha/examples.html)** show whole orga
 
 ## Updating
 
-Update the dashboard to the latest release (`git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"`) and start it again, or rebuild the Docker image from there. Then run `pisha-host update` on each computer. The dashboard tells you which ones are out of date.
+Start the latest release of the dashboard: `npx pisha-server@latest`, or `npm install -g pisha-server@latest` for the command; with Docker, `docker pull ghcr.io/roke22/pisha` and create the container again (its data stays in the volume). Then run `pisha-host update` on each computer. The dashboard tells you which ones are out of date.
 
-**From 0.0.7:** what the dashboard held becomes its first company, and computers and sessions keep working as they are. The first time you open it, the server token creates the first owner; after that you sign in with email, password and code, and the token no longer opens the dashboard (`--allow-token-api` keeps it working on `/api` for your scripts). Run `pisha-host update` on each computer and open its sessions again to get the new features, such as the inbox and the team plan; computers not updated keep working without them. The repository is now `roke22/pisha`: the old address still works, and each computer moves to the new one when it updates.
+**From SquadraHQ (0.0.10 or earlier):** Pisha starts afresh. Install the dashboard as above and add your computers again (`pisha-host`, from **Machines → Add machine**); what SquadraHQ kept is not brought over.
 
 ## FAQ
 

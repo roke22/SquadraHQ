@@ -17,3 +17,9 @@ deploy/.env
 
 # The demo container's folder (tokens, Claude Code login, projects)
 deploy/demo/pisha/
+
+# Copied into server/ only while the npm package is packed (scripts/stage-server.mjs)
+server/pisha-host.mjs
+server/pisha-host.mjs.sig
+server/install/
+server/LICENSE

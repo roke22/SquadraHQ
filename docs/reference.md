@@ -152,18 +152,17 @@ Pisha does not run on native Windows: pisha-host refuses to start there and the 
 ### 1. Start the server
 
 ```bash
-git clone https://github.com/roke22/pisha.git pisha && cd pisha
-git checkout "$(git tag --sort=-v:refname | head -1)"   # the latest release
-node server/server.js
+npx pisha-server                 # or: npm install -g pisha-server && pisha-server
 ```
 
-On first start it generates two tokens and prints both, only that time (logs are kept, and read, by more people than should hold them): the **server token** (admin, `data/server-token`), to create the first owner, and the **join token** (`data/join-token`), which machines use to register their sessions, in a ready-to-paste `/pisha:configure` command. It listens on `http://127.0.0.1:7787`.
+It needs only Node.js 22.13 or later; it has no dependencies.
+
+On first start it generates two tokens and prints both, only that time (logs are kept, and read, by more people than should hold them): the **server token** (admin, `~/.pisha/server-token`), to create the first owner, and the **join token** (`~/.pisha/join-token`), which machines use to register their sessions, in a ready-to-paste `/pisha:configure` command. It listens on `http://127.0.0.1:7787`.
 
 - **With Docker:**
   ```bash
-  docker build -f server/Dockerfile -t pisha-server .
-  docker run -d --name pisha-server -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data pisha-server   # this machine only; for other machines use HTTPS (below)
-  docker logs pisha-server   # the first time, shows the tokens (then: docker exec pisha-server cat /data/server-token /data/join-token)
+  docker run -d --name pisha -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data ghcr.io/roke22/pisha   # this machine only; for other machines use HTTPS (below)
+  docker logs pisha   # the first time, shows the tokens (then: docker exec pisha cat /data/server-token /data/join-token)
   ```
 - **Options** (flags, or the environment variable in brackets):
 
@@ -173,12 +172,12 @@ On first start it generates two tokens and prints both, only that time (logs are
   | `--all-interfaces` | Listen on every IP of the machine (same as `--host 0.0.0.0`) |
   | `--port <n>` (`PORT`) | Default `7787` (with `--domain` or `--tls-cert`: `443`; `--domain` also uses `80`, `--http-port`) |
   | `--public-url <url>` (`PUBLIC_URL`) | The address agents and browsers use, e.g. `https://pisha.example.com`; printed in the setup command |
-  | `--data-dir <path>` (`DATA_DIR`) | Database and files. Default `./data` |
+  | `--data-dir <path>` (`DATA_DIR`) | Database and files. Default `~/.pisha` (or `./data`, if it already has a server's data) |
   | `--domain <name>` (`PISHA_DOMAIN`) | Built-in HTTPS with an automatic Let's Encrypt certificate (see below) |
   | `--tls-cert <file>` `--tls-key <file>` | HTTPS with your own certificate; reloaded when the files change |
   | `--trust-proxy` (`TRUST_PROXY=1`) | Behind a reverse proxy (or tunnel) that sets `X-Forwarded-For`: rate limits use the client's address. Without it every client behind it shares one address, and an address has at most 256 connections open |
 
-  `node server/server.js --help` lists every option.
+  `pisha-server --help` lists every option.
 
 ### Serving it on a domain (HTTPS)
 
@@ -190,10 +189,10 @@ Sessions on other machines need to reach the server. **Don't expose it over plai
 2. Make sure ports **80** (certificate validation) and **443** are reachable from the internet.
 3. Start it:
    ```bash
-   node server/server.js --domain pisha.example.com --acme-email you@example.com
+   pisha-server --domain pisha.example.com --acme-email you@example.com
    # or with Docker:
-   docker run -d --name pisha-server -p 80:80 -p 443:443 -v pisha-data:/data \
-     -e PISHA_DOMAIN=pisha.example.com pisha-server
+   docker run -d --name pisha -p 80:80 -p 443:443 -v pisha-data:/data \
+     -e PISHA_DOMAIN=pisha.example.com ghcr.io/roke22/pisha
    ```
    It prints `/pisha:configure https://pisha.example.com <join-token>`, and the dashboard is at `https://pisha.example.com/`.
 
@@ -568,7 +567,7 @@ Codes are required for everyone except observers. An administrator of the server
   - the **join token** (`sj_…`) only registers *new* session names, rate limited. It can't open terminals, read the dashboard or take over a name. Machines added from the dashboard don't get it unless you tick the option (their sessions' names are registered by the server);
   - each session name has its own **secret**, bound to the server that issued it. Once a session holds its name, the server only takes requests for that name from that session (an id the plugin keeps only in memory), also for a couple of minutes after a server restart while it reconnects: a copied secret can't speak for a connected session. It can take a name whose session is gone (or has stopped responding: about 15 seconds, up to about 45 if its network dropped), which is why isolation (above) matters;
   - **Disconnect session** (in the session's **More** menu) cancels the session's secret: whoever has a copy of it is out for good, and what it had queued for other sessions is dropped. A session opened from the dashboard can be opened again from its machine (after closing its terminal) while that machine stays enrolled; otherwise delete the name to use it again. **Deleting** a session also deletes its messages (what it wrote, and what was written to it directly, also from the other sessions' chats) and attachments, overwritten on disk rather than left to expire, drops its queued messages, and sessions that talked to it won't take messages from a new session with that name until you run `/pisha:access unpin <name>` there. A worker whose coordinator was deleted and registered again on purpose also needs `coordinator-pin.json` deleted from its state folder and a new login; a coordinator's approvers are checked against the same pins;
-  - rotate the join token with `curl -X POST <url>/admin/rotateJoinToken -H "Authorization: Bearer <server-token>"` (existing sessions keep working; machines need the new one to register new names; not when it comes from `PISHA_JOIN_TOKEN`: change it there). To change the server token, set `PISHA_SERVER_TOKEN`, or delete `data/server-token` and restart.
+  - rotate the join token with `curl -X POST <url>/admin/rotateJoinToken -H "Authorization: Bearer <server-token>"` (existing sessions keep working; machines need the new one to register new names; not when it comes from `PISHA_JOIN_TOKEN`: change it there). To change the server token, set `PISHA_SERVER_TOKEN`, or delete `~/.pisha/server-token` and restart.
 - **You decide who coordinates a session.** The coordinator can give a worker tasks and answer its permission prompts, so every `/pisha:login` is confirmed by you in Claude Code (with the role, coordinator, server and what the dashboard will see) — a message can't talk Claude into it. A Claude Code that can't ask only logs in with what you approved before. An automatic login with `PISHA_NAME` asks too, unless the machine wrote a `launch.json` for that start (sessions opened from the dashboard); it names a random value only that start is given, so a project setting the same name can't use it. A coordinator's `permissionApprovers` only count once you've confirmed them at a login. Role and coordinator never come from environment variables a project could set; the observation level and the permission relay can only be made stricter by them, and a `CLAUDE_CONFIG_DIR` that is inside the top-level folder holding the session (all of `/opt` for a session in `/opt/projects/app`; `~/code` for one in `~/code/app`), or that isn't yours and private, or that isn't absolute, is ignored, and the session doesn't log in: what is in the default folder may belong to another company's copy.
 - **Codex CLI and Grok CLI sessions** get their messages and permission answers through files in their state folder that pisha-host types into the terminal: like the tmux socket, any process of the same user can write there, so the same isolation advice applies. An answer is typed only while the prompt shows that exact call. Their Pisha tools are approved without asking (they only talk to the squad, and send files under the same rules as `reply` attachments).
 - **Messages from other sessions are work context, never your authorization.** The `/pisha:*` skills can only be run by you, not by Claude, and only edit Pisha's own files. (Claude can call the `login`/`logout` tools, but a login is always confirmed by you, and so is a logout when Claude Code can ask.)

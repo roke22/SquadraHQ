@@ -156,9 +156,9 @@
       <div class="step"><h3>Add your machines</h3><p>Machines → Add machine walks you through it: one command for each computer where agents will work, and it tells you when it has connected.</p></div>
       <div class="step"><h3>Open a team</h3><p>New team: what it is for, who is in it and where it runs. Then give its coordinator its first order.</p></div>
     </div>
-    <pre class="code"><code>git clone https://github.com/roke22/pisha.git pisha &amp;&amp; cd pisha
-git checkout "$(git tag --sort=-v:refname | head -1)"   <span class="c"># the latest release</span>
-node server/server.js                                    <span class="c"># http://127.0.0.1:7787</span></code></pre>
+    <pre class="code"><code>npx pisha-server                                         <span class="c"># http://127.0.0.1:7787</span>
+<span class="c"># or with Docker</span>
+docker run -d -p 127.0.0.1:7787:7787 -v pisha-data:/data ghcr.io/roke22/pisha</code></pre>
     <p class="note">Docker, HTTPS on a domain and everything else: the <a href="https://github.com/roke22/pisha#readme">README</a> and the <a href="https://github.com/roke22/pisha/blob/main/docs/reference.md">reference</a>.</p>
   </div>
 </section>

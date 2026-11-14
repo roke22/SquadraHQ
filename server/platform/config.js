@@ -1,7 +1,8 @@
 import { parseArgs } from 'node:util'
 import { LETS_ENCRYPT_STAGING, LETS_ENCRYPT } from './acme.js'
 import { join } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 
 // Command-line flags win over environment variables.
 //
@@ -12,7 +13,7 @@ import { readFileSync } from 'node:fs'
 //                        (behind a TLS reverse proxy): the setup and enrollment commands use it, and
 //                        the dashboard's terminal accepts it as its Origin
 //   --trust-proxy        behind a reverse proxy: take the client's address from X-Forwarded-For
-//   --data-dir <path>    default ./data
+//   --data-dir <path>    default ~/.pisha (or ./data, if it already has a server's data)
 //
 // HTTPS without a reverse proxy:
 //   --domain <name>      get and renew a Let's Encrypt certificate automatically (needs ports 80 and 443)
@@ -55,7 +56,7 @@ if (ARGS.help) {
   --all-interfaces     Listen on every IP of the machine (same as --host 0.0.0.0)
   --port <n>           Port (default 7787). Env: PORT
   --public-url <url>   Public address, e.g. https://pisha.example.com. Env: PUBLIC_URL
-  --data-dir <path>    Database and files (default ./data). Env: DATA_DIR
+  --data-dir <path>    Database and files (default ~/.pisha, or ./data if it already has a server's). Env: DATA_DIR
 
 HTTPS, built in (no reverse proxy needed):
   --domain <name>      Get and renew a Let's Encrypt certificate automatically. Env: PISHA_DOMAIN
@@ -99,7 +100,10 @@ export const ALLOW_TOKEN_API = ARGS['allow-token-api'] === true || process.env.P
 
 export const PORT = Number(ARGS.port ?? process.env.PORT ?? (TLS ? 443 : 7787))
 export const HOST = ARGS['all-interfaces'] ? '0.0.0.0' : (ARGS.host ?? process.env.HOST ?? (TLS ? '0.0.0.0' : '127.0.0.1'))
-export const DATA_DIR = ARGS['data-dir'] ?? process.env.DATA_DIR ?? join(process.cwd(), 'data')
+// Where it keeps everything: --data-dir or DATA_DIR; else a data/ folder here
+// that already has a server's data (a copy of the repository run as before);
+// else ~/.pisha, wherever it is started from (npx pisha-server).
+export const DATA_DIR = ARGS['data-dir'] ?? process.env.DATA_DIR ?? (existsSync(join(process.cwd(), 'data', 'pisha.db')) ? join(process.cwd(), 'data') : join(homedir(), '.pisha'))
 export const PUBLIC_URL = (ARGS['public-url'] ?? process.env.PUBLIC_URL ?? (DOMAIN ? `https://${DOMAIN}${PORT === 443 ? '' : `:${PORT}`}` : '')).replace(/\/+$/, '')
 for (const [label, n] of [['port', PORT], ['http port', HTTP_PORT]]) {
   if (!Number.isInteger(n) || n < 1 || n > 65535) {

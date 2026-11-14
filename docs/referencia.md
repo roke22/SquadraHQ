@@ -152,18 +152,15 @@ Pisha no funciona en Windows nativo: pisha-host se niega a arrancar y el plugin 
 ### 1. Arrancar el servidor
 
 ```bash
-git clone https://github.com/roke22/pisha.git pisha && cd pisha
-git checkout "$(git tag --sort=-v:refname | head -1)"   # la última versión
-node server/server.js
+npx pisha-server                 # o: npm install -g pisha-server && pisha-server
 ```
 
-La primera vez genera dos tokens y muestra los dos, solo esa vez (los logs los guarda, y los lee, más gente de la que debería tenerlos): el **token del servidor** (administración, `data/server-token`), para crear el primer propietario, y el **token de alta** (`data/join-token`), con el que las máquinas registran sus sesiones, dentro de un comando `/pisha:configure` listo para copiar. Escucha en `http://127.0.0.1:7787`.
+Solo necesita Node.js 22.13 o posterior; no tiene dependencias. La primera vez genera dos tokens y muestra los dos, solo esa vez (los logs los guarda, y los lee, más gente de la que debería tenerlos): el **token del servidor** (administración, `~/.pisha/server-token`), para crear el primer propietario, y el **token de alta** (`~/.pisha/join-token`), con el que las máquinas registran sus sesiones, dentro de un comando `/pisha:configure` listo para copiar. Escucha en `http://127.0.0.1:7787`.
 
 - **Con Docker:**
   ```bash
-  docker build -f server/Dockerfile -t pisha-server .
-  docker run -d --name pisha-server -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data pisha-server   # solo esta máquina; para otras máquinas usa HTTPS (abajo)
-  docker logs pisha-server   # la primera vez, muestra los tokens (después: docker exec pisha-server cat /data/server-token /data/join-token)
+  docker run -d --name pisha -p 127.0.0.1:7787:7787 -e PUBLIC_URL=http://127.0.0.1:7787 -v pisha-data:/data ghcr.io/roke22/pisha   # solo esta máquina; para otras máquinas usa HTTPS (abajo)
+  docker logs pisha   # la primera vez, muestra los tokens (después: docker exec pisha cat /data/server-token /data/join-token)
   ```
 - **Opciones** (parámetro, o la variable de entorno entre paréntesis):
 
@@ -173,12 +170,12 @@ La primera vez genera dos tokens y muestra los dos, solo esa vez (los logs los g
   | `--all-interfaces` | Escucha en todas las IPs de la máquina (igual que `--host 0.0.0.0`) |
   | `--port <n>` (`PORT`) | Por defecto `7787` (con `--domain` o `--tls-cert`: `443`; `--domain` usa además el `80`, `--http-port`) |
   | `--public-url <url>` (`PUBLIC_URL`) | La dirección que usan los agentes y el navegador, por ejemplo `https://pisha.example.com`; aparece en el comando de configuración |
-  | `--data-dir <ruta>` (`DATA_DIR`) | Base de datos y ficheros. Por defecto `./data` |
+  | `--data-dir <ruta>` (`DATA_DIR`) | Base de datos y ficheros. Por defecto `~/.pisha` (o `./data`, si ya tiene los datos de un servidor) |
   | `--domain <nombre>` (`PISHA_DOMAIN`) | HTTPS integrado con certificado automático de Let's Encrypt (ver abajo) |
   | `--tls-cert <fichero>` `--tls-key <fichero>` | HTTPS con tu propio certificado; se recarga si cambian los ficheros |
   | `--trust-proxy` (`TRUST_PROXY=1`) | Detrás de un proxy inverso (o túnel) que pone `X-Forwarded-For`: los límites de frecuencia usan la dirección del cliente. Sin esto, todos los clientes de detrás comparten una dirección, y una dirección tiene como mucho 256 conexiones abiertas |
 
-  `node server/server.js --help` muestra todas las opciones.
+  `pisha-server --help` muestra todas las opciones.
 
 ### Publicarlo con un dominio (HTTPS)
 
@@ -190,10 +187,10 @@ Las sesiones de otras máquinas tienen que poder llegar al servidor. **No lo exp
 2. Asegúrate de que los puertos **80** (validación del certificado) y **443** son accesibles desde internet.
 3. Arráncalo:
    ```bash
-   node server/server.js --domain pisha.example.com --acme-email tu@example.com
+   pisha-server --domain pisha.example.com --acme-email tu@example.com
    # o con Docker:
-   docker run -d --name pisha-server -p 80:80 -p 443:443 -v pisha-data:/data \
-     -e PISHA_DOMAIN=pisha.example.com pisha-server
+   docker run -d --name pisha -p 80:80 -p 443:443 -v pisha-data:/data \
+     -e PISHA_DOMAIN=pisha.example.com ghcr.io/roke22/pisha
    ```
    Muestra `/pisha:configure https://pisha.example.com <token-de-alta>`, y el panel queda en `https://pisha.example.com/`.
 

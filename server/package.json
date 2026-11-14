@@ -1,7 +1,16 @@
 {
   "name": "pisha-server",
   "version": "0.0.10",
-  "description": "Message server for Pisha: a small Telegram-Bot-API-shaped relay between Claude Code sessions",
+  "description": "Pisha: run teams of AI coding agents (Claude Code, Codex, Grok) from a self-hosted dashboard, with an inbox for your decisions",
+  "keywords": [
+    "pisha",
+    "claude-code",
+    "agents",
+    "multi-agent",
+    "orchestration",
+    "self-hosted",
+    "dashboard"
+  ],
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -10,8 +19,33 @@
   "bin": {
     "pisha-server": "./server.js"
   },
+  "files": [
+    "*.js",
+    "accounts",
+    "boards",
+    "dashboard",
+    "machines",
+    "messaging",
+    "observation",
+    "organization",
+    "permissions",
+    "platform",
+    "sessions",
+    "ui",
+    "vendor",
+    "install",
+    "pisha-host.mjs",
+    "pisha-host.mjs.sig",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "prepack": "node ../scripts/stage-server.mjs",
+    "postpack": "node ../scripts/stage-server.mjs --undo"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "repository": {
     "type": "git",

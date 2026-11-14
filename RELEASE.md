@@ -24,6 +24,11 @@ git config --global user.signingkey ~/.ssh/<your-key>.pub
 
 Add the same public key on GitHub as a *signing key* (Settings → SSH and GPG keys), so that tags show as verified.
 
+**Publishing the server.** Pushing a tag also publishes the server, by `.github/workflows/release.yml`, once the release check passes: to npm as `pisha-server` (`npx pisha-server`) and as the image `ghcr.io/roke22/pisha` (`:X.Y.Z` and `:latest`, for amd64 and arm64). For that, once:
+
+1. On npmjs.com, with your account, create an access token that can publish `pisha-server` (a *granular* token with *Read and write* for that package; for the very first release, one for all packages, since the package doesn't exist yet). Put it in the repository as the secret `NPM_TOKEN` (Settings → Secrets and variables → Actions).
+2. After the first release, on GitHub, open the package `pisha` (your profile → Packages), and in its settings make it public and link it to the repository. Until then `docker pull` asks for a login.
+
 **Protecting tags.** In the repository, Settings → Rules → Rulesets, add a tag ruleset for `v*` that blocks updates and deletions. Nobody should be able to move a tag that machines install from.
 
 ## The release
@@ -106,7 +111,7 @@ git tag -s vX.Y.Z -m "Pisha X.Y.Z"
 git push origin vX.Y.Z
 ```
 
-Don't tag if the check fails: see [If something goes wrong](#if-something-goes-wrong). CI checks again on the tag, and the `release` job must be green before you go on.
+Don't tag if the check fails: see [If something goes wrong](#if-something-goes-wrong). CI checks again on the tag, and the `release` job must be green before you go on. The tag also publishes the server to npm and as a container image (the `release` workflow): check that both of its jobs are green, then that `npm view pisha-server version` says `X.Y.Z`.
 
 ### 7. Publish the GitHub Release
 
@@ -120,13 +125,7 @@ Start the notes with a sentence on what the release brings, then a section per c
 
 ### 8. Try it for real
 
-On a server you run:
-
-```bash
-git fetch --tags && git checkout "$(git tag --sort=-v:refname | head -1)"
-```
-
-Check that this lands on `vX.Y.Z`, then restart the server or rebuild its Docker image. On a machine:
+On a server you run, start the new release: `npx pisha-server@latest` (or `npm install -g pisha-server@latest` and restart it), or with Docker `docker pull ghcr.io/roke22/pisha` and create the container again. The dashboard's sign-in screen shows its version: it must be `X.Y.Z`. On a machine:
 
 ```bash
 pisha-host update

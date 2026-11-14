@@ -12,7 +12,7 @@ Thanks for helping. Pisha is small on purpose: one Node.js server with no depend
 
 ```bash
 git clone https://github.com/roke22/pisha.git pisha && cd pisha
-node server/server.js            # dashboard at http://127.0.0.1:7787
+node server/server.js            # dashboard at http://127.0.0.1:7787 (data in ~/.pisha; --data-dir data keeps it here)
 npm test                         # module rules, end-to-end, host, security and upgrade tests (needs tmux)
 npm install && npm run test:ui   # the dashboard in a browser (uses your Chrome)
 ```
