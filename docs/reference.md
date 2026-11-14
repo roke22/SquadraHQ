@@ -4,7 +4,7 @@
 
 <p align="center"><b>A coordinator agent that runs teams of Claude Code agents — fast, unattended, and visible live.</b></p>
 
-<p align="center"><a href="referencia.md">Leer en español</a> · v0.0.10</p>
+<p align="center"><a href="referencia.md">Leer en español</a> · v0.0.11</p>
 
 ---
 
@@ -235,7 +235,7 @@ Then point it at your server, with the command the server printed at startup:
 - **Claude Code runs the plugin with `node`,** so Node 22.13 or later must be on the `PATH` Claude Code sees.
 - To use a local copy of this repository instead, pass its path to `marketplace add` (not on machines run by pisha-host, which only accept the roke22/pisha marketplace).
 
-**Updating:** `claude plugin marketplace update pisha && claude plugin update pisha@pisha`, then restart the sessions.
+**Updating:** start the server's latest release (`npx pisha-server@latest`, or `npm install -g pisha-server@latest` and restart it; with Docker, `docker pull ghcr.io/roke22/pisha` and create the container again), then run `pisha-host update` on each machine (the dashboard says which ones are older); restart the sessions it opened to use the new plugin. Machines install only signed releases, so stay on them rather than on `main`. Update the plugin on machines you set up by hand too (`claude plugin marketplace update pisha && claude plugin update pisha@pisha`). **From 0.0.10:** SquadraHQ is now Pisha, and this is a clean break: a server or a machine of 0.0.10 or earlier is not upgraded, it is installed again. Start the server as in [1. Start the server](#1-start-the-server) (its data goes to `~/.pisha`; what SquadraHQ kept is not brought over), and add each machine again from **Machines → Add machine**, after removing `squadra-host` there (`squadra-host service remove` and `squadra-host forget --close-sessions`) and the `squadra` plugin from Claude Code (`claude plugin uninstall squadra@squadra && claude plugin marketplace remove squadra`).
 
 ### 3. Launch sessions and log in
 
