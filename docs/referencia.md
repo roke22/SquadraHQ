@@ -4,7 +4,7 @@
 
 <p align="center"><b>Un agente coordinador que dirige equipos de agentes de Claude Code: rápido, desatendido y a la vista en directo.</b></p>
 
-<p align="center"><a href="reference.md">Read in English</a> · v0.0.10</p>
+<p align="center"><a href="reference.md">Read in English</a> · v0.0.11</p>
 
 ---
 
@@ -233,7 +233,7 @@ Después apúntalo a tu servidor, con el comando que el servidor mostró al arra
 - **Claude Code ejecuta el plugin con `node`,** así que Node 22.13 o posterior tiene que estar en el `PATH` que ve Claude Code.
 - Para usar una copia local de este repositorio, pasa su ruta a `marketplace add` (no en máquinas con pisha-host, que solo aceptan el marketplace roke22/pisha).
 
-**Actualizar:** `claude plugin marketplace update pisha && claude plugin update pisha@pisha`, y reinicia las sesiones.
+**Actualizar:** arranca la última versión del servidor (`npx pisha-server@latest`, o `npm install -g pisha-server@latest` y reinícialo; con Docker, `docker pull ghcr.io/roke22/pisha` y vuelve a crear el contenedor) y después ejecuta `pisha-host update` en cada máquina (el panel dice cuáles son más antiguas); reinicia las sesiones que abrió para que usen el plugin nuevo. Las máquinas solo instalan versiones firmadas, así que quédate en ellas y no en `main`. Actualiza también el plugin en las máquinas que configuraste a mano (`claude plugin marketplace update pisha && claude plugin update pisha@pisha`). **Desde 0.0.10:** SquadraHQ ahora es Pisha, y es un corte limpio: un servidor o una máquina de la 0.0.10 o anterior no se actualiza, se instala de nuevo. Arranca el servidor como en [1. Arrancar el servidor](#1-arrancar-el-servidor) (sus datos van a `~/.pisha`; lo que guardaba SquadraHQ no se trae) y vuelve a añadir cada máquina desde **Máquinas → Añadir máquina**, después de quitar allí `squadra-host` (`squadra-host service remove` y `squadra-host forget --close-sessions`) y el plugin `squadra` de Claude Code (`claude plugin uninstall squadra@squadra && claude plugin marketplace remove squadra`).
 
 ### 3. Arrancar las sesiones y hacer login
 

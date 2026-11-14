@@ -39,7 +39,7 @@ import { fileURLToPath } from 'node:url'
 import { createCipheriv, createDecipheriv, createHash, createPrivateKey, createPublicKey, diffieHellman, generateKeyPairSync, hkdfSync, randomBytes, sign, verify } from 'node:crypto'
 import { promisify } from 'node:util'
 
-const VERSION = '0.0.10'
+const VERSION = '0.0.11'
 // Who signs releases (scripts/release-sign.mjs): `update` only installs what
 // this key signed. Empty: this copy has no key to check with.
 const RELEASE_PUBLIC_KEY = 'MCowBQYDK2VwAyEA49ojJq4r4KLiWcRJiDxui2HzSZYpZA1qCBI4LLtOOyo'
