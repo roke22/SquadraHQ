@@ -19,6 +19,6 @@
   },
   "homepage": "https://github.com/roke22/pisha",
   "devDependencies": {
-    "@playwright/test": "1.64.1"
+    "@playwright/test": "1.65.0"
   }
 }
