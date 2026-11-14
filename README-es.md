@@ -14,7 +14,7 @@
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="Estrellas en GitHub"></a>
 </p>
 
-<p align="center"><a href="README.md">Read in English</a> · <a href="https://roke22.github.io/pisha/">Web</a> · <a href="https://roke22.github.io/pisha/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
+<p align="center"><a href="README.md">Read in English</a> · <a href="https://pisha.dev/">Web</a> · <a href="https://pisha.dev/es/ejemplos.html">Ejemplos</a> · <a href="docs/referencia.md">Referencia</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
 
 ---
 
@@ -191,7 +191,7 @@ Después:
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-es.jpg"><img src="docs/screenshots/org-chart-light-es.jpg" alt="El organigrama de Pisha: los equipos de Desarrollo, QA y Contenidos, cada coordinador con sus workers" width="1440"></picture>
 
-Los **[ejemplos](https://roke22.github.io/pisha/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
+Los **[ejemplos](https://pisha.dev/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
 
 ## 4. Planifica el trabajo en tableros
 
@@ -251,7 +251,7 @@ Los Channels son la función de Claude Code que entrega mensajes dentro de una s
 
 ## Saber más
 
-- [Ejemplos](https://roke22.github.io/pisha/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
+- [Ejemplos](https://pisha.dev/es/ejemplos.html): organizaciones de marketing, redes sociales, software y lanzamiento, equipo a equipo.
 - [docs/referencia.md](docs/referencia.md): configurar agentes a mano sin el panel, todas las opciones del servidor y cómo funciona todo por dentro.
 - [PLAN.md](PLAN.md): la guía técnica completa.
 

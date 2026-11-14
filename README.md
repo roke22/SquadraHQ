@@ -14,7 +14,7 @@
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="GitHub stars"></a>
 </p>
 
-<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://roke22.github.io/pisha/">Website</a> · <a href="https://roke22.github.io/pisha/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
+<p align="center"><a href="README-es.md">Leer en español</a> · <a href="https://pisha.dev/">Website</a> · <a href="https://pisha.dev/examples.html">Examples</a> · <a href="docs/reference.md">Reference</a> · <a href="https://github.com/roke22/pisha/discussions">Discussions</a> · v0.0.11</p>
 
 ---
 
@@ -191,7 +191,7 @@ Then:
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-en.jpg"><img src="docs/screenshots/org-chart-light-en.jpg" alt="The Pisha org chart: the Development, QA and Content teams, each coordinator with its workers" width="1440"></picture>
 
-The **[examples](https://roke22.github.io/pisha/examples.html)** show whole organisations built this way: a marketing agency, a personal brand on social media, a software company and a product launch, with the teams, personas, links and first message for each. Everything the org chart does is in the [reference](docs/reference.md#org-chart).
+The **[examples](https://pisha.dev/examples.html)** show whole organisations built this way: a marketing agency, a personal brand on social media, a software company and a product launch, with the teams, personas, links and first message for each. Everything the org chart does is in the [reference](docs/reference.md#org-chart).
 
 ## 4. Plan the work on boards
 
@@ -251,7 +251,7 @@ Channels are the Claude Code feature that delivers messages into a session. Unti
 
 ## Learn more
 
-- [Examples](https://roke22.github.io/pisha/examples.html): marketing, social media, software and launch organisations, team by team.
+- [Examples](https://pisha.dev/examples.html): marketing, social media, software and launch organisations, team by team.
 - [docs/reference.md](docs/reference.md): setting agents up by hand without the dashboard, every server option, and how it all works.
 - [PLAN.md](PLAN.md): the full technical guide (Spanish).
 
