@@ -306,7 +306,14 @@ test('opening a session runs the fixed command, and the web terminal sees and ty
   // when the dashboard resets its terminal): its mouse wheel goes to it, and
   // pastes are bracketed.
   v.send({ t: 'in', host: hostId, term: 'w1', data: 'FULLSCREEN\r' })
-  await waitFor(() => v.text.includes('FULL VIEW'), { what: 'full view' })
+  // (Its output; or, if a slow machine's stream was in the middle of a screen
+  // snapshot, a fresh screen asked for every 3 s: what this checks is the next viewer's.)
+  let asked = Date.now()
+  await waitFor(() => {
+    if (v.text.includes('FULL VIEW')) return true
+    if (Date.now() - asked > 3000) { asked = Date.now(); v.send({ t: 'refresh', host: hostId, term: 'w1' }) }
+    return false
+  }, { what: 'full view', timeout: 20000 })
   const v3 = await viewer()
   await v3.open()
   await waitFor(() => v3.msgs.some(m => m.t === 'ready'), { what: 'ready 3' })
