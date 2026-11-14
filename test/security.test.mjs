@@ -1,4 +1,4 @@
-// Security regression tests for squadra-server: credentials, message
+// Security regression tests for pisha-server: credentials, message
 // visibility, notices, event sanitising, WebSocket limits and page headers.
 //
 // Run: node --test test/security.test.mjs
@@ -16,7 +16,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'security-admin-token-0123456789'
 const PORT = 21000 + Math.floor(Math.random() * 2000)
 const URL_ = `http://127.0.0.1:${PORT}`
-const dataDir = tempDir('squadra-sec-')
+const dataDir = tempDir('pisha-sec-')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let server, JOIN
 
@@ -35,7 +35,7 @@ async function call(path, body, auth, instance) {
   if (path === 'claimSession' && instance === undefined && body && typeof body === 'object') instance = body.instance
   const r = await fetch(`${URL_}/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Squadra-Instance': instance } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Pisha-Instance': instance } : {}) },
     body: typeof body === 'string' ? body : JSON.stringify(body ?? {}),
   })
   return r.json()
@@ -44,7 +44,7 @@ const get = (path, auth) => fetch(`${URL_}/${path}`, { headers: auth ? { Authori
 
 async function startServer() {
   server = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: ADMIN },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, PISHA_SERVER_TOKEN: ADMIN },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   server.stderr.on('data', d => { if (process.env.DEBUG) process.stderr.write(d) })
@@ -61,7 +61,7 @@ test('the dashboard asks browsers to stay on https also behind a TLS proxy', asy
   assert.equal((await fetch(`${URL_}/`)).headers.get('strict-transport-security'), null)
   const port = PORT + 3000
   const proxied = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: tempDir('squadra-hsts-'), SQUADRA_SERVER_TOKEN: ADMIN, PUBLIC_URL: 'https://squadra.example.com' },
+    env: { ...process.env, PORT: String(port), DATA_DIR: tempDir('pisha-hsts-'), PISHA_SERVER_TOKEN: ADMIN, PUBLIC_URL: 'https://pisha.example.com' },
     stdio: 'ignore',
   })
   try {
@@ -128,7 +128,7 @@ test('a worker that stops responding keeps what it is sent until it is announced
   const cut = new AbortController()
   const poll = fetch(`${URL_}/getUpdates`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${w}`, 'X-Squadra-Instance': 'inst-gw-0001' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${w}`, 'X-Pisha-Instance': 'inst-gw-0001' },
     body: JSON.stringify({ timeout: 30, instance: 'inst-gw-0001', offset: seen.result.at(-1).update_id + 1 }),
     signal: cut.signal,
   }).catch(() => {})
@@ -140,7 +140,7 @@ test('a worker that stops responding keeps what it is sent until it is announced
   // Sent to meanwhile: queued, not refused.
   const sent = await call('sendMessage', { chat_id: 'gw', text: 'task during the cut' }, c, 'inst-gc-0001')
   assert.ok(sent.ok, sent.description)
-  const o = sent.result.squadra_offline_recipients[0]
+  const o = sent.result.pisha_offline_recipients[0]
   assert.equal(o.name, 'gw')
   assert.equal(o.queued, true)
   assert.ok(o.down_in > 100)
@@ -233,7 +233,7 @@ function rawWs(path, { origin, auth } = {}) {
     const sock = connect(PORT, '127.0.0.1', () => {
       sock.write(`GET ${path} HTTP/1.1\r\nHost: 127.0.0.1:${PORT}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
         `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n${origin ? `Origin: ${origin}\r\n` : ''}` +
-        `${auth ? `Sec-WebSocket-Protocol: squadra, auth.${auth}\r\n` : ''}\r\n`)
+        `${auth ? `Sec-WebSocket-Protocol: pisha, auth.${auth}\r\n` : ''}\r\n`)
     })
     let head = ''
     const onData = d => {
@@ -274,11 +274,11 @@ test('websockets: a foreign Origin is refused, no socket is accepted without a c
   assert.equal(a.status, 101)
   assert.equal((await rawWs('/api/terminal', { auth: t })).status, 401, 'a ticket works once')
   a.sock.destroy()
-  // An old squadra-host (no credential in the request) is told why and closed at once.
+  // An old pisha-host (no credential in the request) is told why and closed at once.
   const old = await rawWs('/host/connect')
   assert.equal(old.status, 101)
   assert.equal(await closed(old.sock), true, 'closed at once')
-  // A wrong machine secret is told at once (squadra-host then stops).
+  // A wrong machine secret is told at once (pisha-host then stops).
   const w = await rawWs('/host/connect', { auth: 'sh_wrong' })
   assert.equal(w.status, 101)
   assert.equal(await closed(w.sock), true, 'closed at once')
@@ -520,7 +520,7 @@ test('eighth audit: automatic replies make no relation; groups per owner are cap
   const b = (await call('register', { name: 'au8b' }, ADMIN)).result.secret
   await call('claimSession', { instance: 'inst-au8b-001', role: 'coordinator' }, b)
   assert.ok((await call('sendMessage', { chat_id: 'au8b', text: 'hi' }, a)).ok)
-  assert.ok((await call('sendMessage', { chat_id: 'au8a', text: 'Pairing required: …', squadra_auto: true }, b, 'inst-au8b-001')).ok)
+  assert.ok((await call('sendMessage', { chat_id: 'au8a', text: 'Pairing required: …', pisha_auto: true }, b, 'inst-au8b-001')).ok)
   assert.equal((await call('getChat', { chat_id: 'au8b' }, a)).result.online, undefined)
   const g = (await call('register', { name: 'gr8' }, ADMIN)).result.secret
   for (let i = 0; i < 50; i++) assert.ok((await call('joinGroup', { chat_id: `#gr8x${i}` }, g)).ok)
@@ -540,17 +540,17 @@ test('fifteenth audit: a deleted session\'s queued messages go with it; a name r
   const c = (await call('register', { name: 'c15' }, ADMIN)).result.secret
   const w = (await call('register', { name: 'w15' }, ADMIN)).result.secret
   assert.ok((await call('sendMessage', { chat_id: 'c15', text: 'queued before the delete' }, w)).ok)
-  const first = (await call('getChat', { chat_id: 'w15' }, c)).result.squadra_identity
+  const first = (await call('getChat', { chat_id: 'w15' }, c)).result.pisha_identity
   assert.match(first, /^[0-9a-f]{24}$/)
   const del = await call('api/delete', { session: 'w15' }, ADMIN)
   assert.ok(del.ok, del.description)
   const ups = (await call('getUpdates', { timeout: 0 }, c)).result
   assert.ok(!ups.some(u => u.message?.from?.id === 'w15'), 'nothing from the deleted session is delivered')
   const w2 = (await call('register', { name: 'w15' }, ADMIN)).result.secret
-  assert.notEqual((await call('getChat', { chat_id: 'w15' }, c)).result.squadra_identity, first)
+  assert.notEqual((await call('getChat', { chat_id: 'w15' }, c)).result.pisha_identity, first)
   assert.ok((await call('sendMessage', { chat_id: 'c15', text: 'new one' }, w2)).ok)
   const m = (await call('getUpdates', { timeout: 0 }, c)).result.find(u => u.message?.text === 'new one')
-  assert.ok(m.message.from.squadra_identity && m.message.from.squadra_identity !== first, 'each message says which identity sent it')
+  assert.ok(m.message.from.pisha_identity && m.message.from.pisha_identity !== first, 'each message says which identity sent it')
   // A terminal's label is its session name: a machine can't show another one.
   const secret = await hostSecret('lbl15')
   const r = await rawWs('/host/connect', { auth: secret })
@@ -566,9 +566,9 @@ test('release: every version string matches', () => {
   const root = new URL('..', import.meta.url)
   const read = p => readFileSync(new URL(p, root), 'utf8')
   const v = JSON.parse(read('package.json')).version
-  for (const p of ['server/package.json', 'plugins/squadra/package.json', 'plugins/squadra/.claude-plugin/plugin.json']) assert.equal(JSON.parse(read(p)).version, v, p)
+  for (const p of ['server/package.json', 'plugins/pisha/package.json', 'plugins/pisha/.claude-plugin/plugin.json']) assert.equal(JSON.parse(read(p)).version, v, p)
   assert.ok(JSON.parse(read('.claude-plugin/marketplace.json')).plugins.every(x => x.version === v), 'marketplace.json')
-  assert.match(read('host/squadra-host.mjs'), new RegExp(`const VERSION = '${v.replace(/\./g, '\\.')}'`))
+  assert.match(read('host/pisha-host.mjs'), new RegExp(`const VERSION = '${v.replace(/\./g, '\\.')}'`))
   for (const p of ['README.md', 'README-es.md']) assert.ok(read(p).includes(`· v${v}<`), p)
   const lock = JSON.parse(read('package-lock.json'))
   assert.deepEqual([lock.version, lock.packages[''].version], [v, v], 'package-lock.json')
@@ -616,7 +616,7 @@ test('seventeenth audit: an old plugin is told to update; public bodies have the
   assert.ok((await call('claimSession', { instance: 'inst-old17-001', role: 'coordinator' }, s)).ok)
   const r = await call('sendMessage', { chat_id: 'old17', text: 'x' }, s)
   assert.equal(r.error_code, 409)
-  assert.match(r.description, /update the Squadra plugin/)
+  assert.match(r.description, /update the Pisha plugin/)
   // Registration with the join token takes small bodies only.
   const big = await call('register', { name: 'big17', pad: 'x'.repeat(8000) }, JOIN).catch(() => ({ error_code: 413 })) // (refused and cut)
   assert.equal(big.error_code, 413)
@@ -707,7 +707,7 @@ test('twentieth audit: a body trickled after an early answer, unreadable paramet
   // A claim without the session id in the header (a plugin older than 0.0.2) is told to update.
   const r = await fetch(`${URL_}/claimSession`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s}` }, body: JSON.stringify({ instance: 'inst-p20-0002', role: 'coordinator' }) }).then(x => x.json())
   assert.equal(r.error_code, 409)
-  assert.match(r.description, /update the Squadra plugin/)
+  assert.match(r.description, /update the Pisha plugin/)
 })
 
 test('twenty-second audit: invites and joins that keep failing do not use up the sending budget', async () => {
@@ -726,13 +726,13 @@ test('a machine added but never connected shows as pending and can be removed', 
   const en = await call('api/hosts/enroll', { name: 'pend1' }, ADMIN)
   const r = await call('host/enroll', { code: en.result.code, info: { hostname: 'pend1' } })
   assert.ok(r.ok, r.description)
-  assert.match(en.result.plugin_command, /^claude plugin marketplace add roke22\/SquadraHQ#v\d+\.\d+\.\d+ && claude plugin install squadra@squadra$/)
+  assert.match(en.result.plugin_command, /^claude plugin marketplace add roke22\/pisha#v\d+\.\d+\.\d+ && claude plugin install pisha@pisha$/)
   // One command per system, each running the installer the server serves (and nothing else under /install/).
   for (const os of ['linux', 'macos', 'windows']) assert.ok(en.result.install[os].includes(en.result.code), os)
   assert.match(en.result.install.linux, /\/install\/linux\.sh' && echo '[0-9a-f]{64}  install\.sh' \| /)
   const sh = await fetch(`${URL_}/install/linux.sh`)
   assert.equal(sh.status, 200)
-  assert.match(await sh.text(), /squadra-host\.mjs enroll/)
+  assert.match(await sh.text(), /pisha-host\.mjs enroll/)
   assert.notEqual((await fetch(`${URL_}/install/..%2Fserver.js`)).status, 200)
   const find = async () => (await get('api/state', ADMIN)).result.hosts.find(h => h.id === r.result.id)
   const h = await find()
@@ -768,9 +768,9 @@ test('a name taken with the join token directs no worker until it is approved in
   assert.equal(claimed.result.coordinator_pending, true)
   assert.equal((await call('sendMessage', { chat_id: 'apw', text: 'do this' }, squat)).parameters.reason, 'approval_pending')
   assert.equal((await call('sendMessage', { chat_id: 'apq', text: 'my report' }, w, 'inst-apw-0001')).parameters.reason, 'approval_pending')
-  assert.ok((await call('sendMessage', { chat_id: 'apq', text: 'hello', squadra_hello: true }, w, 'inst-apw-0001')).ok)
+  assert.ok((await call('sendMessage', { chat_id: 'apq', text: 'hello', pisha_hello: true }, w, 'inst-apw-0001')).ok)
   // A hello doesn't open the other direction.
-  assert.equal((await call('sendMessage', { chat_id: 'apw', text: 'x', squadra_hello: true }, squat)).parameters.reason, 'approval_pending')
+  assert.equal((await call('sendMessage', { chat_id: 'apw', text: 'x', pisha_hello: true }, squat)).parameters.reason, 'approval_pending')
   // Coordinators see it as pending; so does the dashboard.
   assert.equal((await call('claimSession', { instance: 'inst-apq-0001', role: 'coordinator' }, squat, 'inst-apq-0001')).result.approval_pending, true)
   assert.equal((await session('apq')).approval_pending, true)
@@ -810,7 +810,7 @@ test('machines connect with a one-time ticket, and their secret never goes in th
   await sleep(300)
   assert.equal(await closed(a.sock, 300), false, 'stays connected')
   a.sock.destroy()
-  // Used once; and it isn't the "unknown machine" answer, which stops squadra-host.
+  // Used once; and it isn't the "unknown machine" answer, which stops pisha-host.
   const again = await rawWs('/host/connect', { auth: ticket })
   assert.equal(again.status, 101)
   const text = await new Promise(resolve => { let s = again.head; again.sock.on('data', d => { s += d.toString('latin1') }); again.sock.on('close', () => resolve(s)); setTimeout(() => resolve(s), 1500) })
@@ -823,7 +823,7 @@ test('machines connect with a one-time ticket, and their secret never goes in th
 })
 
 test('a server that cannot start ends with an error, for whatever started it', async () => {
-  const data = tempDir('squadra-nostart-')
+  const data = tempDir('pisha-nostart-')
   const port = PORT + 3700 + Math.floor(Math.random() * 200)
   // (Files that exist, but aren't a certificate and a key.)
   writeFileSync(join(data, 'bad.crt'), 'not a certificate')
@@ -837,9 +837,9 @@ test('a server that cannot start ends with an error, for whatever started it', a
 })
 
 test('the cap on sessions also holds for registrations that arrive together', async t => {
-  const data = tempDir('squadra-cap-')
+  const data = tempDir('pisha-cap-')
   const port = PORT + 3900 + Math.floor(Math.random() * 90)
-  const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, SQUADRA_MAX_SESSIONS: '2', SQUADRA_SERVER_TOKEN: 'cap-test-server-token' }, stdio: 'ignore' })
+  const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, PISHA_MAX_SESSIONS: '2', PISHA_SERVER_TOKEN: 'cap-test-server-token' }, stdio: 'ignore' })
   t.after(() => p.kill('SIGKILL'))
   for (let i = 0; ; i++) {
     try { if ((await fetch(`http://127.0.0.1:${port}/health`)).ok) break } catch {}
@@ -873,10 +873,10 @@ test('text with many joiners keeps them where they belong', async () => {
 })
 
 test('the tokens are printed the time they are made, and not at every start', async () => {
-  const data = tempDir('squadra-banner-')
+  const data = tempDir('pisha-banner-')
   const start = env => new Promise((resolve, reject) => {
     const port = PORT + 3100 + Math.floor(Math.random() * 500)
-    const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, SQUADRA_SERVER_TOKEN: '', SWARM_SERVER_TOKEN: '', ...env }, stdio: ['ignore', 'ignore', 'pipe'] })
+    const p = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: data, PISHA_SERVER_TOKEN: '', SWARM_SERVER_TOKEN: '', ...env }, stdio: ['ignore', 'ignore', 'pipe'] })
     let out = ''
     p.stderr.on('data', d => { out += d; if (/Dashboard: /.test(out)) { p.kill('SIGTERM') } })
     p.on('close', () => resolve(out))
@@ -889,7 +889,7 @@ test('the tokens are printed the time they are made, and not at every start', as
   const second = await start({})
   assert.ok(!second.includes(admin) && !second.includes(join_), 'not again')
   assert.ok(second.includes(join(data, 'server-token')), 'it says where it is')
-  const fromEnv = await start({ SQUADRA_SERVER_TOKEN: 'a-token-from-the-environment' })
+  const fromEnv = await start({ PISHA_SERVER_TOKEN: 'a-token-from-the-environment' })
   assert.ok(!fromEnv.includes('a-token-from-the-environment'))
 })
 
@@ -901,7 +901,7 @@ test('deleting a session takes its messages and attachments off the disk, at onc
   await call('sendMessage', { chat_id: 'delb', text: 'CANARY-FROM-THE-DELETED-ONE' }, a, 'inst-dela-0001')
   await call('sendMessage', { chat_id: 'dela', text: 'CANARY-TO-THE-DELETED-ONE' }, b, 'inst-delb-0001')
   await call('sendMessage', { chat_id: 'delc', text: 'KEPT-BETWEEN-OTHERS' }, b, 'inst-delb-0001')
-  const up = await fetch(`${URL_}/sendDocument?chat_id=dela&filename=n.txt`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${b}`, 'X-Squadra-Instance': 'inst-delb-0001' }, body: 'CANARY-ATTACHMENT' })
+  const up = await fetch(`${URL_}/sendDocument?chat_id=dela&filename=n.txt`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${b}`, 'X-Pisha-Instance': 'inst-delb-0001' }, body: 'CANARY-ATTACHMENT' })
   assert.ok((await up.json()).ok)
   await call('releaseSession', { instance: 'inst-dela-0001', reason: 'logout' }, a, 'inst-dela-0001')
   assert.ok((await call('api/delete', { session: 'dela' }, ADMIN)).ok)
@@ -980,7 +980,7 @@ test('approval: an unapproved name reaches no follower through a group, nor thos
 // The installer's command, run for real with programs that write down how they
 // were called: tmux, Claude Code and Node are stand-ins, so nothing is installed.
 function installerBench(extra = {}) {
-  const dir = tempDir('squadra-bench-')
+  const dir = tempDir('pisha-bench-')
   const log = join(dir, 'log')
   const tool = (name, body) => { writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`); chmodSync(join(dir, name), 0o755) }
   for (const name of ['curl', 'bash', 'sha256sum', 'cat', 'rm', 'mktemp', 'env', 'cp']) {
@@ -1007,7 +1007,7 @@ test('adding a machine: the installer is checked before it runs, and the code is
     bench.run(en.install.linux)
     const said = bench.said()
     assert.match(said, /^bash install\.sh /m, 'the installer ran')
-    assert.match(said, /^node squadra-host\.mjs enroll .* --code-file=code/m, 'squadra-host ran')
+    assert.match(said, /^node pisha-host\.mjs enroll .* --code-file=code/m, 'pisha-host ran')
     assert.ok(!said.includes(en.code), `the code was in someone's arguments:\n${said}`)
     assert.equal(readFileSync(`${bench.log}.code`, 'utf8'), en.code)
   } finally { bench.done() }

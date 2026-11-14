@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://roke22.github.io/SquadraHQ/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/SquadraHQ/"/>
-    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/SquadraHQ/es/"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/SquadraHQ/"/>
+    <loc>https://roke22.github.io/pisha/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/pisha/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/pisha/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/pisha/"/>
   </url>
   <url>
-    <loc>https://roke22.github.io/SquadraHQ/es/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/SquadraHQ/"/>
-    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/SquadraHQ/es/"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/SquadraHQ/"/>
+    <loc>https://roke22.github.io/pisha/es/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/pisha/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/pisha/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/pisha/"/>
   </url>
   <url>
-    <loc>https://roke22.github.io/SquadraHQ/examples.html</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/SquadraHQ/examples.html"/>
-    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/SquadraHQ/es/ejemplos.html"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/SquadraHQ/examples.html"/>
+    <loc>https://roke22.github.io/pisha/examples.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/pisha/examples.html"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/pisha/es/ejemplos.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/pisha/examples.html"/>
   </url>
   <url>
-    <loc>https://roke22.github.io/SquadraHQ/es/ejemplos.html</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/SquadraHQ/examples.html"/>
-    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/SquadraHQ/es/ejemplos.html"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/SquadraHQ/examples.html"/>
+    <loc>https://roke22.github.io/pisha/es/ejemplos.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://roke22.github.io/pisha/examples.html"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://roke22.github.io/pisha/es/ejemplos.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://roke22.github.io/pisha/examples.html"/>
   </url>
 </urlset>

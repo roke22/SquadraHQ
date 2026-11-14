@@ -21,7 +21,8 @@ const SERVER_MODULES = {
   permissions: ['platform', 'sessions'],
   machines: ['platform', 'sessions', 'observation', 'permissions'],
   organization: ['platform', 'sessions', 'messaging', 'observation', 'machines'],
-  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions'],
+  boards: ['platform', 'sessions', 'messaging'],
+  dashboard: ['platform', 'sessions', 'messaging', 'observation', 'machines', 'organization', 'permissions', 'boards'],
   ui: [],
 }
 const SERVER_OTHER_FOLDERS = ['vendor']
@@ -34,7 +35,7 @@ const PLUGIN_HELPERS = ['observe.js', 'paths.js', 'signing.js']
 // are one way only: what is Claude's stays out of what any agent could reuse.
 const PROGRAMS = [
   { dir: 'server', modules: SERVER_MODULES, otherFolders: SERVER_OTHER_FOLDERS },
-  { dir: 'plugins/squadra', modules: PLUGIN_MODULES, otherFolders: ['hooks', 'skills', '.claude-plugin'], helpers: PLUGIN_HELPERS },
+  { dir: 'plugins/pisha', modules: PLUGIN_MODULES, otherFolders: ['hooks', 'skills', '.claude-plugin'], helpers: PLUGIN_HELPERS },
 ]
 
 // Static imports and re-exports, and import() of a literal. A dynamic import
@@ -105,7 +106,7 @@ function sourcesIn(dir) {
 }
 
 test('modules: the programs follow the rules', () => {
-  assert.deepEqual(violations({ ...sourcesIn('server'), ...sourcesIn('plugins/squadra') }), [])
+  assert.deepEqual(violations({ ...sourcesIn('server'), ...sourcesIn('plugins/pisha') }), [])
 })
 
 test('modules: a module uses another through its index.js', () => {
@@ -123,16 +124,16 @@ test('modules: only along the arrows, and never in a circle', () => {
   }
   const asked = { 'server/sessions/x.js': `export function createSessions(platform, { messaging }) {}` }
   assert.match(violations(asked).join(), /"sessions" may not use "messaging"/)
-  const claude = { 'plugins/squadra/core/x.js': `import('../claude/index.js')` }
+  const claude = { 'plugins/pisha/core/x.js': `import('../claude/index.js')` }
   assert.match(violations(claude).join(), /"core" may not use "claude"/)
 })
 
 test('modules: core speaks to the agent only through agent.js', () => {
-  const core = Object.entries(sourcesIn('plugins/squadra/core'))
+  const core = Object.entries(sourcesIn('plugins/pisha/core'))
   assert.ok(core.length)
   for (const [file, source] of core) assert.doesNotMatch(source, /notifications\/claude/, file)
   // A helper stays plain: what imports a module isn't one.
-  for (const h of PLUGIN_HELPERS) assert.doesNotMatch(readFileSync(join(ROOT, 'plugins/squadra', h), 'utf8'), /from '\.\/(core|claude)\//, h)
+  for (const h of PLUGIN_HELPERS) assert.doesNotMatch(readFileSync(join(ROOT, 'plugins/pisha', h), 'utf8'), /from '\.\/(core|claude)\//, h)
 })
 
 // The host is one file that can't import anything, and the plugin installs from
@@ -148,8 +149,8 @@ test('modules: the checks the plugin and the host each keep are the same', () =>
     assert.notEqual(start, -1, `${name} in ${file}`)
     return src.slice(start + 1, src.indexOf('}', start)).filter(l => !l.trim().startsWith('//')).map(l => l.replace(/\s+\/\/ .*$/, ''))
   }
-  const HOST = 'host/squadra-host.mjs', PATHS = 'plugins/squadra/paths.js'
-  for (const [name, file] of [['NAME_RE', 'plugins/squadra/core/settings.js'], ['LINKS_MAX', 'plugins/squadra/core/access.js'], ['HOME', 'plugins/squadra/core/sendable.js']]) {
+  const HOST = 'host/pisha-host.mjs', PATHS = 'plugins/pisha/paths.js'
+  for (const [name, file] of [['NAME_RE', 'plugins/pisha/core/settings.js'], ['LINKS_MAX', 'plugins/pisha/core/access.js'], ['HOME', 'plugins/pisha/core/sendable.js']]) {
     assert.ok(definition(HOST, name), name)
     assert.equal(definition(file, name), definition(HOST, name), name)
   }
@@ -157,7 +158,7 @@ test('modules: the checks the plugin and the host each keep are the same', () =>
   assert.equal(definition('server/permissions/permissions.js', 'RULE_RE'), definition(HOST, 'RULE_RE'))
   assert.deepEqual(body(HOST, 'privateChain'), body(PATHS, 'safeChain'))
   assert.deepEqual(body(HOST, 'realNearest'), body(PATHS, 'realNearest'))
-  assert.deepEqual(body(HOST, 'serverSigned'), body('plugins/squadra/signing.js', 'signedBy'))
+  assert.deepEqual(body(HOST, 'serverSigned'), body('plugins/pisha/signing.js', 'signedBy'))
   // (Remembered differently in each.)
   const noMemo = list => list.filter(l => !/privateGroupMemo|privateGroupCache|\bcached\b/.test(l))
   assert.deepEqual(noMemo(body(HOST, 'privateGroup')), noMemo(body(PATHS, 'privateGroup')))
@@ -167,7 +168,7 @@ test('modules: the checks the plugin and the host each keep are the same', () =>
 })
 
 test('modules: the host uses each agent only through its object', () => {
-  const source = readFileSync(join(ROOT, 'host/squadra-host.mjs'), 'utf8')
+  const source = readFileSync(join(ROOT, 'host/pisha-host.mjs'), 'utf8')
   const claude = source.indexOf('// --- Claude Code ---'), typed = source.indexOf('// --- Codex CLI and Grok CLI ---'), end = source.indexOf('// --- opening and closing sessions ---')
   assert.ok(claude > 0 && typed > claude && end > typed)
   // [section, the objects the rest of the file may use]
@@ -183,10 +184,10 @@ test('modules: the host uses each agent only through its object', () => {
 test('modules: nothing unknown, nothing that can not be checked, no reaching out', () => {
   assert.match(violations({ 'server/stuff/x.js': '' }).join(), /not a known module/)
   assert.match(violations({ 'server/messaging/x.js': 'const m = await import(name)' }).join(), /can't be checked/)
-  assert.match(violations({ 'server/messaging/x.js': `import '../../plugins/squadra/signing.js'` }).join(), /outside server/)
+  assert.match(violations({ 'server/messaging/x.js': `import '../../plugins/pisha/signing.js'` }).join(), /outside server/)
   assert.match(violations({ 'server/messaging/x.js': `import '../server.js'` }).join(), /doesn't import the top/)
-  assert.match(violations({ 'plugins/squadra/core/x.js': `import '../server.js'` }).join(), /doesn't import the top/)
-  assert.deepEqual(violations({ 'plugins/squadra/core/x.js': `import '../signing.js'` }), [])
+  assert.match(violations({ 'plugins/pisha/core/x.js': `import '../server.js'` }).join(), /doesn't import the top/)
+  assert.deepEqual(violations({ 'plugins/pisha/core/x.js': `import '../signing.js'` }), [])
   // The entry point joins the modules; inside one, anything goes.
   assert.deepEqual(violations({
     'server/server.js': `import { a } from './machines/index.js'\nimport { b } from './acme.js'`,

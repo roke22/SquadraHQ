@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t">
+  <title id="t">Pisha</title>
+  <rect width="64" height="64" rx="15" fill="#F2B90F"/>
+  <circle cx="22.5" cy="25" r="4.8" fill="#14213D"/>
+  <path d="M35 26.5q5.5-5 11 0" fill="none" stroke="#14213D" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M19 37q13 14 26 0" fill="none" stroke="#14213D" stroke-width="4.6" stroke-linecap="round"/>
+</svg>

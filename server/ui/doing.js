@@ -65,7 +65,7 @@ export function commandPhrase(line) {
 }
 
 const fileName = summary => String(summary ?? '').replace(/\s+\([^)]*\)$/, '').split('/').filter(Boolean).pop() ?? ''
-const squadraTool = (tool, summary) => {
+const pishaTool = (tool, summary) => {
   const to = /^chat_id: (.+)$/.exec(summary)?.[1] ?? ''
   switch (tool) {
     case 'reply': return to ? T.nowReply(to) : T.nowWriting
@@ -107,6 +107,6 @@ export function nowPhrase(tool) {
     case 'Skill': return T.nowSkill(sum.slice(0, 60))
   }
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name)
-  if (mcp) return (mcp[1] === 'squadra' || mcp[1].endsWith('_squadra') ? squadraTool(mcp[2], sum) : null) ?? T.nowMcp(mcp[2].replace(/_/g, ' '), mcp[1].replace(/^plugin_[^_]+_/, ''))
+  if (mcp) return (mcp[1] === 'pisha' || mcp[1].endsWith('_pisha') ? pishaTool(mcp[2], sum) : null) ?? T.nowMcp(mcp[2].replace(/_/g, ' '), mcp[1].replace(/^plugin_[^_]+_/, ''))
   return name ? T.nowTool(name) : T.tool
 }

@@ -21,12 +21,12 @@ import { parseUtterance, yesNo, speakable } from './voice-parse.js'
 
 const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition
 const SPEECH_LANG = LANG === 'es' ? 'es-ES' : 'en-GB'
-const CONSENT = 'squadra.voice-ok'
+const CONSENT = 'pisha.voice-ok'
 const HEARD_TRIES = 2 // silences in a row before moving on
 // How fast it reads, as on a voice message: a tap on the chip, the next one.
 // (Small steps: past 1.2 the voices get hard to follow.)
 const RATES = [1, 1.1, 1.2]
-const RATE_KEY = 'squadra.voice-rate'
+const RATE_KEY = 'pisha.voice-rate'
 let rate = (() => { try { const r = Number(localStorage.getItem(RATE_KEY)); return RATES.includes(r) ? r : 1 } catch { return 1 } })()
 // (Said in words, normal, fast, faster: a number says little about a voice.)
 const rateLabel = r => T.vRates[RATES.indexOf(r)] ?? `${r.toLocaleString(LOCALE)}×`

@@ -1,6 +1,6 @@
 {
-  "name": "squadra",
-  "description": "Squadra: multi-agent Claude Code. A coordinator agent runs squads of Claude Code agents on any machine, approves their safe actions and only asks you what matters. Live web dashboard and web terminal, self-hosted server with zero dependencies.",
+  "name": "pisha",
+  "description": "Pisha: multi-agent Claude Code. A coordinator agent runs squads of Claude Code agents on any machine, approves their safe actions and only asks you what matters. Live web dashboard and web terminal, self-hosted server with zero dependencies.",
   "owner": {
     "name": "Jose J. Anton",
     "url": "https://github.com/roke22"
@@ -10,9 +10,9 @@
   },
   "plugins": [
     {
-      "name": "squadra",
-      "source": "./plugins/squadra",
-      "description": "Channel that lets Claude Code sessions message each other through your self-hosted Squadra server, with one session acting as coordinator of the others. Includes pairing, allowlists and access policy (/squadra:access) and reports activity to the Squadra dashboard.",
+      "name": "pisha",
+      "source": "./plugins/pisha",
+      "description": "Channel that lets Claude Code sessions message each other through your self-hosted Pisha server, with one session acting as coordinator of the others. Includes pairing, allowlists and access policy (/pisha:access) and reports activity to the Pisha dashboard.",
       "version": "0.0.10"
     }
   ]

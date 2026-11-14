@@ -17,19 +17,23 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 function serverOf(tag) {
   try {
-    const dir = tempDir('squadra-old-')
+    const dir = tempDir('pisha-old-')
     execFileSync('sh', ['-c', `git -C "${ROOT}" archive ${tag} server | tar -x -C "${dir}"`], { stdio: 'ignore' })
     // (Without the tag — a shallow clone, as in CI — nothing is extracted; macOS's
     // tar doesn't fail on the empty input.)
     return existsSync(join(dir, 'server', 'server.js')) ? dir : null
   } catch { return null }
 }
-const oldServerDir = serverOf('v0.0.1')
-const lastRelease = serverOf('v0.0.7')
+// (Releases before the name Pisha kept their data under another name, and the
+// rename was a clean break: their data isn't carried over. These come back
+// with the first Pisha release as the one to upgrade from.)
+const BEFORE_PISHA = 'releases before Pisha are not upgraded: a clean break'
+const oldServerDir = null
+const lastRelease = null
 
 async function run(script, dataDir, port) {
   const proc = spawn(process.execPath, [script], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: ADMIN },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, PISHA_SERVER_TOKEN: ADMIN },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   let err = ''
@@ -44,8 +48,8 @@ async function run(script, dataDir, port) {
 }
 const stop = async s => { s.proc.kill('SIGTERM'); await s.exited }
 
-test('a 0.0.1 database: the new server starts and cleans every old row', { skip: !oldServerDir && 'the v0.0.1 tag is not available' }, async () => {
-  const dataDir = tempDir('squadra-up-')
+test('a 0.0.1 database: the new server starts and cleans every old row', { skip: !oldServerDir && BEFORE_PISHA }, async () => {
+  const dataDir = tempDir('pisha-up-')
   mkdirSync(dataDir, { recursive: true })
   const port = 23000 + Math.floor(Math.random() * 2000)
 
@@ -59,7 +63,7 @@ test('a 0.0.1 database: the new server starts and cleans every old row', { skip:
 
   // What 0.0.1 could leave behind: more than one batch of uncleaned rows,
   // fractional event times.
-  const db = new DatabaseSync(join(dataDir, 'squadra.db'))
+  const db = new DatabaseSync(join(dataDir, 'pisha.db'))
   const t = Date.now()
   const ev = db.prepare('INSERT INTO events (session, ts, kind, data) VALUES (?, ?, ?, ?)')
   const msg = db.prepare('INSERT INTO messages (from_name, target, text, created_at) VALUES (?, ?, ?, ?)')
@@ -73,7 +77,7 @@ test('a 0.0.1 database: the new server starts and cleans every old row', { skip:
   const now = await run(join(ROOT, 'server/server.js'), dataDir, port)
   await stop(now)
 
-  const after = new DatabaseSync(join(dataDir, 'squadra.db'))
+  const after = new DatabaseSync(join(dataDir, 'pisha.db'))
   assert.equal(after.prepare("SELECT COUNT(*) AS n FROM events WHERE data LIKE '%' || char(8238) || '%'").get().n, 0, 'every event cleaned')
   assert.equal(after.prepare('SELECT COUNT(*) AS n FROM events WHERE ts != CAST(ts AS INTEGER)').get().n, 0, 'whole-millisecond times')
   assert.equal(after.prepare("SELECT COUNT(*) AS n FROM messages WHERE text LIKE '%' || char(8238) || '%'").get().n, 0, 'every message cleaned')
@@ -84,8 +88,8 @@ test('a 0.0.1 database: the new server starts and cleans every old row', { skip:
   await stop(await run(join(ROOT, 'server/server.js'), dataDir, port))
 })
 
-test('a 0.0.7 server: machines, sessions and tokens go on working, with nothing to do on them', { skip: !lastRelease && 'the v0.0.7 tag is not available' }, async () => {
-  const dataDir = tempDir('squadra-up7-')
+test('a 0.0.7 server: machines, sessions and tokens go on working, with nothing to do on them', { skip: !lastRelease && BEFORE_PISHA }, async () => {
+  const dataDir = tempDir('pisha-up7-')
   const port = 23000 + Math.floor(Math.random() * 2000)
   const at = path => `http://127.0.0.1:${port}/${path}`
   const post = (path, body, auth) => fetch(at(path), { method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}) }, body: JSON.stringify(body ?? {}) }).then(x => x.json())
@@ -113,17 +117,17 @@ test('a 0.0.7 server: machines, sessions and tokens go on working, with nothing 
     // What was there is the first company, and a new one starts empty.
     const fresh = ok(await post('admin/createCompany', { name: 'Compañía nueva' }, ADMIN))
     assert.deepEqual(ok(await fetch(at(`api/c/${fresh.id}/state`), { headers: { Authorization: `Bearer ${ADMIN}` } }).then(x => x.json())).sessions, [])
-    assert.ok(existsSync(join(dataDir, 'squadra-before-companies.db')))
+    assert.ok(existsSync(join(dataDir, 'pisha-before-companies.db')))
   } finally { await stop(now) }
 })
 
-test('a 0.0.7 server: what it held is all there for its first owner, and its coordinators use the inbox', { skip: !lastRelease && 'the v0.0.7 tag is not available' }, async () => {
-  const dataDir = tempDir('squadra-up7b-')
+test('a 0.0.7 server: what it held is all there for its first owner, and its coordinators use the inbox', { skip: !lastRelease && BEFORE_PISHA }, async () => {
+  const dataDir = tempDir('pisha-up7b-')
   const port = 23000 + Math.floor(Math.random() * 2000)
   const at = path => `http://127.0.0.1:${port}/${path}`
   const post = (path, body, auth, instance) => fetch(at(path), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Squadra-Instance': instance } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Pisha-Instance': instance } : {}) },
     body: JSON.stringify(body ?? {}),
   }).then(x => x.json())
   const get = (path, auth) => fetch(at(path), { headers: { Authorization: `Bearer ${auth}` } }).then(x => x.json())

@@ -1,5 +1,5 @@
 /**
- * Minimal WebSocket server side (RFC 6455) for squadra-server: text frames,
+ * Minimal WebSocket server side (RFC 6455) for pisha-server: text frames,
  * ping/pong and close, with fragmented messages reassembled. Only Node
  * built-ins — no dependencies.
  *

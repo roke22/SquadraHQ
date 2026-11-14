@@ -1,7 +1,7 @@
 import { now, cleanText, bad, ApiError } from '../platform/index.js'
 
 // What a coordinator says is for the person: a decision only they can take, or
-// something they will want to know when they are back. Squadra doesn't read it
+// something they will want to know when they are back. Pisha doesn't read it
 // or know what it is about: it keeps it where they can see it, until they say.
 const MAX_TEXT = 2000
 const MAX_OPTION = 200

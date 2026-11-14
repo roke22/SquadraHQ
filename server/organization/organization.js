@@ -40,10 +40,10 @@ export function createOrganization(platform, { sessions, messaging, observation,
       // Writing to a session isn't enough (anyone can): it has to have written back.
       // (Only messages since both current identities exist: a name deleted and
       // registered again starts with no relations.)
-      if (!related(name, id)) return { id, type: 'private', username: id, created_at: unix(ident.created_at), squadra_identity: ident.epoch, presence_hidden: true }
+      if (!related(name, id)) return { id, type: 'private', username: id, created_at: unix(ident.created_at), pisha_identity: ident.epoch, presence_hidden: true }
       const a = activity.get(id)
       return {
-        id, type: 'private', username: id, created_at: unix(ident.created_at), squadra_identity: ident.epoch, ...presenceOf(id),
+        id, type: 'private', username: id, created_at: unix(ident.created_at), pisha_identity: ident.epoch, ...presenceOf(id),
         context: a?.context_pct != null ? { pct: a.context_pct, tokens: a.context_tokens, compact_at: a.compact_at } : null,
         persona: personaView(id),
         // What the dashboard says it is for, and of its squad when it leads

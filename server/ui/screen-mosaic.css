@@ -20,16 +20,7 @@
 .arch .info .n .arch-name { font-family: var(--mono); font-size: 12.5px; }
 .arch { border-left-width: 1px; border-left-color: var(--line); border-radius: var(--r-md); }
 
-/* The org chart: each team a card, its coordinator and workers, linked by lines.
-   (Heights stay as they are: the lines between cards are drawn from them.) */
-.org-card { border-radius: var(--r-md); box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
-.org-head { background: var(--panel); }
-.org-title { font-weight: 600; }
-.org-agent { gap: 7px; }
-.org-agent .role { width: 13px; height: 13px; }
-.org-agent .n { font: 500 12.5px var(--mono); }
-.org-agent.coord .n { color: var(--text); }
-.org-agent:hover, .org-agent:focus-visible { background: var(--raised); }
+/* The org chart: its own styles are in screen-org.css; its menus buttons, here. */
 .org-more { display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; }
 .org-more .ic { width: 15px; height: 15px; }
 .org-more:hover { background: var(--raised); }

@@ -16,4 +16,13 @@ deploy/.env
 !deploy/demo/example/.claude/
 
 # The demo container's folder (tokens, Claude Code login, projects)
-deploy/demo/squadra/
+deploy/demo/pisha/
+
+# Copied into server/ only while the npm package is packed (scripts/stage-server.mjs)
+server/pisha-host.mjs
+server/pisha-host.mjs.sig
+server/install/
+server/LICENSE
+
+# The video manual: script, screenshots, clips and videos (published on the website or YouTube, not here)
+manual/

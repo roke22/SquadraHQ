@@ -7,9 +7,9 @@ import {
   VERSION, cleanText, pathTooLong, cutText, acceptWebSocket, sameOrigin, trimSlashes, AGENTS,
 } from '../platform/index.js'
 
-const HOST_SCRIPT = [new URL('../../host/squadra-host.mjs', import.meta.url), new URL('../squadra-host.mjs', import.meta.url)]
+const HOST_SCRIPT = [new URL('../../host/pisha-host.mjs', import.meta.url), new URL('../pisha-host.mjs', import.meta.url)]
 
-// The installers that prepare a machine and run squadra-host (install/ in
+// The installers that prepare a machine and run pisha-host (install/ in
 // the repository, or next to this file in the Docker image).
 export const INSTALLERS = { 'linux.sh': 'text/x-shellscript; charset=utf-8', 'macos.sh': 'text/x-shellscript; charset=utf-8', 'windows.bat': 'text/plain; charset=utf-8' }
 const withSha = body => ({ sha: createHash('sha256').update(body).digest('hex') })
@@ -64,7 +64,7 @@ export function createMachines(platform, { sessions, observation, permissions })
   // types /clear in its terminal, as the user would, and the worker's plugin
   // confirms it (its SessionStart "clear" event). Only the coordinator's own
   // worker, opened from the dashboard, connected and idle, once a minute.
-  const FRESH_WAIT_MS = Number(process.env.SQUADRA_FRESH_WAIT_MS ?? 20_000)
+  const FRESH_WAIT_MS = Number(process.env.PISHA_FRESH_WAIT_MS ?? 20_000)
   const freshWaiters = new Map() // worker -> resolve(confirmed)
   bus.on('context-cleared', name => freshWaiters.get(name)?.(true))
   // Codex CLI and Grok CLI are started again instead (the machine says so):
@@ -138,7 +138,7 @@ export function createMachines(platform, { sessions, observation, permissions })
     }
   }
 
-  // A host is squadra-host running on a machine. It joins with a one-time code
+  // A host is pisha-host running on a machine. It joins with a one-time code
   // the dashboard generates (POST /host/enroll), gets its own secret, and keeps a
   // WebSocket open to /host/connect. Through it the server can only ask for a
   // session *spec* (name, role, folder, compact window, persona id) — the host validates it
@@ -206,13 +206,13 @@ export function createMachines(platform, { sessions, observation, permissions })
     // The command checks the program it downloads against this server's copy
     // (sha256sum on Linux, shasum on macOS) before running it.
     const sha = hostScript()?.sha ?? null
-    // (A company's machine gets its own copy of everything: see squadra-host.)
+    // (A company's machine gets its own copy of everything: see pisha-host.)
     const company = credentialPrefix ? ` --company=${companyId}` : ''
     const check = (sum, file) => (sum ? ` && echo ${q(`${sum}  ${file}`)} | (sha256sum -c - 2>/dev/null || shasum -a 256 -c -)` : '')
     // Downloaded, checked and only then run; and the code in a file (printf is
     // part of the shell): a program's arguments can be read by anyone on the machine.
     const unix = file => `cd "$(mktemp -d)" && curl -fsSLo install.sh ${q(`${base}/install/${file}`)}${check(installer(file)?.sha, 'install.sh')} && printf %s ${q(code)} > code && bash install.sh ${q(base)} --code-file code${sha ? ` --sha256 ${sha}` : ''} --server-key=${SERVER_KEY.hash}${company}`
-    const bat = '"$d\\squadra-install.bat"'
+    const bat = '"$d\\pisha-install.bat"'
     return {
       code,
       enrollment: ticket,
@@ -220,19 +220,19 @@ export function createMachines(platform, { sessions, observation, permissions })
       server_url: base,
       sha256: sha,
       server_key: SERVER_KEY.hash,
-      // The Squadra plugin release that goes with this server (squadra-host pins the same one).
-      plugin_command: `claude plugin marketplace add roke22/SquadraHQ#v${VERSION} && claude plugin install squadra@squadra`,
+      // The Pisha plugin release that goes with this server (pisha-host pins the same one).
+      plugin_command: `claude plugin marketplace add roke22/pisha#v${VERSION} && claude plugin install pisha@pisha`,
       // One command per system: the installer prepares the machine (tmux, Node,
-      // Claude Code) and runs squadra-host with this code. (Windows: inside WSL.)
+      // Claude Code) and runs pisha-host with this code. (Windows: inside WSL.)
       install: {
         linux: unix('linux.sh'),
         macos: unix('macos.sh'),
         // (PowerShell's quotes. "--server-key x", not "=": a .bat splits its arguments at "=".)
-        windows: `[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; $d = Join-Path $env:TEMP ([guid]::NewGuid()); New-Item -ItemType Directory $d | Out-Null; irm ${ps(`${base}/install/windows.bat`)} -OutFile ${bat}; if ((Get-FileHash ${bat} -Algorithm SHA256).Hash -ne ${ps(installer('windows.bat')?.sha ?? '')}) { throw 'the installer does not match the checksum the dashboard gave' }; $env:SQUADRA_ENROLL_CODE = ${ps(code)}; & ${bat} ${ps(base)} --linux-sha256 ${installer('linux.sh')?.sha ?? ''}${sha ? ` --sha256 ${sha}` : ''} --server-key ${SERVER_KEY.hash}${credentialPrefix ? ` --company ${companyId}` : ''}`,
+        windows: `[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; $d = Join-Path $env:TEMP ([guid]::NewGuid()); New-Item -ItemType Directory $d | Out-Null; irm ${ps(`${base}/install/windows.bat`)} -OutFile ${bat}; if ((Get-FileHash ${bat} -Algorithm SHA256).Hash -ne ${ps(installer('windows.bat')?.sha ?? '')}) { throw 'the installer does not match the checksum the dashboard gave' }; $env:PISHA_ENROLL_CODE = ${ps(code)}; & ${bat} ${ps(base)} --linux-sha256 ${installer('linux.sh')?.sha ?? ''}${sha ? ` --sha256 ${sha}` : ''} --server-key ${SERVER_KEY.hash}${credentialPrefix ? ` --company ${companyId}` : ''}`,
       },
-      // Just squadra-host, on a machine that already has what it needs.
+      // Just pisha-host, on a machine that already has what it needs.
       // Downloaded into a new private folder: nobody can swap the file between the check and the run.
-      command: `cd "$(mktemp -d)" && curl -fsSLo squadra-host.mjs ${q(`${base}/host/squadra-host.mjs`)}${check(sha, 'squadra-host.mjs')} && printf %s ${q(code)} > code && node squadra-host.mjs enroll ${q(base)} --code-file=code --server-key=${SERVER_KEY.hash}${company}`,
+      command: `cd "$(mktemp -d)" && curl -fsSLo pisha-host.mjs ${q(`${base}/host/pisha-host.mjs`)}${check(sha, 'pisha-host.mjs')} && printf %s ${q(code)} > code && node pisha-host.mjs enroll ${q(base)} --code-file=code --server-key=${SERVER_KEY.hash}${company}`,
     }
   }
 
@@ -246,10 +246,10 @@ export function createMachines(platform, { sessions, observation, permissions })
     if (!row || row.expires_at < t) {
       throw new ApiError(403, 'Forbidden: the code is wrong or has expired; generate a new one in the dashboard (Machines → + Add machine)')
     }
-    // A copy of squadra-host set up for another company (without what the
+    // A copy of pisha-host set up for another company (without what the
     // dashboard's command says, say) would use another's folder.
     // (Older ones don't say, and only a company's own copy keeps its sessions apart:
-    // the command for one always downloads this server's squadra-host.)
+    // the command for one always downloads this server's pisha-host.)
     if (String(p.company ?? (credentialPrefix ? '' : companyId)) !== companyId) throw new ApiError(403, 'Forbidden: this code is for another company: run the whole command the dashboard gives')
     db.prepare('DELETE FROM host_enrollments WHERE code_hash = ?').run(row.code_hash) // single use
     const id = `h_${randomBytes(8).toString('hex')}`
@@ -368,7 +368,7 @@ export function createMachines(platform, { sessions, observation, permissions })
     let link = null
     let hostId = null
     const hello = setTimeout(() => ws.close(4000, 'hello expected'), 10_000)
-    // squadra-host pings every 25 s: a machine silent for 90 s is gone (it
+    // pisha-host pings every 25 s: a machine silent for 90 s is gone (it
     // crashed, slept or lost its network without closing), not online.
     let lastHeard = now()
     const alive = setInterval(() => { if (now() - lastHeard > 90_000) ws.close(4008, 'nothing heard for 90 seconds') }, 30_000)
@@ -385,7 +385,7 @@ export function createMachines(platform, { sessions, observation, permissions })
         // Disconnected from the dashboard meanwhile.
         if (!db.prepare('SELECT 1 FROM hosts WHERE id = ?').get(row.id)) return ws.close(4001, 'unknown or disconnected host')
         clearTimeout(hello)
-        ws.maxMessage = 8 * 1024 * 1024 // terminal screens can be large (squadra-host keeps them under 2 MB)
+        ws.maxMessage = 8 * 1024 * 1024 // terminal screens can be large (pisha-host keeps them under 2 MB)
         hostId = row.id
         // One live connection per host: the newest wins. The old one is cleaned
         // up first (its requests fail, its viewers are told).
@@ -412,7 +412,7 @@ export function createMachines(platform, { sessions, observation, permissions })
           if (allow('hostping', hostId, 30)) ws.send(JSON.stringify({ t: 'pong' }))
           break
         case 'info':
-          // squadra-host sends it when something changes: a machine sending
+          // pisha-host sends it when something changes: a machine sending
           // it nonstop is ignored (each one is a database write and a broadcast).
           if (!allow('hostinfo', hostId, 60)) break
           link.info = ownTerminals(sanitizeHostInfo(m.info), hostId)
@@ -559,32 +559,32 @@ export function createMachines(platform, { sessions, observation, permissions })
   function upgrade(req, socket, head) {
     if (pathTooLong(req.url)) { refuseSocket(socket, '414 URI Too Long'); return }
     const path = trimSlashes(new URL(req.url ?? '/', 'http://localhost').pathname)
-    // squadra-host never sends an Origin: a browser page can't hold machine slots.
+    // pisha-host never sends an Origin: a browser page can't hold machine slots.
     if (path === '/host/connect' && req.headers.origin) { refuseSocket(socket, '403 Forbidden'); return }
     if (path !== '/host/connect' && path !== '/api/terminal') {
       refuseSocket(socket, '404 Not Found')
       return
     }
     // The dashboard's terminal socket only from the dashboard's own page (a
-    // browser always sends Origin; squadra-host sends none).
+    // browser always sends Origin; pisha-host sends none).
     if (path === '/api/terminal' && req.headers.origin && !sameOrigin(req)) { refuseSocket(socket, '403 Forbidden'); return }
     // Authenticated before the socket is accepted, so nobody without a
     // credential holds a connection open: the credential comes as a
-    // subprotocol ("squadra", "auth.<credential>"). The dashboard's is a
+    // subprotocol ("pisha", "auth.<credential>"). The dashboard's is a
     // one-time ticket (POST /api/terminal/ticket), and so is a machine's (POST
     // /host/ticket); machines older than 0.0.7 send their secret here.
     const offered = offeredProtocols(req)
     const cred = offeredCredential(req)
     // (Credentials are random, 192 bits or more: a wrong one costs one lookup.)
     const refuse = (status, text) => refuseSocket(socket, `${status} ${text}`)
-    if (!offered.includes('squadra') || !cred) {
-      // squadra-host older than 0.0.2 (it sent its secret in a message): it is
+    if (!offered.includes('pisha') || !cred) {
+      // pisha-host older than 0.0.2 (it sent its secret in a message): it is
       // told why, in the close reason it prints, and the log says so (once a
       // minute at most). The socket is closed at once.
       if (path === '/host/connect' && req.headers.upgrade?.toLowerCase() === 'websocket') {
-        if (allowServerWide('old-host-log', 'all', 1)) log(`a squadra-host older than 0.0.2 tried to connect from ${req.socket.remoteAddress}: update it (see the README)`)
+        if (allowServerWide('old-host-log', 'all', 1)) log(`a pisha-host older than 0.0.2 tried to connect from ${req.socket.remoteAddress}: update it (see the README)`)
         const old = acceptWebSocket(req, socket, head, { log: logError, maxMessage: 1024 })
-        old?.close(4426, 'this squadra-host is older than the server (0.0.2): update it: add the machine again from the dashboard (+ Add machine)')
+        old?.close(4426, 'this pisha-host is older than the server (0.0.2): update it: add the machine again from the dashboard (+ Add machine)')
         return
       }
       return refuse(426, 'Upgrade Required')
@@ -607,7 +607,7 @@ export function createMachines(platform, { sessions, observation, permissions })
       viewerTicket = takeTerminalTicket(cred)
       if (!viewerTicket) return refuse(401, 'Unauthorized')
     }
-    const ws = acceptWebSocket(req, socket, head, { log: logError, maxMessage: 16 * 1024, protocol: 'squadra' })
+    const ws = acceptWebSocket(req, socket, head, { log: logError, maxMessage: 16 * 1024, protocol: 'pisha' })
     if (!ws) return
     // A machine that was disconnected is told so (and stops), at once.
     // (A ticket says nothing about the machine: lost in a restart of this
@@ -616,7 +616,7 @@ export function createMachines(platform, { sessions, observation, permissions })
     if (path === '/host/connect' && !host) { ws.close(4001, 'unknown or disconnected host'); return }
     // A machine that has proved its key doesn't connect with its secret alone,
     // nor without the encrypted link that key gets it.
-    if (path === '/host/connect' && host.public_key && !linkKeys) { ws.close(4003, 'this machine has a key: update its squadra-host (0.0.7 or later)'); return }
+    if (path === '/host/connect' && host.public_key && !linkKeys) { ws.close(4003, 'this machine has a key: update its pisha-host (0.0.7 or later)'); return }
     if (linkKeys) encryptSocket(ws, linkKeys)
     wsClients.add(ws)
     if (path === '/host/connect') openHostLink(ws, req, host)
@@ -647,7 +647,7 @@ export function createMachines(platform, { sessions, observation, permissions })
   // exchange that this server signs and that machine proved it took part in.
   function hostTicketAnswer(host, p) {
     if (p.proof == null) {
-      if (host.public_key) throw keyRefused('this machine has a key, and this request doesn\'t prove it: update its squadra-host (0.0.7 or later)')
+      if (host.public_key) throw keyRefused('this machine has a key, and this request doesn\'t prove it: update its pisha-host (0.0.7 or later)')
       return { ticket: newHostTicket(host.id) }
     }
     const offered = String(p.key ?? '')
@@ -663,9 +663,9 @@ export function createMachines(platform, { sessions, observation, permissions })
     if (!host.public_key) db.prepare('UPDATE hosts SET public_key = ? WHERE id = ?').run(offered, host.id)
     const mine = generateKeyPairSync('x25519')
     const myEph = mine.publicKey.export({ format: 'der', type: 'spki' }).toString('base64url')
-    const okm = Buffer.from(hkdfSync('sha256', diffieHellman({ privateKey: mine.privateKey, publicKey: peer }), String(p.challenge), `squadra-link-1|${eph}|${myEph}`, 64))
+    const okm = Buffer.from(hkdfSync('sha256', diffieHellman({ privateKey: mine.privateKey, publicKey: peer }), String(p.challenge), `pisha-link-1|${eph}|${myEph}`, 64))
     const ticket = newHostTicket(host.id, { fromHost: okm.subarray(0, 32), toHost: okm.subarray(32) })
-    return { ticket, eph: myEph, sig: signAsServer(['squadra-link-1', eph, myEph, String(p.challenge), ticket]) }
+    return { ticket, eph: myEph, sig: signAsServer(['pisha-link-1', eph, myEph, String(p.challenge), ticket]) }
   }
 
   // Every message on that link: AES-256-GCM, numbered by its place in each
@@ -771,7 +771,7 @@ export function createMachines(platform, { sessions, observation, permissions })
     return {
       personas: (Array.isArray(r?.personas) ? r.personas : []).slice(0, 200)
         .filter(x => x && PERSONA_ID_RE.test(String(x.id)) && ['skill', 'agent'].includes(x.kind) && ['project', 'user'].includes(x.scope))
-        .map(x => ({ id: x.id, kind: x.kind, scope: x.scope, name: str(x.name, 64) || x.id.split(':')[2], description: str(x.description, 300), no_squadra_tools: x.no_squadra_tools === true })),
+        .map(x => ({ id: x.id, kind: x.kind, scope: x.scope, name: str(x.name, 64) || x.id.split(':')[2], description: str(x.description, 300), no_pisha_tools: x.no_pisha_tools === true })),
     }
   }
 
@@ -826,7 +826,7 @@ export function createMachines(platform, { sessions, observation, permissions })
       return
     }
     const takes = hostLinks.get(id)?.info?.permission_profiles
-    if (takes == null) throw conflict('old_machine', `"${name}" follows the permission profile "${p.name}", and its machine is too old to apply one: update it (squadra-host update), or give the session no profile`)
+    if (takes == null) throw conflict('old_machine', `"${name}" follows the permission profile "${p.name}", and its machine is too old to apply one: update it (pisha-host update), or give the session no profile`)
     // (How far it takes them is the machine's to say, as it is now: it refuses what it doesn't.)
     spec.permissions = { profile: p.name, allow: p.allow, ask: p.ask, deny: p.deny, notes: p.notes }
   }
@@ -879,7 +879,7 @@ export function createMachines(platform, { sessions, observation, permissions })
   }
 
   // A worker opened from here for a coordinator also opened from here: the
-  // coordinator's machine approves it, as /squadra:access pair would (whoever
+  // coordinator's machine approves it, as /pisha:access pair would (whoever
   // opened both meant them to work together). A coordinator opened by hand,
   // or not connected, pairs as before. Written down either way it happens.
   async function approveOnCoordinator(coordinator, worker, actor) {

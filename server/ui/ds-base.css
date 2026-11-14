@@ -1,4 +1,4 @@
-/* SquadraHQ design system: tokens and base.
+/* Pisha design system: tokens and base.
    Every colour, size and duration the dashboard uses starts here. Light is the
    default; dark is the system's choice unless light was picked here, or picked
    here (data-theme on <html>, set before the page draws). */
@@ -13,61 +13,105 @@
   src: url("/vendor/InterVariable.woff2") format("woff2");
 }
 
+/* Space Grotesk Bold, for the name in the logo only (served by this server,
+   SIL Open Font License). Until it loads, the system's own font. */
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/space-grotesk-700.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/space-grotesk-ext-700.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
   /* type */
   --sans: InterVariable, Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --brand-font: "Space Grotesk", var(--sans);
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 18px; --fs-2xl: 22px;
-  /* shape */
-  --r-sm: 4px; --r: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13.5px; --fs-lg: 15px; --fs-xl: 18px; --fs-2xl: 22px;
+  /* shape: soft corners, a pixel ring instead of borders (affectUI's look) */
+  --r-sm: 6px; --r: 10px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px; --r-pill: 999px;
   /* space: a 4 px grid */
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px;
-  /* motion: quick, and none for who asks for none */
-  --ease: cubic-bezier(.2, .8, .2, 1);
-  --t-fast: 120ms; --t: 180ms; --t-slow: 260ms;
+  /* motion: quick and soft, and none for who asks for none */
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --t-fast: 140ms; --t: 200ms; --t-slow: 280ms;
   /* layout */
   --rail-w: 264px; --head-h: 52px;
 
-  /* light */
-  --bg: #f6f6f7; --panel: #ffffff; --raised: #f0f1f3; --line: #e2e4e8; --line-2: #cfd2d8;
-  --text: #15171b; --muted: #5a606c;
-  --accent: #a9553a; --on-accent: #ffffff;
-  --ok: #1a7a4d; --warn: #855b06; --err: #b0342a; --info: #2c5f96;
-  --coord: #5a4b9e; --worker: #1b6a79;
+  /* light: neutral greys; the brand's albero only for what is the brand's */
+  --bg: #f5f5f5; --tray: #f0f0f0; --panel: #ffffff; --raised: #f4f4f5; --line: #ececec; --line-2: #d9d9d9;
+  --text: #171717; --ink-2: #404040; --muted: #6b6b6b; --faint: #a3a3a3;
+  --brand-ink: #14213d; /* the name in the logo: Tinta on light, white on dark */
+  --accent: #f2b90f; --on-accent: #14213d; /* albero, with tinta on it (never white: too little contrast) */
+  --on-fill: #ffffff; /* text on a filled state colour */
+  --ok: #1e8a4f; --warn: #b25e00; --err: #c4320a; --info: #2456d6;
+  --ok-soft: #e6f6ed; --warn-soft: #fff1e0; --err-soft: #fdecea; --info-soft: #eaf1ff;
+  --coord: #8a35d6; --worker: #0f7489;
+  /* the main action: a dark gradient with a light edge and a 1 px ring (light, in dark mode) */
+  --fill-top: #323137; --fill-bottom: #201e25; --fill-hover-top: #3c3b42; --fill-hover-bottom: #29272f;
+  --fill-edge-top: #4b4951; --fill-edge-bottom: #18171b; --fill-ring: #0d0d0d; --on-ink: #fafafa;
+  --focus: rgba(0, 96, 226, .7);
   --term: #15171b; --term-text: #e9ebee;
-  --scrim: rgba(15, 17, 20, .38);
-  --shadow-pop: 0 1px 2px rgba(15, 17, 20, .06), 0 12px 32px rgba(15, 17, 20, .14);
+  --scrim: rgba(0, 0, 0, .18);
+  --shadow-card: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .04);
+  --shadow-card-hover: 0 0 0 1px var(--line-2), 0 2px 6px -1px rgba(0, 0, 0, .08);
+  --shadow-pop: 0 0 0 1px rgba(0, 0, 0, .06), 0 18px 40px -12px rgba(0, 0, 0, .18), 0 4px 12px -4px rgba(0, 0, 0, .06);
+  --shadow-dialog: 0 0 0 1px rgba(0, 0, 0, .04), 0 24px 56px -12px rgba(0, 0, 0, .28), 0 6px 16px -6px rgba(0, 0, 0, .08);
   color-scheme: light;
 
   /* names the screens not yet redrawn still use */
   --panel-2: var(--raised); --idle: var(--muted);
-  --coord-soft: color-mix(in srgb, var(--coord) 12%, var(--panel));
-  --worker-soft: color-mix(in srgb, var(--worker) 12%, var(--panel));
-  --bubble: var(--raised); --bubble-in: color-mix(in srgb, var(--info) 10%, var(--panel));
+  --coord-soft: color-mix(in srgb, var(--coord) 10%, var(--panel));
+  --worker-soft: color-mix(in srgb, var(--worker) 10%, var(--panel));
+  --bubble: var(--raised); --bubble-in: var(--info-soft);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1114; --panel: #15181c; --raised: #1c2025; --line: #262a30; --line-2: #343941;
-    --text: #e9ebee; --muted: #a0a6b1;
-    --accent: #d98563; --on-accent: #17120f;
-    --ok: #4cbb87; --warn: #d6a243; --err: #ee7b70; --info: #7eb0e8;
-    --coord: #b1a5e6; --worker: #6bbccb;
+    --bg: #111113; --tray: #111113; --panel: #19191b; --raised: #26262a; --line: #2a2a2e; --line-2: #3a3a40;
+    --text: #ededed; --ink-2: #c8c8cc; --muted: #a1a1a6; --faint: #6b6b72; --brand-ink: #ffffff;
+    --accent: #f2b90f; --on-accent: #14213d; --on-fill: #121213;
+    --ok: #5fc88a; --warn: #ffb35c; --err: #ff8a7a; --info: #8ab4ff;
+    --ok-soft: #123020; --warn-soft: #3a2610; --err-soft: #3b1c14; --info-soft: #16243f;
+    --coord: #c9a2f5; --worker: #6bbccb;
+    --fill-top: #f4f4f5; --fill-bottom: #e4e4e7; --fill-hover-top: #ffffff; --fill-hover-bottom: #ececef;
+    --fill-edge-top: #ffffff; --fill-edge-bottom: #d4d4d8; --fill-ring: rgba(0, 0, 0, .6); --on-ink: #121213;
+    --focus: rgba(77, 141, 255, .8);
     --term: #0a0b0d; --term-text: #e9ebee;
-    --scrim: rgba(0, 0, 0, .55);
-    --shadow-pop: 0 1px 2px rgba(0, 0, 0, .4), 0 16px 48px rgba(0, 0, 0, .45);
+    --scrim: rgba(0, 0, 0, .5);
+    --shadow-card: 0 0 0 1px var(--line);
+    --shadow-card-hover: 0 0 0 1px var(--line-2), 0 2px 6px rgba(0, 0, 0, .4);
+    --shadow-pop: 0 0 0 1px rgba(255, 255, 255, .06), 0 18px 40px -12px rgba(0, 0, 0, .6);
+    --shadow-dialog: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 56px -12px rgba(0, 0, 0, .7);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1114; --panel: #15181c; --raised: #1c2025; --line: #262a30; --line-2: #343941;
-  --text: #e9ebee; --muted: #a0a6b1;
-  --accent: #d98563; --on-accent: #17120f;
-  --ok: #4cbb87; --warn: #d6a243; --err: #ee7b70; --info: #7eb0e8;
-  --coord: #b1a5e6; --worker: #6bbccb;
+  --bg: #111113; --tray: #111113; --panel: #19191b; --raised: #26262a; --line: #2a2a2e; --line-2: #3a3a40;
+  --text: #ededed; --ink-2: #c8c8cc; --muted: #a1a1a6; --faint: #6b6b72; --brand-ink: #ffffff;
+  --accent: #f2b90f; --on-accent: #14213d; --on-fill: #121213;
+  --ok: #5fc88a; --warn: #ffb35c; --err: #ff8a7a; --info: #8ab4ff;
+  --ok-soft: #123020; --warn-soft: #3a2610; --err-soft: #3b1c14; --info-soft: #16243f;
+  --coord: #c9a2f5; --worker: #6bbccb;
+  --fill-top: #f4f4f5; --fill-bottom: #e4e4e7; --fill-hover-top: #ffffff; --fill-hover-bottom: #ececef;
+  --fill-edge-top: #ffffff; --fill-edge-bottom: #d4d4d8; --fill-ring: rgba(0, 0, 0, .6); --on-ink: #121213;
+  --focus: rgba(77, 141, 255, .8);
   --term: #0a0b0d; --term-text: #e9ebee;
-  --scrim: rgba(0, 0, 0, .55);
-  --shadow-pop: 0 1px 2px rgba(0, 0, 0, .4), 0 16px 48px rgba(0, 0, 0, .45);
+  --scrim: rgba(0, 0, 0, .5);
+  --shadow-card: 0 0 0 1px var(--line);
+  --shadow-card-hover: 0 0 0 1px var(--line-2), 0 2px 6px rgba(0, 0, 0, .4);
+  --shadow-pop: 0 0 0 1px rgba(255, 255, 255, .06), 0 18px 40px -12px rgba(0, 0, 0, .6);
+  --shadow-dialog: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 56px -12px rgba(0, 0, 0, .7);
   color-scheme: dark;
 }
 
@@ -86,7 +130,7 @@ a { color: var(--info); text-underline-offset: 2px; }
 
 /* One focus ring everywhere, only for the keyboard. */
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; border-radius: var(--r-sm); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
 
 /* Quiet scrollbars that still show where you are. */
 * { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }

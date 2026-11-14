@@ -1,5 +1,5 @@
 /**
- * Minimal ACME client (RFC 8555) for squadra-server: gets and renews a TLS
+ * Minimal ACME client (RFC 8555) for pisha-server: gets and renews a TLS
  * certificate from Let's Encrypt with the HTTP-01 challenge. Only Node
  * built-ins — no dependencies.
  *

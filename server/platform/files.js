@@ -2,7 +2,7 @@ import { statSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { TLS, PUBLIC_URL } from './config.js'
 
-// Public files (the page, xterm.js, squadra-host) are read once and kept:
+// Public files (the page, xterm.js, pisha-host) are read once and kept:
 // every answer shares the same bytes, so requests piled up on a connection
 // that doesn't read can't make the server copy a file for each. Read again
 // only when the file changes on disk.

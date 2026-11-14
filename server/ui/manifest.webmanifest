@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "SquadraHQ",
-  "short_name": "SquadraHQ",
+  "name": "Pisha",
+  "short_name": "Pisha",
   "description": "Teams of AI agents, run by a coordinator, with an inbox for your decisions.",
   "start_url": "/",
   "scope": "/",

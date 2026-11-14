@@ -183,7 +183,7 @@ test('the shell: Ctrl+K goes anywhere, and the settings open over everything and
   await expect(page.locator('#settingsBtn')).toBeFocused()
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await page.evaluate(() => localStorage.removeItem('squadraTheme'))
+  await page.evaluate(() => localStorage.removeItem('pishaTheme'))
 })
 
 test('the shell on a phone: no sidebar, the places and the settings at the bottom, and back as an arrow', async ({ browser }) => {
@@ -297,6 +297,12 @@ test('the sessions: they are listed with their squad', async ({ page }) => {
   await expect(team.locator('.tm-person').first()).toContainText('coord')
   await expect(team.locator('.tm-person.sub', { hasText: 'worker1' })).toHaveCount(1)
   await expect(page.locator('#topTabs a[aria-current=page]')).toHaveText('List')
+  // Its whole header leads to the team, not just its name.
+  const head = team.locator('.tm-h')
+  const box = await head.boundingBox()
+  await page.mouse.click(box.x + box.width - 12, box.y + box.height / 2)
+  await expect(page).toHaveURL(/#\/q\/coord$/)
+  await page.goto(`${server.url}/?company=default#/teams`)
   // The plan its coordinator keeps: how far it is on its card, each task on its page.
   await coord.call('setPlan', { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'done', who: 'worker1' }, { title: 'Drop the old column', state: 'waiting', ref: 'GH-6', who: 'coord' }] })
   await expect(team.locator('.tm-foot')).toContainText('Ship the cart')
@@ -319,6 +325,32 @@ test('the org chart: a squad shows its coordinator and its worker', async ({ pag
   const card = page.locator('.org-card[data-squad="coord"]')
   await expect(card).toBeVisible()
   await expect(card).toContainText('worker1')
+  // Its header pressed without dragging it opens the team; by the keyboard too.
+  await card.locator('.org-head').click({ position: { x: 20, y: 20 } })
+  await expect(page).toHaveURL(/#\/q\/coord$/)
+  await page.goto(`${server.url}/?company=default#/org`)
+  await page.locator('.org-card[data-squad="coord"] .org-head').focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/#\/q\/coord$/)
+  // Its people: what its coordinator hands one shows on its card as what it is on,
+  // with a light down to it; pressing an agent opens it (its terminal, where it has one).
+  await page.goto(`${server.url}/?company=default#/org`)
+  const worker = page.locator('.org-card[data-squad="coord"] .org-agent[data-orgopen="worker1"]')
+  await expect(worker.locator('.oa-st')).toBeVisible()
+  await coord.send('worker1', 'Round the cart total to two decimals')
+  await expect(worker.locator('.oa-task')).toContainText('Round the cart total to two decimals')
+  await expect(worker.locator('.oa-clock')).toHaveText(/^\d+:\d\d$/)
+  // A task of its own in its coordinator's plan goes first, its clock kept while it stays under way.
+  const plan = { title: 'Ship the cart', tasks: [{ title: 'Round the total', state: 'doing', who: 'worker1', ref: 'GH-7' }] }
+  await coord.call('setPlan', plan)
+  await expect(worker.locator('.oa-task')).toContainText('GH-7')
+  await expect(worker.locator('.oa-task')).toContainText('Round the total')
+  await page.waitForTimeout(2100)
+  await coord.call('setPlan', plan)
+  await expect(worker.locator('.oa-clock')).toHaveText(/^0:0[2-9]$/)
+  await coord.call('setPlan', { tasks: [] })
+  await worker.click({ position: { x: 120, y: 80 } })
+  await expect(page).toHaveURL(/#\/s\/worker1$/)
 })
 
 test('a chat: it shows the history, and a new message without reloading', async ({ page }) => {
@@ -347,6 +379,12 @@ test('the inbox: what a coordinator left is there, with what it wrote kept as te
   // Nothing is open until one is picked: the list has the page.
   await expect(box.locator('.ibx-item').first()).toContainText('Migrate the <b>column</b>?')
   await expect(box.locator('.ibx-detail')).toBeHidden()
+  // Each says what it is, and how long it has waited, on a clock that runs.
+  const first = box.locator('.ibx-item').first()
+  await expect(first.locator('.ibx-side .tag')).toHaveText('Decision')
+  await expect(first.locator('.ibx-clock')).toHaveText(/^\d+:\d\d$/)
+  const at = await first.locator('.ibx-clock').textContent()
+  await expect(first.locator('.ibx-clock')).not.toHaveText(at, { timeout: 3000 })
   await box.locator('.ibx-item').first().click()
   await expect(box.locator('a[href="https://example.com/issues/421"]')).toBeVisible()
   // Esc closes it, and clicking it again opens it.
@@ -440,7 +478,7 @@ test('the inbox: a question opened from the dashboard is answered there, and one
 test('the inbox read aloud: each decision with its options, answered by voice and sent only on a yes; a note replied to', async ({ page }) => {
   // The browser's speech, played by the test: what it says is kept, what is "heard" is queued.
   await page.addInitScript(() => {
-    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    try { localStorage.setItem('pisha.voice-ok', '1') } catch {}
     window.__said = []
     window.__heard = []
     window.SpeechRecognition = class {
@@ -483,7 +521,7 @@ test('the inbox read aloud: each decision with its options, answered by voice an
 
 test('the inbox read aloud: "stop" ends it, also while it asks whether to send, and nothing is sent', async ({ page }) => {
   await page.addInitScript(() => {
-    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    try { localStorage.setItem('pisha.voice-ok', '1') } catch {}
     window.__said = []
     window.__heard = ['la uno', 'para']
     window.SpeechRecognition = class {
@@ -507,7 +545,7 @@ test('the inbox read aloud: "stop" ends it, also while it asks whether to send, 
 test('the inbox read aloud: its speed changes with a tap on the card, at once, and is remembered', async ({ page }) => {
   // A voice that keeps talking until it is cut short, as a long question would.
   await page.addInitScript(() => {
-    try { localStorage.setItem('squadra.voice-ok', '1') } catch {}
+    try { localStorage.setItem('pisha.voice-ok', '1') } catch {}
     window.__said = []
     window.SpeechRecognition = class { start() { setTimeout(() => this.onend?.(), 20) } abort() {} }
     window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text } }
@@ -548,8 +586,8 @@ test('the inbox read aloud: its speed changes with a tap on the card, at once, a
   await page.locator('#voiceBar [data-voicestop]').click()
   await expect(page.locator('#voiceBar')).toHaveCount(0)
   // Remembered here, for the next time.
-  expect(await page.evaluate(() => localStorage.getItem('squadra.voice-rate'))).toBe('1.1')
-  await page.evaluate(() => localStorage.removeItem('squadra.voice-rate'))
+  expect(await page.evaluate(() => localStorage.getItem('pisha.voice-rate'))).toBe('1.1')
+  await page.evaluate(() => localStorage.removeItem('pisha.voice-rate'))
 })
 
 test('the inbox: pending and done apart; done a page at a time, by words or team; what arrives shows by itself', async ({ page }) => {
@@ -669,7 +707,7 @@ test('a company: its activity, what it keeps, its export; deleted, and brought b
   await expect(page.locator('[name=retention_days]')).toHaveValue('30')
   const download = page.waitForEvent('download')
   await page.locator('a[href$="/company/export"]').click()
-  expect((await download).suggestedFilename()).toContain(`squadra-${co.id}-`)
+  expect((await download).suggestedFilename()).toContain(`pisha-${co.id}-`)
   const del = page.locator('[data-delete-company]')
   await del.locator('[name=confirm]').fill('not the name')
   await del.locator('button').click()
@@ -692,6 +730,25 @@ test('a terminal: it shows the screen, and what is typed reaches the machine', a
   await page.keyboard.type('hello')
   await expect(screen).toContainText('hello')
   expect(machine.typed.join('')).toContain('hello')
+})
+
+test('the inbox, running: who is at work now, with its clock, and it opens its session', async ({ page }) => {
+  const s = await startSession(server, 'busy1', 'worker', 'coord')
+  // (At work for over a minute, from one tool to its text to the next: the clock counts it all.)
+  const t0 = Date.now() - 65_000
+  await s.observe([
+    { kind: 'prompt', ts: t0 }, { kind: 'tool_start', id: 'b1', tool: 'Bash', ts: t0 + 1000, summary: 'npm test' },
+    { kind: 'tool_end', id: 'b1', tool: 'Bash', ts: t0 + 20_000, ok: true }, { kind: 'text', text: 'tests pass', ts: t0 + 30_000 },
+    { kind: 'tool_start', id: 'b2', tool: 'Bash', ts: Date.now() - 2000, summary: 'npm run lint' },
+  ])
+  await signIn(page, '#/inbox')
+  await expect(page.locator('#topTabs [data-ibxtab=running] .badge')).not.toHaveCount(0)
+  await page.locator('#topTabs [data-ibxtab=running]').click()
+  const row = page.locator('#inbox .ibx-item', { hasText: 'busy1' })
+  await expect(row.locator('.ibx-side .tag')).toHaveText('Working')
+  await expect(row.locator('.ibx-clock')).toHaveText(/^1:\d\d$/)
+  await row.click()
+  await expect(page).toHaveURL(/#\/s\/busy1$/)
 })
 
 test('the chat: what is opened stays open when more arrives, and text being selected is not redrawn away', async ({ page }) => {

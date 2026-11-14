@@ -145,7 +145,7 @@ export function sortedSessions({ archived = false } = {}) {
 }
 
 // Which squads are unfolded in the sidebar (remembered per browser).
-export const squadOpen = (() => { try { return JSON.parse(store.get(companyPref('squadraSquads')) || '{}') } catch { return {} } })()
+export const squadOpen = (() => { try { return JSON.parse(store.get(companyPref('pishaSquads')) || '{}') } catch { return {} } })()
 
 // Which agent a session runs (Claude Code, Codex CLI or Grok CLI): a small mark
 // beside its role, its name on hover. Our own marks, not the labs' logos.

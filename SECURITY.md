@@ -1,20 +1,20 @@
 # Security policy
 
-Squadra relays messages between Claude Code sessions and exposes a web dashboard, so security matters to us. Thank you for looking.
+Pisha relays messages between Claude Code sessions and exposes a web dashboard, so security matters to us. Thank you for looking.
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue. Use [GitHub private vulnerability reporting](https://github.com/roke22/SquadraHQ/security/advisories/new) or email the address on the [maintainer's profile](https://github.com/roke22). You will get an answer within a few days, and a fix in a release before any public disclosure.
+Please do **not** open a public issue. Use [GitHub private vulnerability reporting](https://github.com/roke22/pisha/security/advisories/new) or email the address on the [maintainer's profile](https://github.com/roke22). You will get an answer within a few days, and a fix in a release before any public disclosure.
 
 ## Supported versions
 
-Only the latest release gets fixes. Update the server to the latest release tag (`git fetch --tags && git checkout <latest tag>`, not `main`, which can hold a squadra-host that isn't signed yet) and run `squadra-host update` on each machine.
+Only the latest release gets fixes. Update the server to the latest release tag (`git fetch --tags && git checkout <latest tag>`, not `main`, which can hold a pisha-host that isn't signed yet) and run `pisha-host update` on each machine.
 
 ## What is in scope
 
-- `squadra-server`: authentication with accounts, codes and the server token, the dashboard, the web terminal, the message relay and ACME/HTTPS handling.
-- The `squadra` plugin: pairing, allowlists, access policy and what it sends to the server.
-- `squadra-host` and the install scripts.
+- `pisha-server`: authentication with accounts, codes and the server token, the dashboard, the web terminal, the message relay and ACME/HTTPS handling.
+- The `pisha` plugin: pairing, allowlists, access policy and what it sends to the server.
+- `pisha-host` and the install scripts.
 
 Prompt-injection through channel messages is a known class of risk; the plugin's access control and the coordinator's instructions are designed around it, and reports of bypasses are very welcome.
 
@@ -37,7 +37,7 @@ What it does not cover:
 
 - Whoever administers the server can read every company's data: messages are not encrypted end to end.
 - The server's own log is common to all companies, and its lines say which company they are about.
-- A machine can serve several companies, with one `squadra-host` per company. Under one operating-system user they are kept apart only against accidents: an agent with a shell, or a person at a terminal, can read the other company's folder. The dashboard warns about it. To really separate them, use a different operating-system user or a different machine.
+- A machine can serve several companies, with one `pisha-host` per company. Under one operating-system user they are kept apart only against accidents: an agent with a shell, or a person at a terminal, can read the other company's folder. The dashboard warns about it. To really separate them, use a different operating-system user or a different machine.
 - Whoever holds the server token can always use `/admin` and `/register`, on any company, also once there are users. What is done on `/admin` is written down in the server's audit table.
 - Someone removed from a company who could manage it may have kept its join token: replace it (the dashboard reminds you). Unused machine codes are cancelled at that moment.
 - Limits on connections and on what is being received are for the whole server, so a company can slow down the others, but not reach them.

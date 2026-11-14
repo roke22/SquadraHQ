@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { unix, now, guarded, bad, ApiError, VERSION, ROLES, AGENTS } from '../platform/index.js'
 
-export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, plans, organization, permissions }) {
+export function createDashboard(platform, { sessions, observation, machines, messaging, inbox, plans, organization, permissions, boards }) {
   const { rotateJoinToken, db, bus, broadcast, sseClients, truncateLog, dataDir, log, every } = platform
   const {
     register, approveSession, presenceOf, personaView, identityCreatedAt, identityExists, isOnline, linksOf,
@@ -88,7 +88,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
   }))
 
   const dashboardReads = {
-    // One session's history for the chat view: its events and Squadra
+    // One session's history for the chat view: its events and Pisha
     // messages it sent or received, merged by time, newest page first. Paginate
     // backwards with ?before=<next_before>. The cursor is exact (time, type, id),
     // so items sharing a millisecond are never skipped or repeated.
@@ -159,8 +159,13 @@ export function createDashboard(platform, { sessions, observation, machines, mes
         plans: plans.list(),
         squads: listSquads(),
         permissions: permissions.permissionsState(),
+        boards: boards.boardList(),
       }
     },
+    boards: () => boards.boardReads.boards(),
+    'boards/tasks': q => boards.boardReads.tasks(q),
+    'boards/task': q => boards.boardReads.task(q),
+    'boards/trash': q => boards.boardReads.trash(q),
     events(q) {
       const limit = Math.max(1, Math.min(Number(q.get('limit') ?? 300) || 300, 1000))
       const before = Number(q.get('before') ?? Number.MAX_SAFE_INTEGER)
@@ -190,7 +195,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     },
   }
 
-  // Clear a session's chat: its own activity is deleted; squadra messages stay
+  // Clear a session's chat: its own activity is deleted; pisha messages stay
   // (they're also part of the other side's chat) but are hidden from this one.
   function clearChat(name) {
     if (!identityExists(name)) throw bad('session not found')
@@ -221,6 +226,7 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     // Nor is it linked with other squads any more, nor its squad described.
     if (db.prepare('DELETE FROM squads WHERE coordinator = ?').run(name).changes) broadcast('squads', listSquads())
     plans.forget(name)
+    boards.forget(name)
     const links = linksOf(name)
     db.prepare('DELETE FROM squad_links WHERE a = ? OR b = ?').run(name, name)
     if (links.length) { broadcast('links', listLinks()); for (const n of links) void pushLinks(n) }
@@ -361,12 +367,13 @@ export function createDashboard(platform, { sessions, observation, machines, mes
     'inbox/read-all': p => inbox.resolveTells(Array.isArray(p.ids) ? p.ids.map(Number) : p.ids),
     'inbox/answer': (p, req) => answerFromInbox(p, req.actor),
     'inbox/dismiss': (p, req) => dismissFromInbox(p, req.actor),
+    ...Object.fromEntries(Object.entries(boards.boardActions).map(([k, fn]) => [k, (p, req) => fn(p, req.actor ?? null)])),
   }
 
   // Who may do each thing, at least. Whatever isn't here nobody may do, and the
   // server refuses to start (see the end): every new action says who it is for.
   const dashboardRoles = {
-    reads: { inbox: 'observer', 'inbox/done': 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer' },
+    reads: { inbox: 'observer', 'inbox/done': 'observer', timeline: 'observer', state: 'observer', events: 'observer', hosts: 'observer', messages: 'observer', stream: 'observer', boards: 'observer', 'boards/tasks': 'observer', 'boards/task': 'observer', 'boards/trash': 'manager' },
     actions: {
       'inbox/resolve': 'operator', 'inbox/read-all': 'operator', 'inbox/answer': 'operator', 'inbox/dismiss': 'operator', kick: 'operator', clear: 'operator', archive: 'operator', unarchive: 'operator',
       'terminals/open': 'operator', 'terminals/kill': 'operator', 'terminal/ticket': 'operator', 'hosts/personas': 'operator',
@@ -375,6 +382,8 @@ export function createDashboard(platform, { sessions, observation, machines, mes
       'templates/save': 'manager', 'templates/delete': 'manager', 'links/add': 'manager', 'links/delete': 'manager',
       'org/squad': 'manager', 'org/positions': 'manager', 'org/describe': 'manager',
       'permissions/save': 'manager', 'permissions/delete': 'manager', 'permissions/assign': 'manager',
+      'tasks/create': 'operator', 'tasks/update': 'operator', 'tasks/comment': 'operator', 'tasks/notify': 'operator',
+      'tasks/delete': 'manager', 'tasks/restore': 'manager', 'boards/create': 'manager', 'boards/update': 'manager', 'boards/delete': 'manager', 'boards/prefix': 'manager', 'boards/flow': 'manager', 'boards/github': 'manager', 'boards/github-off': 'manager', 'boards/github-merge': 'manager', 'boards/github-sync': 'operator', 'boards/github-watch': 'observer',
     },
   }
   for (const [table, roles] of [[dashboardActions, dashboardRoles.actions], [{ ...dashboardReads, stream: true }, dashboardRoles.reads]]) {

@@ -12,7 +12,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { randomBytes } from 'node:crypto'
-import { serverNoticeIsGood } from '../plugins/squadra/signing.js'
+import { serverNoticeIsGood } from '../plugins/pisha/signing.js'
 import { execFileSync } from 'node:child_process'
 import { tempDir } from './tempdirs.mjs'
 
@@ -20,7 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ADMIN = 'companies-admin-token-0123456789'
 const PORT = 24000 + Math.floor(Math.random() * 2000)
 const URL_ = `http://127.0.0.1:${PORT}`
-const dataDir = tempDir('squadra-companies-')
+const dataDir = tempDir('pisha-companies-')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 let server
 
@@ -38,7 +38,7 @@ async function call(path, body, auth, instance) {
   if (path === 'claimSession' && instance === undefined && body && typeof body === 'object') instance = body.instance
   const r = await fetch(`${URL_}/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Squadra-Instance': instance } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(instance ? { 'X-Pisha-Instance': instance } : {}) },
     body: JSON.stringify(body ?? {}),
   })
   return r.json()
@@ -58,7 +58,7 @@ const inbox = async secret => ok(await get('getUpdates?timeout=0', secret))
 
 before(async () => {
   server = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, SQUADRA_SERVER_TOKEN: ADMIN },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, PISHA_SERVER_TOKEN: ADMIN },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   server.stderr.on('data', d => { if (process.env.DEBUG) process.stderr.write(d) })
@@ -70,7 +70,7 @@ test('a company has its own folder, and its credentials say whose they are', asy
   const a = await newCompany('Acme')
   assert.match(a.id, /^[a-z0-9]{8}$/)
   assert.match(a.join_token, new RegExp(`^sj_${a.id}_`))
-  assert.ok(existsSync(join(dataDir, 'companies', a.id, 'squadra.db')))
+  assert.ok(existsSync(join(dataDir, 'companies', a.id, 'pisha.db')))
   assert.match(await register(a, 'prefixed'), new RegExp(`^sq_${a.id}_`))
   const en = ok(await act(a, 'hosts/enroll', { name: 'm1' }))
   const host = ok(await call('host/enroll', { code: en.code, company: a.id, info: { hostname: 'm1' } }))
@@ -259,7 +259,7 @@ test('a company at its database limit takes nothing more from its sessions, and 
   const a = await newCompany('Full')
   const [x, y] = [await register(a, 'x'), await register(a, 'y')]
   ok(await call('sendMessage', { chat_id: 'y', text: 'before' }, x))
-  const file = join(dataDir, 'companies', a.id, 'squadra.db')
+  const file = join(dataDir, 'companies', a.id, 'pisha.db')
   const direct = new DatabaseSync(file)
   direct.prepare('INSERT INTO events (session, ts, kind, data) VALUES (?, ?, ?, ?)').run('filler', Date.now(), 'status', 'x'.repeat(3 * 1024 * 1024))
   direct.close()
@@ -288,9 +288,9 @@ test('a company at its database limit takes nothing more from its sessions, and 
 
 test('on a disk about to fill up, sessions can add nothing, and can still be deleted', async () => {
   const port = PORT + 1
-  const dir = tempDir('squadra-companies-disk-')
+  const dir = tempDir('pisha-companies-disk-')
   const low = spawn(process.execPath, [join(ROOT, 'server/server.js')], {
-    env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN, SQUADRA_MIN_FREE_MB: '999999999999' },
+    env: { ...process.env, PORT: String(port), DATA_DIR: dir, PISHA_SERVER_TOKEN: ADMIN, PISHA_MIN_FREE_MB: '999999999999' },
     stdio: 'ignore',
   })
   const on = (path, body, auth = ADMIN) => fetch(`http://127.0.0.1:${port}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}` }, body: JSON.stringify(body) }).then(r => r.json())
@@ -313,7 +313,7 @@ test('exports: the copy is not made on the thread that answers everyone, one cop
   assert.doesNotMatch(readFileSync(join(ROOT, 'server/company-export.js'), 'utf8').split('const COPY_DATABASE')[0], /VACUUM/)
   const [a, b] = [await newCompany('Export one'), await newCompany('Export two')]
   // Enough that the answer doesn't fit in what the sockets hold while nobody reads it.
-  const direct = new DatabaseSync(join(dataDir, 'companies', a.id, 'squadra.db'))
+  const direct = new DatabaseSync(join(dataDir, 'companies', a.id, 'pisha.db'))
   direct.prepare('INSERT INTO events (session, ts, kind, data) VALUES (?, ?, ?, ?)').run('filler', Date.now(), 'status', randomBytes(15 * 1024 * 1024).toString('hex'))
   direct.close()
   const open = c => fetch(`${URL_}/${api(c, 'company/export')}`, { headers: { Authorization: `Bearer ${ADMIN}` } })
@@ -335,7 +335,7 @@ test('exports: the copy is not made on the thread that answers everyone, one cop
 // A machine's end of the terminal link, and a dashboard's.
 function socket(path, cred) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${PORT}${path}`, ['squadra', `auth.${cred}`])
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}${path}`, ['pisha', `auth.${cred}`])
     const inbox = []
     ws.onmessage = e => inbox.push(JSON.parse(e.data))
     ws.onopen = () => resolve({ ws, inbox })
@@ -395,7 +395,7 @@ test('links changed while a machine is away: the dashboard says so, and the mach
   const { host, connect } = await machineOf(a, 'away-box')
   const [lead, peer] = [await register(a, 'lead'), await register(a, 'peer')]
   for (const [secret, instance] of [[lead, 'inst-lead-0001'], [peer, 'inst-peer-0001']]) ok(await call('claimSession', { instance, role: 'coordinator' }, secret))
-  const direct = new DatabaseSync(join(dataDir, 'companies', a.id, 'squadra.db'))
+  const direct = new DatabaseSync(join(dataDir, 'companies', a.id, 'pisha.db'))
   direct.prepare('UPDATE identities SET host_id = ? WHERE name = ?').run(host.id, 'lead')
   direct.close()
   const added = ok(await act(a, 'links/add', { a: 'lead', b: 'peer' }))
@@ -467,7 +467,7 @@ test('the server token is what opens a company, for now; a join token or a sessi
 })
 
 test('the first company is the data of a server upgraded, untouched', async () => {
-  assert.ok(existsSync(join(dataDir, 'squadra.db')))
+  assert.ok(existsSync(join(dataDir, 'pisha.db')))
   const list = ok(await get('api/companies', ADMIN))
   const first = list.find(c => c.id === 'default')
   assert.ok(first, 'the first company is listed')
@@ -485,23 +485,23 @@ test('a server notice names its company: it can\'t be replayed in another', asyn
   // (Notices only reach a coordinator that has written to that worker.)
   ok(await call('sendMessage', { chat_id: 'worker', text: 'a task' }, coord, 'instance-coord-1'))
   ok(await call('releaseSession', { instance: 'instance-worker-1', reason: 'logout' }, worker, 'instance-worker-1'))
-  const res = await fetch(`${URL_}/getUpdates?timeout=0&instance=instance-coord-1`, { headers: { Authorization: `Bearer ${coord}`, 'X-Squadra-Instance': 'instance-coord-1' } })
-  const notice = ok(await res.json()).find(u => u.message?.squadra_notice)?.message
+  const res = await fetch(`${URL_}/getUpdates?timeout=0&instance=instance-coord-1`, { headers: { Authorization: `Bearer ${coord}`, 'X-Pisha-Instance': 'instance-coord-1' } })
+  const notice = ok(await res.json()).find(u => u.message?.pisha_notice)?.message
   assert.ok(notice, 'the notice arrived')
-  assert.equal(notice.squadra_company, a.id)
+  assert.equal(notice.pisha_company, a.id)
   const { key } = ok(await get('server-identity?nonce=0123456789abcdef'))
   const fields = { from: 'worker', to: 'coord', id: notice.message_id, date: notice.date, text: notice.text }
-  assert.ok(serverNoticeIsGood(key, notice.squadra_server_sig, { ...fields, company: a.id }))
+  assert.ok(serverNoticeIsGood(key, notice.pisha_server_sig, { ...fields, company: a.id }))
   // A session of another company, or of a server without them, doesn't take it.
-  assert.ok(!serverNoticeIsGood(key, notice.squadra_server_sig, { ...fields, company: 'otherco0' }))
-  assert.ok(!serverNoticeIsGood(key, notice.squadra_server_sig, fields))
+  assert.ok(!serverNoticeIsGood(key, notice.pisha_server_sig, { ...fields, company: 'otherco0' }))
+  assert.ok(!serverNoticeIsGood(key, notice.pisha_server_sig, fields))
 })
 
 test('a server with data keeps it as the first company, with its machines and sessions, and a copy from before', async () => {
-  const dir = tempDir('squadra-companies-up-')
+  const dir = tempDir('pisha-companies-up-')
   const port = PORT + 3000
   const start = async () => {
-    const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore' })
+    const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, PISHA_SERVER_TOKEN: ADMIN }, stdio: 'ignore' })
     await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${port}/health`)).ok } catch { return false } }, { what: 'server' })
     return proc
   }
@@ -524,10 +524,10 @@ test('a server with data keeps it as the first company, with its machines and se
     const me = ok(await on('getMe', { headers: { Authorization: `Bearer ${secret}` } }))
     assert.equal(me.id, 'veteran')
     assert.ok(ok(await on('host/ticket', { method: 'POST', headers: { Authorization: `Bearer ${host.secret}` }, body: '{}' })).ticket)
-    const copy = new DatabaseSync(join(dir, 'squadra-before-companies.db'), { readOnly: true })
+    const copy = new DatabaseSync(join(dir, 'pisha-before-companies.db'), { readOnly: true })
     assert.equal(copy.prepare("SELECT COUNT(*) AS n FROM identities WHERE name = 'veteran'").get().n, 1)
     copy.close()
-    assert.equal(statSync(join(dir, 'squadra-before-companies.db')).mode & 0o077, 0)
+    assert.equal(statSync(join(dir, 'pisha-before-companies.db')).mode & 0o077, 0)
   } finally { await stop(proc) }
 })
 
@@ -547,10 +547,10 @@ test('limits are per company, can be changed, and bad ones are refused', async (
 })
 
 test('after a restart every company is back, with its sessions, machines and limits', async () => {
-  const dir = tempDir('squadra-companies-restart-')
+  const dir = tempDir('pisha-companies-restart-')
   const port = PORT + 3100
   const start = async () => {
-    const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN }, stdio: 'ignore' })
+    const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, PISHA_SERVER_TOKEN: ADMIN }, stdio: 'ignore' })
     await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${port}/health`)).ok } catch { return false } }, { what: 'server' })
     return proc
   }
@@ -626,13 +626,13 @@ test('exporting a company: its database and attachments, in a file anyone can op
 
   const res = await fetch(`${URL_}/${api(a, 'company/export')}`, { headers: { Authorization: `Bearer ${ADMIN}` } })
   assert.equal(res.status, 200)
-  assert.match(res.headers.get('content-disposition'), new RegExp(`squadra-${a.id}-`))
-  const dir = tempDir('squadra-export-')
+  assert.match(res.headers.get('content-disposition'), new RegExp(`pisha-${a.id}-`))
+  const dir = tempDir('pisha-export-')
   writeFileSync(join(dir, 'out.tar.gz'), Buffer.from(await res.arrayBuffer()))
   execFileSync('tar', ['-xzf', 'out.tar.gz'], { cwd: dir })
   const about = JSON.parse(readFileSync(join(dir, 'company.json'), 'utf8'))
   assert.equal(about.id, a.id)
-  const db = new DatabaseSync(join(dir, 'squadra.db'), { readOnly: true })
+  const db = new DatabaseSync(join(dir, 'pisha.db'), { readOnly: true })
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM messages WHERE text = 'kept in the export'").get().n, 1)
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM messages WHERE text = 'of the other company'").get().n, 0)
   db.close()
@@ -640,16 +640,16 @@ test('exporting a company: its database and attachments, in a file anyone can op
   assert.equal(files.length, 1)
   assert.equal(readFileSync(join(dir, 'files', files[0]), 'utf8'), 'attached text')
   // Not its join token, nor anything of the server's; and nothing left behind.
-  assert.deepEqual(readdirSync(dir).sort(), ['company.json', 'files', 'out.tar.gz', 'squadra.db'])
+  assert.deepEqual(readdirSync(dir).sort(), ['company.json', 'files', 'out.tar.gz', 'pisha.db'])
   assert.ok(!readdirSync(join(dataDir, 'companies', a.id)).some(f => f.startsWith('export-')))
   assert.ok((await read(a, 'company/audit')).some(e => e.action === 'company/export'))
 })
 
 test('deleting a company: stopped at once, back if asked for, and gone when its time is up', async () => {
-  const dir = tempDir('squadra-companies-del-')
+  const dir = tempDir('pisha-companies-del-')
   const port = PORT + 3200
   const start = async grace => {
-    const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, SQUADRA_SERVER_TOKEN: ADMIN, SQUADRA_COMPANY_GRACE_MS: String(grace) }, stdio: 'ignore' })
+    const proc = spawn(process.execPath, [join(ROOT, 'server/server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir, PISHA_SERVER_TOKEN: ADMIN, PISHA_COMPANY_GRACE_MS: String(grace) }, stdio: 'ignore' })
     await waitFor(async () => { try { return (await fetch(`http://127.0.0.1:${port}/health`)).ok } catch { return false } }, { what: 'server' })
     return proc
   }
@@ -670,7 +670,7 @@ test('deleting a company: stopped at once, back if asked for, and gone when its 
     // Stopped: its sessions and its dashboard are out; its data, still there.
     assert.equal((await on('getMe', {}, secret)).error_code, 503)
     assert.equal((await on(`api/c/${a.id}/state`)).error_code, 404)
-    assert.ok(existsSync(join(dir, 'companies', a.id, 'squadra.db')))
+    assert.ok(existsSync(join(dir, 'companies', a.id, 'pisha.db')))
     ok(await on('getMe', {}, stayed.secret))
     assert.equal(ok(await on('api/companies')).find(c => c.id === a.id).status, 'deleting')
 

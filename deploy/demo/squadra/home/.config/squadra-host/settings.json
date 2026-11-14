@@ -1,0 +1,10 @@
+{
+  "folders": [
+    "/squadra/projects"
+  ],
+  "max_sessions": 8,
+  "allow_input": true,
+  "allow_resume": true,
+  "claude_command": "claude",
+  "settings_version": 3
+}

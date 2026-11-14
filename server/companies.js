@@ -19,16 +19,16 @@ const QUOTAS = ['max_sessions', 'max_messages', 'max_events', 'max_updates', 'ma
 const RETENTION = ['retention_days', 'event_hours', 'inbox_days']
 
 // How long a company waits after being deleted, in case it was a mistake.
-const GRACE_MS = Number(process.env.SQUADRA_COMPANY_GRACE_MS ?? 30 * 24 * 3600_000)
+const GRACE_MS = Number(process.env.PISHA_COMPANY_GRACE_MS ?? 30 * 24 * 3600_000)
 
 // The copy of the data taken before a server first has companies: for going back
 // if something goes wrong. It holds what sessions have deleted since, so it goes.
-const BEFORE_COMPANIES = join(DATA_DIR, 'squadra-before-companies.db')
+const BEFORE_COMPANIES = join(DATA_DIR, 'pisha-before-companies.db')
 const COPY_KEPT_MS = 7 * 24 * 3600_000
 
 export function createCompanies(server) {
   // (First: if it fails, this server is as it was.)
-  if (!existsSync(join(DATA_DIR, 'control.db')) && existsSync(join(DATA_DIR, 'squadra.db'))) copyBeforeCompanies()
+  if (!existsSync(join(DATA_DIR, 'control.db')) && existsSync(join(DATA_DIR, 'pisha.db'))) copyBeforeCompanies()
   const control = openControl()
 
   const open = new Map() // id -> a company running
@@ -43,6 +43,8 @@ export function createCompanies(server) {
   function start(r) {
     const company = createCompany(server, {
       id: r.id, dir: folderOf(r.id), quotas: quotasOf(r),
+      // (Who works in it, for its boards: a task can be one of them's.)
+      members: () => control.prepare('SELECT u.id, u.name, u.github FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.company_id = ? AND u.disabled_at IS NULL ORDER BY u.name').all(r.id),
       routeEnrollment: (hash, expires) => {
         if (r.id !== FIRST_COMPANY) control.prepare('INSERT OR REPLACE INTO enrollment_routes (code_hash, company_id, expires_at) VALUES (?, ?, ?)').run(hash, r.id, expires)
       },
@@ -72,7 +74,7 @@ export function createCompanies(server) {
       control.prepare('DELETE FROM companies WHERE id = ?').run(r.id)
       deleting.delete(r.id)
       control.prepare('INSERT INTO platform_audit (at, action, target, detail) VALUES (?, ?, ?, ?)').run(now(), 'company-deleted', r.id, r.name)
-      process.stderr.write(`squadra-server: company "${r.name}" (${r.id}) deleted, with its data\n`)
+      process.stderr.write(`pisha-server: company "${r.name}" (${r.id}) deleted, with its data\n`)
     }
   }
   setInterval(guarded(cleanup), 3600_000).unref()
@@ -162,7 +164,7 @@ export function createCompanies(server) {
       rmSync(folderOf(id), { recursive: true, force: true })
       throw err
     }
-    process.stderr.write(`squadra-server: company "${name}" (${id}) created\n`)
+    process.stderr.write(`pisha-server: company "${name}" (${id}) created\n`)
     return { ...view(row(id)), join_token: company.platform.joinToken().token }
   }
 
@@ -188,7 +190,7 @@ export function createCompanies(server) {
     deleting.add(company.id)
     open.delete(company.id)
     company.close()
-    process.stderr.write(`squadra-server: company "${r.name}" (${company.id}) stopped: it will be deleted on ${new Date(at).toISOString()}\n`)
+    process.stderr.write(`pisha-server: company "${r.name}" (${company.id}) stopped: it will be deleted on ${new Date(at).toISOString()}\n`)
     return { id: company.id, status: 'deleting', delete_after: at }
   }
   function restore(id) {
@@ -197,7 +199,7 @@ export function createCompanies(server) {
     control.prepare("UPDATE companies SET status = 'active', delete_after = NULL WHERE id = ?").run(id)
     deleting.delete(id)
     start(row(id))
-    process.stderr.write(`squadra-server: company "${r.name}" (${id}) restored\n`)
+    process.stderr.write(`pisha-server: company "${r.name}" (${id}) restored\n`)
     return view(row(id))
   }
 
@@ -245,7 +247,7 @@ export function createCompanies(server) {
         if (copying) throw new ApiError(409, 'Conflict: an export is being prepared on this server; try again in a moment')
         if (!company.platform.allow('export', 'all', 5, 3600_000)) throw new ApiError(429, 'Too Many Requests: at most 5 exports an hour')
         exporting.add(company.id)
-        try { await streamExport(company, { id: company.id, name: row(company.id).name, squadra: VERSION }, res, { oneCopy }) } finally { exporting.delete(company.id) }
+        try { await streamExport(company, { id: company.id, name: row(company.id).name, pisha: VERSION }, res, { oneCopy }) } finally { exporting.delete(company.id) }
       },
     },
     'company/delete': {
@@ -279,14 +281,14 @@ export function createCompanies(server) {
 function copyBeforeCompanies() {
   const partial = `${BEFORE_COMPANIES}.partial`
   rmSync(partial, { force: true })
-  const db = new DatabaseSync(join(DATA_DIR, 'squadra.db'))
+  const db = new DatabaseSync(join(DATA_DIR, 'pisha.db'))
   try {
     db.prepare('VACUUM INTO ?').run(partial)
     renameSync(partial, BEFORE_COMPANIES)
-    process.stderr.write(`squadra-server: a copy of the data before companies is in ${BEFORE_COMPANIES}; it is deleted after 7 days\n`)
+    process.stderr.write(`pisha-server: a copy of the data before companies is in ${BEFORE_COMPANIES}; it is deleted after 7 days\n`)
   } catch (err) {
     rmSync(partial, { force: true })
-    process.stderr.write(`squadra-server: cannot copy the data before upgrading it (${err.message}). Nothing changed\n`)
+    process.stderr.write(`pisha-server: cannot copy the data before upgrading it (${err.message}). Nothing changed\n`)
     process.exit(1)
   } finally { db.close() }
 }

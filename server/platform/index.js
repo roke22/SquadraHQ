@@ -51,7 +51,7 @@ export function createPlatform(server, { id, dir, quotas, routeEnrollment }) {
     quota: (what, otherwise) => quotas[what] ?? otherwise,
     setQuotas: limits => { quotas = limits; roomUntil = 0 },
     ensureRoom,
-    log: text => process.stderr.write(`squadra-server: ${credentialPrefix && `[${id}] `}${text}\n`),
+    log: text => process.stderr.write(`pisha-server: ${credentialPrefix && `[${id}] `}${text}\n`),
     ...credentials, ...opened, ...createStream(every),
     ...createLimits(), bus: new EventEmitter(),
   }

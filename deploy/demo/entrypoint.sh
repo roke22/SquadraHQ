@@ -1,11 +1,11 @@
 #!/bin/sh
 # Runs as root only to pick the user: the owner of the folder mounted at
-# /squadra (who created it on the computer), so the files stay theirs. A
+# /pisha (who created it on the computer), so the files stay theirs. A
 # folder Docker created by itself (root's) is given to the image's "node" user.
-# Its home folder is /squadra/home: Squadra reads the home from the user's
+# Its home folder is /pisha/home: Pisha reads the home from the user's
 # account, not from $HOME, and everything must stay in the mounted folder.
 set -eu
-D="${SQUADRA_DIR:-/squadra}"
+D="${PISHA_DIR:-/pisha}"
 mkdir -p "$D"
 if [ "$(id -u)" != 0 ]; then exec start.sh; fi # (started with --user: as is)
 uid=$(stat -c %u "$D")

@@ -1,5 +1,5 @@
 name: Feature request
-description: Something you would like Squadra to do
+description: Something you would like Pisha to do
 labels: [enhancement]
 body:
   - type: textarea
@@ -12,5 +12,5 @@ body:
   - type: textarea
     id: proposal
     attributes:
-      label: How could Squadra help
+      label: How could Pisha help
       description: Optional. If you have an idea of how it should work, describe it here.

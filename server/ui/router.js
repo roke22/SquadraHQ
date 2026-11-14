@@ -9,6 +9,7 @@ import { personaTag, sessionTerm, renderTop } from './topbar.js'
 import { buildMosaic, renderArchived } from './mosaic.js'
 import { renderInbox } from './inbox.js'
 import { renderTeams } from './teams.js'
+import { renderBoards } from './boards.js'
 import { renderTeam } from './team.js'
 import { renderSessionAside } from './session.js'
 import { renderNewTeam } from './newteam.js'
@@ -82,7 +83,7 @@ function mountSessionTerm(host, name) {
   if (state.termView?.host === host && state.termView.term === name && state.timeline) return
   state.termView?.destroy()
   state.timeline?.destroy()
-  const kept = store.get(companyPref('squadraTlFolded'))
+  const kept = store.get(companyPref('pishaTlFolded'))
   const folded = kept ? kept === '1' : matchMedia('(max-width: 900px)').matches
   $('terminal').innerHTML = `<div class="tv${folded ? ' folded' : ''}"><div class="tv-term"></div><aside class="tv-aside" aria-label="${esc(T.tlAside(name))}"><button type="button" class="icon-btn tv-fold" data-tvfold aria-expanded="${!folded}" aria-label="${esc(folded ? T.tlShow : T.tlHide)}" title="${esc(folded ? T.tlShow : T.tlHide)}">${icon('chevron', folded ? 'flip' : '')}</button><div class="tv-body"></div></aside></div>`
   state.termView = new TermView(host, name, $('terminal').querySelector('.tv-term'))
@@ -94,10 +95,11 @@ export function route() {
   closeMenu()
   // Going to a worker unfolds its squad in the sidebar, so it shows where you are.
   const c = r.view === 'session' && sessions.get(r.name)?.role === 'worker' ? sessions.get(r.name).coordinator : null
-  if (c && squadOpen[c] === false) { squadOpen[c] = true; store.set(companyPref('squadraSquads'), JSON.stringify(squadOpen)) }
+  if (c && squadOpen[c] === false) { squadOpen[c] = true; store.set(companyPref('pishaSquads'), JSON.stringify(squadOpen)) }
   $('archived').hidden = r.view !== 'archived'
   $('inbox').hidden = r.view !== 'inbox'
   $('teams').hidden = r.view !== 'teams'
+  $('boards').hidden = r.view !== 'boards' && r.view !== 'board'
   $('team').hidden = r.view !== 'team'
   $('newteam').hidden = r.view !== 'newteam'
   $('addmachine').hidden = r.view !== 'addmachine'
@@ -129,12 +131,12 @@ export function route() {
     $('session').hidden = true
     $('mosaic').hidden = false
     buildMosaic()
-  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams' || r.view === 'team' || r.view === 'newteam' || r.view === 'addmachine') {
+  } else if (r.view === 'archived' || r.view === 'org' || r.view === 'inbox' || r.view === 'teams' || r.view === 'boards' || r.view === 'board' || r.view === 'team' || r.view === 'newteam' || r.view === 'addmachine') {
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }
     clearMosaic()
     $('session').hidden = true
     $('mosaic').hidden = true
-    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else if (r.view === 'team') renderTeam(); else if (r.view === 'newteam') renderNewTeam(); else if (r.view === 'addmachine') renderAddMachine(); else renderArchived()
+    if (r.view === 'org') renderOrg(); else if (r.view === 'inbox') renderInbox(); else if (r.view === 'teams') renderTeams(); else if (r.view === 'boards' || r.view === 'board') renderBoards(); else if (r.view === 'team') renderTeam(); else if (r.view === 'newteam') renderNewTeam(); else if (r.view === 'addmachine') renderAddMachine(); else renderArchived()
   } else if (st) {
     // The session's live terminal, as in Machines: watch it and type to it.
     if (state.sessionView) { state.sessionView.destroy(); state.sessionView = null; $('session').innerHTML = '' }

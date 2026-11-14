@@ -22,7 +22,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
     const everywhere = HOST === '0.0.0.0' || HOST === '::'
     const url = PUBLIC_URL || `${scheme}://${everywhere ? '<this-machine-ip>' : HOST}:${PORT}`
     const lines = [
-      `squadra-server v${VERSION}: listening on ${scheme}://${HOST}:${PORT}${everywhere ? ' (all interfaces)' : ''} (data: ${DATA_DIR})`,
+      `pisha-server v${VERSION}: listening on ${scheme}://${HOST}:${PORT}${everywhere ? ' (all interfaces)' : ''} (data: ${DATA_DIR})`,
       '',
       // (The tokens themselves only the time they are made, not at every start:
       // logs are kept, and read, by more than whoever holds these.)
@@ -32,7 +32,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
       '',
       `  Join token — for machines: registers new sessions, nothing else (${joinToken().source}).`,
       '  Configure each machine from Claude Code with:',
-      `    /squadra:configure ${url} ${isNewToken(joinToken().source) ? joinToken().token : '<join-token>'}`,
+      `    /pisha:configure ${url} ${isNewToken(joinToken().source) ? joinToken().token : '<join-token>'}`,
       `  Dashboard: ${url}/`,
       '',
       `  Server key: ${SERVER_KEY.fingerprint} (${SERVER_KEY_FILE}). Machines and sessions remember it: back this`,
@@ -73,7 +73,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
       if (n > 256) {
         // (Said in the log, at most once a minute: behind a tunnel or proxy
         // without --trust-proxy every client shares one address.)
-        if (allowServerWide('conn-cap-log', 'all', 1)) process.stderr.write(`squadra-server: ${ip} has 256 connections open: refusing more (behind a reverse proxy or tunnel? start with --trust-proxy)\n`)
+        if (allowServerWide('conn-cap-log', 'all', 1)) process.stderr.write(`pisha-server: ${ip} has 256 connections open: refusing more (behind a reverse proxy or tunnel? start with --trust-proxy)\n`)
         socket.destroy()
       }
     })
@@ -87,7 +87,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
     const hint = err.code === 'EACCES' && port < 1024
       ? ` Ports below 1024 need privileges: run as root, grant it with "sudo setcap cap_net_bind_service=+ep $(command -v node)", or use Docker with -p ${port}:${port}.`
       : err.code === 'EADDRINUSE' ? ' Something else is already using that port.' : ''
-    process.stderr.write(`squadra-server: cannot listen on port ${port}: ${err.message}.${hint}\n`)
+    process.stderr.write(`pisha-server: cannot listen on port ${port}: ${err.message}.${hint}\n`)
     process.exit(1)
   }
 
@@ -109,7 +109,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
     const read = () => ({ key: readFileSync(TLS_KEY), cert: readFileSync(TLS_CERT) })
     let creds
     try { creds = read() } catch (err) {
-      process.stderr.write(`squadra-server: cannot read the certificate: ${err.message}\n`)
+      process.stderr.write(`pisha-server: cannot read the certificate: ${err.message}\n`)
       process.exit(2)
     }
     const srv = httpsServer(creds)
@@ -117,8 +117,8 @@ export async function startListening(server, { nowServing, joinToken, handle, on
     // Renewed by certbot or similar: pick the new files up without restarting.
     for (const f of [TLS_CERT, TLS_KEY]) {
       watchFile(f, { interval: 60_000 }, () => {
-        try { srv.setSecureContext(read()); process.stderr.write('squadra-server: certificate reloaded\n') }
-        catch (err) { process.stderr.write(`squadra-server: certificate reload failed: ${err.message}\n`) }
+        try { srv.setSecureContext(read()); process.stderr.write('pisha-server: certificate reloaded\n') }
+        catch (err) { process.stderr.write(`pisha-server: certificate reload failed: ${err.message}\n`) }
       }).unref?.()
     }
   } else {
@@ -129,7 +129,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
       email: ACME_EMAIL,
       directory: ACME_DIRECTORY,
       dir: join(DATA_DIR, 'tls'),
-      log: m => process.stderr.write(`squadra-server: ${m}\n`),
+      log: m => process.stderr.write(`pisha-server: ${m}\n`),
     })
     const challengeServer = createHttpServer((req, res) => {
       if (!guardRequest(req, res)) return
@@ -150,7 +150,7 @@ export async function startListening(server, { nowServing, joinToken, handle, on
       for (let attempt = 1; ; attempt++) {
         try { return await acme.ensureCertificate() } catch (err) {
           const delay = Math.min(60_000 * attempt, 30 * 60_000)
-          process.stderr.write(`squadra-server: could not get a certificate for ${DOMAIN}: ${err.message}\n` +
+          process.stderr.write(`pisha-server: could not get a certificate for ${DOMAIN}: ${err.message}\n` +
             `  Check that the domain's DNS points to this machine and that port ${HTTP_PORT} is reachable from the internet. Retrying in ${delay / 60_000} min.\n`)
           await new Promise(r => setTimeout(r, delay))
         }
@@ -165,16 +165,16 @@ export async function startListening(server, { nowServing, joinToken, handle, on
     await listen(https, PORT, HOST).catch(err => failListen(err, PORT))
     startupBanner('https')
     if (creds === kept && Date.now() >= kept.renewAt) {
-      acme.ensureCertificate().then(c => { if (c.renewed) { https.setSecureContext({ key: c.key, cert: c.cert }); process.stderr.write('squadra-server: certificate renewed\n') } },
-        err => process.stderr.write(`squadra-server: certificate renewal failed (will retry): ${err.message}\n`))
+      acme.ensureCertificate().then(c => { if (c.renewed) { https.setSecureContext({ key: c.key, cert: c.cert }); process.stderr.write('pisha-server: certificate renewed\n') } },
+        err => process.stderr.write(`pisha-server: certificate renewal failed (will retry): ${err.message}\n`))
     }
     // Check twice a day; renew 30 days before expiry and swap it in live.
     setInterval(async () => {
       try {
         const c = await acme.ensureCertificate()
-        if (c.renewed) { https.setSecureContext({ key: c.key, cert: c.cert }); process.stderr.write('squadra-server: certificate renewed\n') }
+        if (c.renewed) { https.setSecureContext({ key: c.key, cert: c.cert }); process.stderr.write('pisha-server: certificate renewed\n') }
       } catch (err) {
-        process.stderr.write(`squadra-server: certificate renewal failed (will retry): ${err.message}\n`)
+        process.stderr.write(`pisha-server: certificate renewal failed (will retry): ${err.message}\n`)
       }
     }, 12 * 60 * 60 * 1000).unref()
   }

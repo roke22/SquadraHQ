@@ -128,7 +128,7 @@ export function openSettings(start) {
       <p class="note settings-ver">${esc(document.querySelector('.ver')?.textContent ?? '')}</p>`
     for (const b of body.querySelectorAll('[data-theme]')) b.onclick = () => setTheme(b.dataset.theme)
     for (const b of body.querySelectorAll('[data-notify]')) b.onclick = async () => { await setNotify(b.dataset.notify); appearance() }
-    for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('squadraLang', b.dataset.lang); location.reload() } }
+    for (const b of body.querySelectorAll('[data-lang]')) b.onclick = () => { if (b.dataset.lang !== LANG) { store.set('pishaLang', b.dataset.lang); location.reload() } }
   }
 
   // Everyone in the companies you manage, a column each: their role there,
@@ -308,9 +308,21 @@ export function openSettings(start) {
     const waiting = state.me.deleting ?? []
     body.innerHTML = `<div class="set-card set-me"><span class="set-avatar" aria-hidden="true">${esc((me.name || me.email || '?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(me.name)}</b><span class="note">${esc(me.email)}</span></div></div>
       ${waiting.length ? `<table class="people"><tbody>${waiting.map(c => `<tr><td><b>${esc(c.name)}</b><br><span class="note">${esc(T.deletesOn(fmtTime(c.delete_after)))}</span></td><td><button class="btn ok" data-restore="${esc(c.id)}">${esc(T.restore)}</button></td></tr>`).join('')}</tbody></table>` : ''}
+      <h4>${esc(T.ghUserTitle)}</h4><div class="set-card"><form data-ghuser class="people-form"><label class="field"><span>${esc(T.ghUserLabel)}</span><input type="text" name="github" maxlength="40" autocomplete="off" spellcheck="false" placeholder="octocat" value="${esc(me.github ?? '')}"></label>
+      <button class="btn primary">${esc(T.save)}</button></form><p class="note">${esc(T.ghUserHint)}</p><p class="note" data-ghdone></p></div>
       <h4>${esc(T.passwordTitle)}</h4><div class="set-card"><form data-password class="people-stack"><label class="field"><span>${esc(T.currentPassword)}</span><input type="password" name="current" autocomplete="current-password" required></label>
       <label class="field"><span>${esc(T.newPassword)}</span><input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
       <button class="btn primary">${esc(T.setPassword)}</button></form><p class="note" data-done></p></div>`
+    body.querySelector('[data-ghuser]').onsubmit = async e => {
+      e.preventDefault()
+      ok()
+      try {
+        const r = await call('/auth/profile', { github: e.target.elements.github.value })
+        state.me.user = r.user
+        e.target.elements.github.value = r.user.github ?? ''
+        body.querySelector('[data-ghdone]').textContent = T.ghUserSaved
+      } catch (err) { fail(err) }
+    }
     body.querySelector('[data-password]').onsubmit = async e => {
       e.preventDefault()
       ok()

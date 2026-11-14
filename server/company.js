@@ -6,6 +6,7 @@ import { createPermissions } from './permissions/index.js'
 import { createMachines } from './machines/index.js'
 import { createOrganization } from './organization/index.js'
 import { createDashboard } from './dashboard/index.js'
+import { createBoards } from './boards/index.js'
 import { upgradeStoredData } from './data-upgrade.js'
 import { cleanExports } from './company-export.js'
 
@@ -18,8 +19,9 @@ import { cleanExports } from './company-export.js'
 //   messaging      messages, groups, attachments
 //   observation    what each session is doing
 //   permissions    permission profiles: what the agents may do without asking
-//   machines       squadra-host: joining, its link, terminals
+//   machines       pisha-host: joining, its link, terminals
 //   organization   squads, links between them, templates
+//   boards         task boards: people's and agents' tasks
 //   dashboard      what the dashboard reads and does
 export function createCompany(server, options) {
   const platform = createPlatform(server, options)
@@ -31,12 +33,13 @@ export function createCompany(server, options) {
   const permissions = createPermissions(platform, { sessions })
   const machines = createMachines(platform, { sessions, observation, permissions })
   const organization = createOrganization(platform, { sessions, messaging, observation, machines })
-  const dashboard = createDashboard(platform, { sessions, messaging, inbox, plans, observation, machines, organization, permissions })
+  const boards = createBoards(platform, { sessions, messaging, members: options.members ?? (() => []) })
+  const dashboard = createDashboard(platform, { sessions, messaging, inbox, plans, observation, machines, organization, permissions, boards })
 
   // What a session can ask for, by its name in the request.
   const methods = {
     ...observation.observationMethods, ...machines.machineMethods, ...organization.organizationMethods,
-    ...sessions.sessionMethods, ...messaging.messagingMethods, ...inbox.inboxMethods, ...plans.planMethods,
+    ...sessions.sessionMethods, ...messaging.messagingMethods, ...inbox.inboxMethods, ...plans.planMethods, ...boards.boardMethods,
   }
 
   function cleanup() {
@@ -72,5 +75,5 @@ export function createCompany(server, options) {
     try { platform.db.close() } catch {}
   }
 
-  return { id: options.id, platform, sessions, messaging, observation, machines, organization, dashboard, methods, dropClients, close }
+  return { id: options.id, platform, sessions, messaging, observation, machines, organization, boards, dashboard, methods, dropClients, close }
 }

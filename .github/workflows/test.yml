@@ -43,9 +43,16 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
+      # (When one fails: its screenshot and trace, to see what the page showed.)
+      - if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ui-test-results
+          path: test-results/
+          retention-days: 7
 
   # A release must be signed: a machine won't install one that isn't. (Only for
-  # a release: between them, squadra-host can change without being signed yet.)
+  # a release: between them, pisha-host can change without being signed yet.)
   release:
     if: github.ref_type == 'tag' || startsWith(github.head_ref, 'release-')
     runs-on: ubuntu-latest

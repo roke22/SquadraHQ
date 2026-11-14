@@ -129,12 +129,12 @@ function launchTemplateDialog(name) {
 }
 
 // A persona list's options, by kind and where they come from. (An agent
-// whose tools leave out Squadra's can't message its squad: only solo.)
+// whose tools leave out Pisha's can't message its squad: only solo.)
 export function personaOptions(list, want, solo) {
   const groups = [['skill', 'project', T.personaSkillsProject], ['skill', 'user', T.personaSkillsUser], ['agent', 'project', T.personaAgentsProject], ['agent', 'user', T.personaAgentsUser]]
   return groups.map(([kind, scope, label]) => {
     const xs = list.filter(p => p.kind === kind && p.scope === scope)
-    return xs.length ? `<optgroup label="${esc(label)}">${xs.map(p => { const off = p.no_squadra_tools && !solo; return `<option value="${esc(p.id)}" ${p.id === want && !off ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(p.name)}${off ? ` — ${esc(T.personaNoTools)}` : ''}</option>` }).join('')}</optgroup>` : ''
+    return xs.length ? `<optgroup label="${esc(label)}">${xs.map(p => { const off = p.no_pisha_tools && !solo; return `<option value="${esc(p.id)}" ${p.id === want && !off ? 'selected' : ''} ${off ? 'disabled' : ''}>${esc(p.name)}${off ? ` — ${esc(T.personaNoTools)}` : ''}</option>` }).join('')}</optgroup>` : ''
   }).join('')
 }
 

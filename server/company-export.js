@@ -71,7 +71,7 @@ export async function streamExport(company, about, res, { oneCopy = fn => fn() }
   const { dataDir } = company.platform
   const copy = join(dataDir, `export-${randomBytes(8).toString('hex')}.db`)
   try {
-    await oneCopy(() => copyDatabase(join(dataDir, 'squadra.db'), copy))
+    await oneCopy(() => copyDatabase(join(dataDir, 'pisha.db'), copy))
     const files = []
     for (const f of readdirSync(join(dataDir, 'files'))) {
       const path = join(dataDir, 'files', f)
@@ -80,13 +80,13 @@ export async function streamExport(company, about, res, { oneCopy = fn => fn() }
     const date = new Date().toISOString().slice(0, 10)
     res.writeHead(200, {
       'Content-Type': 'application/gzip',
-      'Content-Disposition': `attachment; filename="squadra-${company.id}-${date}.tar.gz"`,
+      'Content-Disposition': `attachment; filename="pisha-${company.id}-${date}.tar.gz"`,
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
     })
     const entries = [
       { name: 'company.json', text: `${JSON.stringify({ ...about, exported_at: new Date().toISOString() }, null, 2)}\n` },
-      { name: 'squadra.db', path: copy },
+      { name: 'pisha.db', path: copy },
       ...files,
     ]
     await pipeline(Readable.from(tarOf(entries)), createGzip(), res)

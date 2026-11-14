@@ -1,6 +1,6 @@
-# Demo de Squadra (Docker)
+# Demo de Pisha (Docker)
 
-El panel y una máquina que ejecuta Claude Code, en un solo contenedor: la forma más rápida de probar Squadra en un equipo. Para un uso real, el panel y las máquinas van por separado: mira el [README principal](../../README-es.md).
+El panel y una máquina que ejecuta Claude Code, en un solo contenedor: la forma más rápida de probar Pisha en un equipo. Para un uso real, el panel y las máquinas van por separado: mira el [README principal](../../README-es.md).
 
 ## Arráncala
 
@@ -8,27 +8,27 @@ Desde esta carpeta (`deploy/demo`):
 
 ```bash
 docker-compose up -d               # o bien: docker compose up -d
-cat squadra/data/server-token      # el token que crea el primer propietario (cuando haya arrancado, unos 20 s)
+cat pisha/data/server-token      # el token que crea el primer propietario (cuando haya arrancado, unos 20 s)
 ```
 
-El token también aparece en los logs, en el recuadro *Squadra demo* (`docker-compose logs`).
+El token también aparece en los logs, en el recuadro *Pisha demo* (`docker-compose logs`).
 
 1. Abre **http://localhost:7787** y crea el primer propietario con ese token. Necesitarás una app de autenticación para los códigos.
-2. **+ Nueva sesión**: carpeta `/squadra/projects/demo`, rol *Coordinador*, persona `project-lead`.
+2. **+ Nueva sesión**: carpeta `/pisha/projects/demo`, rol *Coordinador*, persona `project-lead`.
 3. La primera vez, Claude Code pide en el terminal de la sesión el tema, tu login de Claude (`/login`: abre el enlace y pega el código) y si confías en la carpeta. El login se guarda para todas las sesiones siguientes.
 4. Desde la escuadra (👥), **+ Worker**: uno con la persona `developer` y otro con `designer`. Después pide al coordinador algo pequeño.
 
 ## Dónde está todo
 
-Todo vive en `deploy/demo/squadra/`, y es tuyo:
+Todo vive en `deploy/demo/pisha/`, y es tuyo:
 
 | Carpeta | Qué |
 |---|---|
 | `data/` | El panel: sus tokens, sesiones, mensajes y plantillas |
-| `home/` | La carpeta personal del contenedor: el login y los ajustes de Claude Code, el plugin de Squadra y la credencial de la máquina |
+| `home/` | La carpeta personal del contenedor: el login y los ajustes de Claude Code, el plugin de Pisha y la credencial de la máquina |
 | `projects/` | Donde se pueden abrir sesiones. `demo/` es un proyecto de ejemplo con tres personas en `.claude/skills/` |
 
-Pon tus proyectos en `projects/` (o monta otra carpeta ahí). Borra `deploy/demo/squadra/` para empezar de cero.
+Pon tus proyectos en `projects/` (o monta otra carpeta ahí). Borra `deploy/demo/pisha/` para empezar de cero.
 
 ## Conviene saber
 

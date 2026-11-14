@@ -12,7 +12,7 @@ import { icon } from './icons.js'
 import { newSessionDialog, templatesDialog } from './squads.js'
 import { showLogin, serverVersion, olderThan } from './app.js'
 
-// machines (squadra-host): list, add, rename, disconnect, open and close sessions
+// machines (pisha-host): list, add, rename, disconnect, open and close sessions
 
 // The machine where a session runs, if it was opened from here.
 // Only on the machine the server opened it on (host_id): another machine
@@ -50,7 +50,7 @@ export function hostLine(h) {
 }
 
 // A machine's allowed folders: removable, and one more can be added, when
-// the machine lets the dashboard change them (squadra-host 0.0.3+).
+// the machine lets the dashboard change them (pisha-host 0.0.3+).
 export function folderChips(h) {
   const i = h.info ?? {}
   const editable = h.online && i.folders_from_dashboard === true
@@ -59,6 +59,40 @@ export function folderChips(h) {
     return `<span class="fchip ${home ? 'home' : ''}" title="${esc(home ? T.homeFolder : f)}"><code>${home ? '' : ''}${esc(f)}</code>${editable ? `<button type="button" data-hact="rmfolder" data-h="${esc(h.id)}" data-f="${esc(f)}" title="${esc(T.removeFolder(f))}" aria-label="${esc(T.removeFolder(f))}">✕</button>` : ''}</span>`
   }).join(' ')
   return `${chips || T.noFolders}${editable && can('manager') ? ` <button type="button" class="btn addf" data-hact="addfolder" data-h="${esc(h.id)}">${T.addFolder}</button>` : h.online && i.folders_from_dashboard === false && i.version ? ` <span class="t">· ${T.foldersLocal}</span>` : ''}`
+}
+
+// What a machine runs, one thing a line: its name on the left, its version on the right.
+function installed(h) {
+  const i = h.info ?? {}
+  const rows = [
+    ['pisha-host', i.version ? `v${i.version}` : ''],
+    [T.mcPlugin, i.plugin?.installed ? (i.plugin.version ? `v${i.plugin.version}` : T.mcYes) : ''],
+    ['Claude', i.claude ? i.claude.replace(/\s*\(Claude Code\)/, '') : ''],
+    ['tmux', i.tmux ? String(i.tmux).replace(/^tmux\s*/i, '') : ''],
+    [T.mcSystem, [i.platform, i.arch].filter(Boolean).join(' ')],
+    [T.mcHostname, i.hostname && i.hostname !== h.name ? i.hostname : ''],
+  ].filter(r => r[1])
+  return rows.length ? `<dl class="hi-dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '—'
+}
+
+// Its folders, one a line (removable when the dashboard may change them;
+// one more is added from its More menu).
+function folderList(h) {
+  const i = h.info ?? {}
+  const editable = h.online && i.folders_from_dashboard === true && can('manager')
+  const rows = (i.folders ?? []).map(f => {
+    const home = i.home && f === i.home
+    return `<li class="fchip${home ? ' home' : ''}" title="${esc(home ? T.homeFolder : f)}"><code>${esc(f)}</code>${editable ? `<button type="button" data-hact="rmfolder" data-h="${esc(h.id)}" data-f="${esc(f)}" title="${esc(T.removeFolder(f))}" aria-label="${esc(T.removeFolder(f))}">✕</button>` : ''}</li>`
+  }).join('')
+  const local = h.online && i.folders_from_dashboard === false && i.version ? `<div class="t">${T.foldersLocal}</div>` : ''
+  return `${rows ? `<ul class="hi-folders">${rows}</ul>` : esc(T.noFolders)}${local}`
+}
+
+// One part of what a machine says of itself (what it runs, its folders, its
+// limits): its icon, named for screen readers, then the part, and anything to
+// do about it in a note below.
+function infoRow(ic, label, html, notes = []) {
+  return `<div class="hi-row"><span class="hi-ic" title="${esc(label)}">${icon(ic)}<span class="sr-only">${esc(label)}</span></span><div class="hi-b"><div class="hi-t">${html}</div>${notes.filter(Boolean).map(n => `<div class="plugin-missing">${n}</div>`).join('')}</div></div>`
 }
 
 // Connected, disconnected, or enrolled and never connected yet.
@@ -83,7 +117,7 @@ function overview(all) {
 }
 // A machine that stopped answering while sessions were open on it: what to check there.
 function trouble(h) {
-  const cmd = state.company && state.company !== 'default' ? `squadra-host-${state.company} status` : 'squadra-host status'
+  const cmd = state.company && state.company !== 'default' ? `pisha-host-${state.company} status` : 'pisha-host status'
   return `<section class="card mc-trouble"><h2>${esc(T.mcNotAnswering(h.name))}</h2><p>${esc(T.mcNotAnsweringHint)}</p>
       <div class="cmdrow"><pre class="cmd">${esc(cmd)}</pre><button type="button" class="btn" data-copy>${esc(T.copy)}</button></div></section>`
 }
@@ -113,10 +147,13 @@ export function renderHosts(only) {
           </span></div>`
     }).join('')
     return `<div class="host ${h.online ? '' : 'offline'}">
-        <div class="host-head"><span class="dot ${h.online ? 'ok' : ''}"></span><span class="n">${esc(h.name)}</span>
-          <span class="m">${hostState(h)}${hostLine(h) ? ` · ${esc(hostLine(h))}` : ''}</span>
+        <div class="host-head"><span class="dot ${h.online ? 'ok' : ''}"></span><span class="n">${esc(h.name)}</span><span class="st">${hostState(h)}</span>
           <span class="acts">${h.online ? (can('operator') ? `<button class="btn" data-hact="new" data-h="${esc(h.id)}">${T.newSession}</button>` : '') : (can('manager') ? `<button class="btn danger" data-hact="disconnect" data-h="${esc(h.id)}">${T.disconnect}</button>` : '')}${can('manager') ? `<button class="btn quiet" data-hmenu="${esc(h.id)}" aria-haspopup="menu" aria-label="${esc(T.actions(h.name))}">${esc(T.svMoreShort)}</button>` : ''}</span></div>
-        ${i.shares_user ? `<div class="host-warn">${esc(T.sharedUserWarn)}</div>` : ''}<div class="host-meta">${i.version && serverVersion && olderThan(i.version, serverVersion) ? `<span class="plugin-missing">${T.hostOld(esc(i.version), esc(serverVersion))}</span>` : ''}${i.plugin ? (i.plugin.installed && i.plugin.enabled ? `<span>${T.pluginOk(esc(i.plugin.version ?? ''))}</span>` : `<span class="plugin-missing">${T.pluginMissing(!i.plugin.installed)}</span>`) : ''}<span class="folders">${T.folders}: ${folderChips(h)}</span>${i.max_sessions ? `<span>${T.maxSessions(i.max_sessions)}</span>` : ''}<span>${i.allow_input === false ? T.typingOff : T.typingOn}</span></div>
+        ${i.shares_user ? `<div class="host-warn">${esc(T.sharedUserWarn)}</div>` : ''}
+        <div class="host-info">${infoRow('package', T.mcInstalled, installed(h),
+          [i.version && serverVersion && olderThan(i.version, serverVersion) ? T.hostOld(esc(i.version), esc(serverVersion)) : '', i.plugin && !(i.plugin.installed && i.plugin.enabled) ? T.pluginMissing(!i.plugin.installed) : ''])}
+          ${infoRow('folder', T.folders, folderList(h))}
+          ${infoRow('sliders', T.mcLimits, [i.max_sessions ? T.maxSessions(i.max_sessions) : '', i.allow_input === false ? T.typingOff : T.typingOn].filter(Boolean).join(' · '))}</div>
         <div class="host-terms">${rows || `<div class="host-empty">${T.noTerminals}</div>`}</div>
       </div>`
   }).join('')}</div>`)
@@ -139,7 +176,9 @@ function openHostMenu(anchor, id) {
   if (!h) return
   state.menuEl = document.createElement('div')
   state.menuEl.className = 'menu'
-  state.menuEl.innerHTML = `<button data-a="rename">${T.rename}</button><button data-a="disconnect" class="danger">${T.disconnect}</button>`
+  // (Adding a folder too, when the machine lets the dashboard change them.)
+  const folders = h.online && h.info?.folders_from_dashboard === true ? `<button data-a="addfolder">${T.addFolder}</button>` : ''
+  state.menuEl.innerHTML = `${folders}<button data-a="rename">${T.rename}</button><button data-a="disconnect" class="danger">${T.disconnect}</button>`
   document.body.appendChild(state.menuEl)
   const r = anchor.getBoundingClientRect()
   const w = state.menuEl.offsetWidth

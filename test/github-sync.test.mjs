@@ -1,0 +1,391 @@
+// A board kept in step with a GitHub project, both ways, against a GitHub
+// that answers from memory (fake-github.mjs): columns, issues, drafts,
+// agents, types, labels, sub-issues, comments, closing and deleting.
+//
+// Run: node --test test/github-sync.test.mjs
+
+import { test, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { startFakeGithub } from './fake-github.mjs'
+import { startServer, SERVER_TOKEN as TOKEN } from './ui/harness.mjs'
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+let server, gh, URL_
+before(async () => {
+  gh = await startFakeGithub()
+  server = await startServer({ env: { PISHA_GITHUB_API: gh.url, PISHA_GITHUB_FRESH_MS: '6000' } })
+  URL_ = server.url
+})
+after(async () => { if (process.env.DEBUG) process.stderr.write(server?.log() ?? ''); await server?.stop(); await gh?.stop() })
+
+const api = async (method, params, secret, instance) => (await fetch(`${URL_}/${method}`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}`, ...(instance ? { 'X-Pisha-Instance': instance } : {}) },
+  body: JSON.stringify(params),
+})).json()
+const get = async path => (await fetch(`${URL_}/api/${path}`, { headers: { Authorization: `Bearer ${TOKEN}` } })).json()
+const post = async (path, body) => (await fetch(`${URL_}/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` }, body: JSON.stringify(body) })).json()
+
+async function session(name, role, coordinator) {
+  const secret = (await api('register', { name }, TOKEN)).result.secret
+  const instance = `inst-${name}-000001`
+  await api('claimSession', { instance, role, ...(coordinator ? { coordinator } : {}) }, secret, instance)
+  return {
+    board: async params => (await api('board', params, secret, instance)).result,
+    notices: async () => {
+      const u = await api('getUpdates', { offset: 0, timeout: 0, instance }, secret, instance)
+      return (u.result ?? []).map(x => x.message).filter(m => m?.from?.id === 'pisha:board')
+    },
+  }
+}
+const tasks = async board => (await get(`c/default/boards/tasks?board=${board}`)).result
+const task = async seq => (await get(`c/default/boards/task?id=${seq}`)).result
+const byTitle = async (board, title) => (await tasks(board)).find(t => t.title === title)
+const watch = async body => assert.ok((await post('boards/github-watch', body)).ok)
+const statusName = async (board, id) => (await get('c/default/boards')).result.boards.find(b => b.id === board.id).statuses.find(s => s.id === id)?.name
+const sync = async board => { const r = await post('boards/github-sync', { board }); assert.ok(r.ok, r.description); assert.equal(r.result.github.error, null); return r.result }
+
+test('github: a board in step with a project, both ways, and nobody told by it', async () => {
+  const coord = await session('gc1', 'coordinator')
+  await session('gdev', 'worker', 'gc1')
+  // On GitHub already: two issues and a draft.
+  const login = gh.person.addIssue({ title: 'Login page', status: 'Todo', labels: ['bug'] })
+  gh.person.comment(login.id, 'Seen on Safari')
+  const signup = gh.person.addIssue({ title: 'Signup', status: 'In Progress' })
+  gh.person.comment(signup.id, 'Use the new form component')
+  gh.person.addDraft({ title: 'Idea: dark mode' })
+
+  const board = (await post('boards/create', { name: 'Web', teams: ['gc1'] })).result
+  // Wrong address, repository or token: said so, nothing saved.
+  assert.match((await post('boards/github', { board: board.id, url: 'https://example.com/x', repo: 'acme/web', token: gh.token })).description, /its address on GitHub/)
+  assert.match((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: 'ghp_wrong' })).description, /refused the token/)
+  assert.match((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/9', repo: 'acme/web', token: gh.token })).description, /no project 9/)
+
+  let r = await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })
+  assert.ok(r.ok, r.description)
+  assert.deepEqual([r.result.title, r.result.repo], ['Web launch', 'acme/web'])
+  assert.ok(!JSON.stringify(r.result).includes(gh.token))
+  let b = await sync(board.id)
+
+  // The columns are GitHub's (theirs first), and ours GitHub lacked are there now; every card kept its column.
+  assert.deepEqual(b.statuses.slice(0, 3).map(s => s.name), ['Todo', 'In Progress', 'Done'])
+  assert.deepEqual(gh.look.options(), b.statuses.map(s => s.name))
+  assert.equal(gh.look.statusOf(login.id), 'Todo')
+  assert.equal(gh.look.statusOf(signup.id), 'In Progress')
+  // GitHub's items are tasks, in their column, with their labels and comments.
+  const st = name => b.statuses.find(s => s.name === name).id
+  const tLogin = await byTitle(board.id, 'Login page')
+  assert.equal(tLogin.status, st('Todo'))
+  assert.deepEqual(tLogin.labels.map(id => b.labels.find(l => l.id === id).name), ['bug'])
+  // (A task's comments come when it is opened.)
+  const tSignup = await task((await byTitle(board.id, 'Signup')).seq)
+  assert.deepEqual(tSignup.comments, [])
+  let before = gh.calls.length
+  await watch({ board: board.id, task: tSignup.seq, taskOpened: true })
+  assert.deepEqual(gh.calls.slice(before), ['Project', 'Item'])
+  assert.deepEqual((await task(tSignup.seq)).comments.map(c => [c.author.name, c.text]), [['@octocat', 'Use the new form component']])
+  // Opened again by someone else at once, or the board just read: GitHub isn't asked again.
+  before = gh.calls.length
+  await watch({ board: board.id, task: tSignup.seq, opened: true, taskOpened: true })
+  assert.equal(gh.calls.length, before)
+  // An agent reading a task: GitHub's comments first.
+  const seen = await coord.board({ action: 'get', id: tLogin.id })
+  assert.match(seen.comments.at(-1), /^@octocat, .*: Seen on Safari$/)
+  assert.ok(await byTitle(board.id, 'Idea: dark mode'))
+  // The project has an Agent field with the board's agents, and a Type field with its types.
+  assert.deepEqual(gh.look.field('Agent').options.map(o => o.name).sort(), ['gc1', 'gdev'])
+  assert.deepEqual(gh.look.field('Task type').options.map(o => o.name), ['Task', 'Bug'])
+
+  // Made here: an issue in the repository, in the project, with its column, agent and type.
+  const pricing = (await post('tasks/create', { board: board.id, title: 'Pricing table', status: st('In Progress'), assignee: { kind: 'session', id: 'gdev' }, type: 'Bug' })).result
+  await sync(board.id)
+  const iPricing = gh.look.issue('Pricing table')
+  assert.ok(iPricing && gh.look.inProject(iPricing.id))
+  assert.deepEqual([gh.look.statusOf(iPricing.id), gh.look.fieldOf(iPricing.id, 'Agent'), gh.look.fieldOf(iPricing.id, 'Task type')], ['In Progress', 'gdev', 'Bug'])
+  assert.match((await task(pricing.seq)).events.at(-1).data.github, /^acme\/web#\d+$/)
+  // A subtask of it: a sub-issue. A comment: on the issue, signed.
+  const sub = (await post('tasks/create', { board: board.id, title: 'Pricing: annual plan', parent: pricing.seq })).result
+  await post('tasks/comment', { id: pricing.seq, text: 'Prices are in the sheet' })
+  await sync(board.id)
+  assert.equal(gh.look.issue('Pricing: annual plan').parent, iPricing.id)
+  assert.ok(gh.calls.includes('ItemOf')) // (GitHub had put it in the project by itself)
+  assert.deepEqual((await task(sub.seq)).github?.number, gh.look.issue('Pricing: annual plan').number)
+  assert.match(iPricing.comments.at(-1).body, /^\*\*.+\*\* \(Pisha\):\n\nPrices are in the sheet$/)
+  // Done here: closed there, as completed, in its column.
+  await post('tasks/update', { id: tLogin.seq, status: st('Done') })
+  await sync(board.id)
+  assert.deepEqual([gh.look.issue('Login page').state, gh.look.issue('Login page').stateReason, gh.look.statusOf(login.id)], ['CLOSED', 'COMPLETED', 'Done'])
+
+  // Changed there: here, as GitHub's, and an agent given a task there isn't told.
+  gh.person.edit(signup.id, { title: 'Signup with Google' })
+  gh.person.close(signup.id, 'NOT_PLANNED')
+  gh.person.comment(signup.id, 'Not this quarter')
+  gh.person.setField(gh.look.issue('Pricing: annual plan').id, 'Agent', 'gdev')
+  b = await sync(board.id)
+  await sleep(600) // (opened again a moment later: read again, with its comments)
+  await watch({ board: board.id, task: tSignup.seq, taskOpened: true })
+  const signupNow = await task(tSignup.seq)
+  assert.equal(signupNow.title, 'Signup with Google')
+  assert.equal(b.statuses.find(s => s.id === signupNow.status).category, 'closed')
+  assert.deepEqual(signupNow.comments.map(c => c.text), ['Use the new form component', 'Not this quarter'])
+  assert.deepEqual(signupNow.events.at(-1).who, { kind: 'github', id: 'github', name: 'GitHub' })
+  const subNow = await task(sub.seq)
+  assert.deepEqual([subNow.assignee?.id, subNow.notify], ['gdev', 'pending'])
+  assert.deepEqual(await coord.notices(), [])
+  // (Nothing changed: nothing written there.)
+  before = gh.calls.length
+  await sync(board.id)
+  assert.deepEqual(gh.calls.slice(before).filter(c => !['Project', 'Items', 'Repository', 'Item', 'PullRequests'].includes(c)), [])
+
+  // A change here goes on its own, soon, without reading the whole board.
+  before = gh.calls.length
+  const ghState = async () => (await get('c/default/boards')).result.boards.find(x => x.id === board.id).github
+  await post('tasks/update', { id: pricing.seq, title: 'Pricing table v2' })
+  assert.ok((await ghState()).pending >= 1) // (the dashboard says it is on its way)
+  for (let i = 0; i < 100 && gh.look.issue('Pricing table v2') == null; i++) await sleep(100)
+  for (let i = 0; i < 50 && (await ghState()).pending; i++) await sleep(100)
+  assert.deepEqual([(await ghState()).pending, (await ghState()).syncing], [0, false])
+  assert.ok(gh.look.issue('Pricing table v2'))
+  // (Other changes from a moment ago may go too, each by itself: never the whole board.)
+  assert.ok(!gh.calls.slice(before).includes('Items'), gh.calls.slice(before).join())
+  assert.deepEqual(gh.calls.slice(before).filter(c => !['Project', 'Item'].includes(c)), ['UpdateIssue'])
+  assert.equal((await get('c/default/boards')).result.boards.find(x => x.id === board.id).github.error, null)
+
+  // A column renamed here: renamed there, every card where it was.
+  const statuses = b.statuses.map(({ id, name, category }) => ({ id, name: name === 'In Progress' ? 'Doing' : name, category }))
+  assert.ok((await post('boards/update', { id: board.id, statuses })).ok)
+  await sync(board.id)
+  assert.ok(gh.look.options().includes('Doing') && !gh.look.options().includes('In Progress'))
+  assert.equal(gh.look.statusOf(iPricing.id), 'Doing')
+  assert.equal(gh.look.statusOf(login.id), 'Done')
+  // A column added there: a column here.
+  gh.person.addOption('Blocked')
+  b = await sync(board.id)
+  assert.equal(b.statuses.at(-1).name, 'Blocked')
+
+  // Deleted here: out of the project, closed as not planned.
+  assert.ok((await post('tasks/delete', { id: tLogin.seq })).ok)
+  await sync(board.id)
+  assert.equal(gh.look.inProject(login.id), false)
+  assert.equal(gh.look.issue('Login page').stateReason, 'NOT_PLANNED')
+
+  // Restored here: in the project again, as it was here (done: closed as completed).
+  assert.ok((await post('tasks/restore', { id: tLogin.seq })).ok)
+  await sync(board.id) // (into the project)
+  await sync(board.id) // (its fields there)
+  assert.deepEqual([gh.look.inProject(login.id), gh.look.issue('Login page').stateReason, gh.look.statusOf(login.id)], [true, 'COMPLETED', 'Done'])
+
+  // Taken out of the project there: in the trash here; its subtask stays, with no parent here and its parent there.
+  gh.person.removeFromProject(iPricing.id)
+  before = gh.calls.length
+  await sync(board.id)
+  assert.equal(await byTitle(board.id, 'Pricing table v2'), undefined)
+  const trashed = (await get(`c/default/boards/trash?board=${board.id}`)).result.find(t => t.seq === pricing.seq)
+  assert.deepEqual(trashed.deleted_by, { kind: 'github', id: 'github', name: 'GitHub' })
+  assert.equal((await task(sub.seq)).parent, null)
+  await sync(board.id)
+  assert.equal(gh.look.issue('Pricing: annual plan').parent, iPricing.id)
+  assert.ok(!gh.calls.slice(before).some(c => ['RemoveSubIssue', 'CloseIssue', 'CreateIssue'].includes(c)), gh.calls.slice(before).join())
+  // Put back in the project there: back here.
+  gh.person.addToProject(iPricing.id)
+  await sync(board.id)
+  assert.ok(await byTitle(board.id, 'Pricing table v2'))
+
+  // Its issue deleted on GitHub: in the trash here. Restored here: what was said here wins, as a new issue.
+  const doomed = (await post('tasks/create', { board: board.id, title: 'Doomed', parent: pricing.seq })).result
+  await sync(board.id)
+  const gone = gh.look.issue('Doomed')
+  assert.ok(gone && gh.look.inProject(gone.id))
+  gh.person.deleteIssue(gone.id)
+  await sync(board.id)
+  assert.equal(await byTitle(board.id, 'Doomed'), undefined)
+  assert.ok((await post('tasks/restore', { id: doomed.seq })).ok)
+  await sync(board.id)
+  await sync(board.id)
+  await sleep(3500) // (and the push of the restore, by itself)
+  await sync(board.id)
+  assert.ok(await byTitle(board.id, 'Doomed'))
+  const reborn = gh.look.issue('Doomed')
+  assert.ok(reborn.id !== gone.id && gh.look.inProject(reborn.id))
+  assert.equal(reborn.parent, iPricing.id)
+  assert.equal(gh.look.issues().filter(i => i.title === 'Doomed').length, 1)
+
+  // Disconnected: no more GitHub, the tasks stay.
+  b = (await post('boards/github-off', { board: board.id })).result
+  assert.equal(b.github, null)
+  assert.ok(await byTitle(board.id, 'Pricing table v2'))
+})
+
+test('github: a task\'s people are the issue\'s assignees, by the GitHub user in their profile', async () => {
+  // A person says who they are on GitHub, in their profile.
+  const cookie = await server.ownerCookie()
+  const profile = async github => (await fetch(`${URL_}/auth/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: URL_, Cookie: cookie }, body: JSON.stringify({ github }) })).json()
+  assert.match((await profile('not a login!')).description, /not a GitHub user/)
+  assert.equal((await profile('@Ana-Dev')).result.user.github, 'Ana-Dev')
+  gh.person.addUser('ana-dev')
+  const ana = (await get('c/default/boards')).result.members.find(m => m.github === 'Ana-Dev')
+  assert.ok(ana)
+
+  const board = (await post('boards/create', { name: 'People' })).result
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+
+  // Hers here: hers there.
+  const footer = (await post('tasks/create', { board: board.id, title: 'Footer', people: [ana.id] })).result
+  assert.deepEqual(footer.people.map(p => p.id), [ana.id])
+  await sync(board.id)
+  const issue = gh.look.issue('Footer')
+  assert.deepEqual(gh.look.assigneesOf(issue.id), ['ana-dev'])
+  // There, octocat instead of her: here, nobody (octocat isn't one of ours).
+  gh.person.assign(issue.id, ['octocat'])
+  await sync(board.id)
+  assert.deepEqual((await task(footer.seq)).people, [])
+  // Hers again here: there too, and octocat stays.
+  await post('tasks/update', { id: footer.seq, people: [ana.id] })
+  await sync(board.id)
+  assert.deepEqual(gh.look.assigneesOf(issue.id).sort(), ['ana-dev', 'octocat'])
+
+  // Someone GitHub can't assign in the repository: still theirs here, and not asked again.
+  gh.person.addUser('outsider', { collaborator: false })
+  assert.ok((await profile('outsider')).ok)
+  const header = (await post('tasks/create', { board: board.id, title: 'Header', people: [ana.id] })).result
+  await sync(board.id)
+  assert.deepEqual(gh.look.assigneesOf(gh.look.issue('Header').id), [])
+  await sleep(3500)
+  const before = gh.calls.length
+  await sync(board.id)
+  assert.deepEqual((await task(header.seq)).people.map(p => p.id), [ana.id])
+  assert.ok(!gh.calls.slice(before).includes('AddAssignees'), gh.calls.slice(before).join())
+})
+
+test('github: pull requests that name a task are on it, and one merged takes it to done', async () => {
+  const coord = await session('gpr', 'coordinator')
+  const board = (await post('boards/create', { name: 'PRs', teams: ['gpr'] })).result
+  const mk = async title => (await post('tasks/create', { board: board.id, title })).result
+  const old = await mk('Old work'), cart = await mk('Cart'), pay = await mk('Payments'), misc = await mk('Misc')
+  // Merged before the board was connected: on the task, but it doesn't move it.
+  const before = gh.person.openPr({ title: `SQ-${old.seq}: old work` })
+  gh.person.mergePr(before)
+  await sleep(5)
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+  const oldNow = await task(old.seq)
+  assert.deepEqual(oldNow.prs.map(p => [p.number, p.state]), [[before.number, 'merged']])
+  assert.notEqual(await statusName(board, oldNow.status), 'Done')
+  assert.ok(!oldNow.events.some(e => e.what === 'pr'), 'the old ones are not news')
+
+  // Named by its branch; another closing its issue; another naming two tasks in its text.
+  const byBranch = gh.person.openPr({ title: 'Cart totals', branch: `sq-${cart.seq}-totals` })
+  const payIssue = gh.look.issue('Payments')
+  const closing = gh.person.openPr({ title: 'Stripe', body: `Closes #${payIssue.number}`, closes: [payIssue.id], draft: true })
+  const both = gh.person.openPr({ title: 'Cleanup', body: `Touches SQ-${cart.seq} and sq-${misc.seq}; not SQ-${misc.seq}0` })
+  await sync(board.id)
+  let c = await task(cart.seq)
+  assert.deepEqual(c.prs.map(p => [p.number, p.state]).sort(), [[byBranch.number, 'open'], [both.number, 'open']].sort())
+  assert.equal(c.events.filter(e => e.what === 'pr').length, 2)
+  assert.deepEqual((await task(pay.seq)).prs.map(p => [p.number, p.state]), [[closing.number, 'draft']])
+  assert.deepEqual((await task(misc.seq)).prs.map(p => p.number), [both.number])
+  // (On the cards too.)
+  assert.equal((await tasks(board.id)).find(t => t.seq === cart.seq).prs.length, 2)
+
+  // Approved, and no longer naming Misc: said so.
+  gh.person.editPr(byBranch, { review: 'APPROVED' })
+  gh.person.editPr(both, { body: `Touches SQ-${cart.seq}` })
+  await sync(board.id)
+  assert.equal((await task(cart.seq)).prs.find(p => p.number === byBranch.number).review, 'approved')
+  assert.deepEqual((await task(misc.seq)).prs, [])
+
+  // The agent reads them.
+  const got = await coord.board({ action: 'get', id: `SQ-${cart.seq}` })
+  assert.ok(got.pull_requests.some(x => x.startsWith(`#${byBranch.number} «Cart totals»: open (review: approved)`)), JSON.stringify(got.pull_requests))
+
+  // Merged: the task goes to done, here and there, said by GitHub.
+  gh.person.mergePr(byBranch)
+  await sync(board.id)
+  c = await task(cart.seq)
+  assert.equal(await statusName(board, c.status), 'Done')
+  assert.equal(c.updated_by.kind, 'github')
+  assert.ok(c.events.some(e => e.what === 'pr' && e.data.state === 'merged' && e.data.number === byBranch.number))
+  await sync(board.id)
+  assert.equal(gh.look.statusOf(gh.look.issue('Cart').id), 'Done')
+  assert.equal(gh.look.issue('Cart').state, 'CLOSED')
+
+  // The board can say not to: merged, shown, not moved.
+  const off = await post('boards/github-merge', { board: board.id, on: false })
+  assert.equal(off.result.github.merge_moves, false)
+  gh.person.editPr(closing, { draft: false })
+  gh.person.mergePr(closing)
+  await sync(board.id)
+  const p = await task(pay.seq)
+  assert.equal(p.prs[0].state, 'merged')
+  assert.notEqual(await statusName(board, p.status), 'Done')
+  // (A closed one is just closed.)
+  gh.person.closePr(both)
+  await sync(board.id)
+  assert.equal((await task(cart.seq)).prs.find(x => x.number === both.number).state, 'closed')
+})
+
+test('github: a comment edited on GitHub is edited here, one deleted there is no longer shown', async () => {
+  const board = (await post('boards/create', { name: 'Comments' })).result
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+  const t = (await post('tasks/create', { board: board.id, title: 'Search box' })).result
+  assert.ok((await post('tasks/comment', { id: t.seq, text: 'Debounce it\nby 300 ms' })).ok)
+  await sync(board.id)
+  const issue = gh.look.issue('Search box')
+  const ours = gh.look.comments(issue.id)[0]
+  const theirs = gh.person.comment(issue.id, 'Also on mobile?')
+  const gone = gh.person.comment(issue.id, 'Wrong issue, sorry')
+  const open = async () => { await sleep(600); await watch({ board: board.id, task: t.seq, taskOpened: true }); return (await task(t.seq)).comments }
+  let list = await open()
+  assert.deepEqual(list.map(c => [c.text, c.edited_at]), [['Debounce it\nby 300 ms', null], ['Also on mobile?', null], ['Wrong issue, sorry', null]])
+  // Edited there (theirs, and ours under its signature), and one deleted.
+  gh.person.editComment(issue.id, theirs.id, 'Also on mobile and tablet?')
+  gh.person.editComment(issue.id, ours.id, ours.body.replace('300 ms', '250 ms'))
+  gh.person.deleteComment(issue.id, gone.id)
+  list = await open()
+  assert.deepEqual(list.map(c => c.text), ['Debounce it\nby 250 ms', 'Also on mobile and tablet?'])
+  assert.ok(list.every(c => c.edited_at))
+  assert.equal((await tasks(board.id)).find(x => x.seq === t.seq).comments, 2)
+  // (Nothing new: nothing changed, and nothing sent again.)
+  const before = gh.calls.length
+  list = await open()
+  assert.deepEqual(list.map(c => c.text), ['Debounce it\nby 250 ms', 'Also on mobile and tablet?'])
+  assert.ok(!gh.calls.slice(before).includes('AddComment'))
+})
+
+test('github: columns changed here and there at once: GitHub\'s changes kept, ours over them', async () => {
+  const board = (await post('boards/create', { name: 'Columns' })).result
+  assert.ok((await post('boards/github', { board: board.id, url: 'https://github.com/orgs/acme/projects/3', repo: 'acme/web', token: gh.token })).ok)
+  await sync(board.id)
+  gh.person.addOption('Spare')
+  gh.person.addOption('Polish')
+  gh.person.addOption('Ready')
+  await sync(board.id)
+  const statuses = async () => (await get('c/default/boards')).result.boards.find(b => b.id === board.id).statuses
+  const before = await statuses()
+  assert.ok(before.some(s => s.name === 'Spare'))
+  // There: a column renamed, one added (with a card in it), one deleted.
+  gh.person.renameOption('Polish', 'Polishing')
+  gh.person.addOption('QA')
+  gh.person.removeOption('Spare')
+  const qa = gh.person.addIssue({ title: 'Check the forms', status: 'QA' })
+  // Here, before the board reads GitHub again: one renamed, one added.
+  const list = before.filter(s => s.name !== 'Spare').map(s => ({ id: s.id, name: s.name === 'Ready' ? 'Ready to go' : s.name, category: s.category }))
+  // (Spare isn't touched here: it stays on the list as it was.)
+  list.push({ id: before.find(s => s.name === 'Spare').id, name: 'Spare', category: before.find(s => s.name === 'Spare').category })
+  list.push({ id: null, name: 'On hold', category: 'started' })
+  const upd = await post('boards/update', { id: board.id, statuses: list }); assert.ok(upd.ok, upd.description)
+  await sync(board.id)
+  const names = (await statuses()).map(s => s.name)
+  assert.ok(names.includes('Polishing') && !names.includes('Polish'), names.join())
+  assert.ok(names.includes('Ready to go') && !names.includes('Ready') && names.includes('QA') && names.includes('On hold'), names.join())
+  assert.ok(!names.includes('Spare'), names.join())
+  assert.deepEqual(gh.look.options().slice().sort(), names.slice().sort())
+  // (The card in the column made there is in it here too, and still there.)
+  await sync(board.id)
+  const card = await byTitle(board.id, 'Check the forms')
+  assert.equal((await statuses()).find(s => s.id === card.status).name, 'QA')
+  assert.equal(gh.look.statusOf(qa.id), 'QA')
+})

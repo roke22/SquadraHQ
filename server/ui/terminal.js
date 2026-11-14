@@ -8,7 +8,7 @@ import { postJson } from './machines.js'
 let xtermReady = null
 function loadXterm() {
   if (xtermReady) return xtermReady
-  // Served by squadra-server itself (vendor/): no third-party scripts.
+  // Served by pisha-server itself (vendor/): no third-party scripts.
   const css = document.createElement('link')
   css.rel = 'stylesheet'
   css.href = '/vendor/xterm.css'
@@ -38,7 +38,7 @@ export const termLink = {
     }, () => { this.connecting = false; if (state.me) this.retry() })
   },
   open(ticket) {
-    const ws = this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/terminal`, ['squadra', `auth.${ticket}`])
+    const ws = this.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/terminal`, ['pisha', `auth.${ticket}`])
     ws.onmessage = ev => {
       let m
       try { m = JSON.parse(ev.data) } catch { return }

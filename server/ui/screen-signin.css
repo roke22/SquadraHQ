@@ -1,15 +1,22 @@
 /* Signing in, and making the first owner: one card in the middle. */
 
 #login, #splash { background: var(--bg); }
-.login-card { width: min(420px, 100%); padding: 32px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--shadow-pop); }
+.login-card { width: min(420px, 100%); padding: 32px; border: 0; border-radius: var(--r-xl); background: var(--panel); box-shadow: var(--shadow-dialog); }
 .login-card .brand { gap: 10px; margin-bottom: 8px; font-size: var(--fs-xl); font-weight: 600; letter-spacing: -.015em; }
 .login-card .brand .logo { width: 30px; height: 30px; }
+.login-card .brand .wordmark { font-size: 26px; }
 .login-card > p { margin: 4px 0 20px; color: var(--muted); line-height: 1.55; }
 .login-card .field { margin-bottom: 12px; }
 .login-card .field input { height: 38px; font-family: var(--sans); }
 .login-card .field input[name=token], .login-card .field input[name=code], .login-card .field input[name=recovery] { font-family: var(--mono); letter-spacing: .02em; }
-.login-card button[type=submit] { width: 100%; height: 40px; margin-top: 8px; border: 0; border-radius: var(--r); background: var(--info); color: var(--on-accent); font-weight: 600; transition: background-color var(--t-fast) var(--ease); }
-.login-card button[type=submit]:hover { background: color-mix(in srgb, var(--info) 88%, var(--text)); }
+/* (The main action: as .btn.primary, a dark gradient with a light edge.) */
+.login-card button[type=submit] {
+  width: 100%; height: 40px; margin-top: 8px; border: 1px solid transparent; border-radius: var(--r-md); font-weight: 500; letter-spacing: -.01em; color: var(--on-ink);
+  background: linear-gradient(var(--fill-top), var(--fill-bottom)) padding-box, linear-gradient(var(--fill-edge-top), var(--fill-edge-bottom)) border-box;
+  box-shadow: 0 0 0 1px var(--fill-ring), 0 2px 4px rgba(0, 0, 0, .1); transition: transform var(--t-fast) var(--ease);
+}
+.login-card button[type=submit]:hover { background: linear-gradient(var(--fill-hover-top), var(--fill-hover-bottom)) padding-box, linear-gradient(var(--fill-edge-top), var(--fill-edge-bottom)) border-box; }
+.login-card button[type=submit]:active { transform: scale(.98); }
 .login-card .linkish { width: auto; height: auto; margin: 2px 0 0; padding: 0; border: 0; background: none; color: var(--text); font-weight: 400; font-size: var(--fs-sm); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
 .login-err { min-height: 1.4em; margin-top: 10px; color: var(--err); font-size: var(--fs-sm); }
 .login-card .foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: var(--fs-xs); }

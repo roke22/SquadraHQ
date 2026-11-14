@@ -1,5 +1,8 @@
-/* SquadraHQ design system: components shared by every screen.
-   Loaded after the screens' own styles, so these win where both define one. */
+/* Pisha design system: components shared by every screen.
+   Loaded after the screens' own styles, so these win where both define one.
+   The look follows affectUI's free components (MIT, https://www.affectui.com,
+   see LICENSE-affectui.txt): neutral surfaces with a 1 px ring, soft corners,
+   a dark gradient for the main action and soft tints for the rest. */
 
 /* --- optical centring ------------------------------------------------------- */
 /* One-line controls centre their text on its capitals, not on the font's box
@@ -11,44 +14,55 @@
 .ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 
 /* --- buttons --------------------------------------------------------------- */
-/* A button's colour says what it does: blue for the neutral (go somewhere,
-   open, add), green for what settles something (answer, done, approve), red
-   for what stops, removes or dismisses; grey only to cancel. Filled for the
-   main action of a place, tinted for the others. (The brand's own colour is
-   for the brand, never for an action, so nothing reads as red that isn't.) */
+/* The main action of a place is dark and filled (.primary); the others are
+   white with a ring; what settles something is green, what stops, removes or
+   dismisses is red, both as a soft tint; .quiet is text only, and cancelling
+   is quiet too. (The brand's albero is for the brand, never for an action.) */
 .btn {
-  --tone: var(--info);
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: 30px; padding: 4px 11px; border: 1px solid transparent; border-radius: var(--r);
-  background: color-mix(in srgb, var(--tone) 11%, transparent); color: var(--tone); font: 500 var(--fs-md)/1.2 var(--sans);
-  white-space: nowrap; text-decoration: none; cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+  --tone: var(--text);
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 12px; border: 0; border-radius: var(--r);
+  background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .06);
+  font: 500 var(--fs-md)/1 var(--sans); letter-spacing: -.01em;
+  white-space: nowrap; text-decoration: none; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--t-fast) ease, color var(--t-fast) ease, box-shadow var(--t-fast) ease, transform var(--t-fast) var(--ease), opacity var(--t-fast) ease;
 }
-.btn.ok { --tone: var(--ok); }
-.btn.danger { --tone: var(--err); }
-.btn:hover { background: color-mix(in srgb, var(--tone) 18%, transparent); }
-.btn:active { transform: translateY(.5px); }
-.btn:disabled, .btn[aria-disabled="true"] { opacity: .5; cursor: default; pointer-events: none; }
-.btn.primary { background: var(--tone); border-color: var(--tone); color: var(--on-accent); }
-.btn.primary:hover { background: color-mix(in srgb, var(--tone) 88%, var(--text)); border-color: transparent; }
-.btn.quiet { background: transparent; }
-.btn.quiet:hover { background: color-mix(in srgb, var(--tone) 11%, transparent); }
-.btn.plain, .btn[data-cancel] { background: var(--raised); color: var(--text); }
-.btn.plain:hover, .btn[data-cancel]:hover { background: color-mix(in srgb, var(--raised) 65%, var(--line-2)); }
-.btn svg, .icon-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.btn:hover { background: var(--raised); }
+.btn:active { transform: scale(.97); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .4; cursor: default; pointer-events: none; }
+/* (Tinted: a ring in their own colour, so they measure what the ringed ones do.) */
+.btn.ok, .btn.danger { --soft: var(--ok-soft); background: var(--soft); color: var(--tone); box-shadow: 0 0 0 1px var(--soft); }
+.btn.ok { --tone: var(--ok); --soft: var(--ok-soft); }
+.btn.danger { --tone: var(--err); --soft: var(--err-soft); }
+.btn.ok:hover { --soft: color-mix(in srgb, var(--ok-soft) 86%, var(--ok)); }
+.btn.danger:hover { --soft: color-mix(in srgb, var(--err-soft) 86%, var(--err)); }
+.btn.primary {
+  background: linear-gradient(var(--fill-top), var(--fill-bottom)) padding-box, linear-gradient(var(--fill-edge-top), var(--fill-edge-bottom)) border-box;
+  border: 1px solid transparent; color: var(--on-ink);
+  box-shadow: 0 0 0 1px var(--fill-ring), 0 2px 4px rgba(0, 0, 0, .1);
+}
+.btn.primary:hover { background: linear-gradient(var(--fill-hover-top), var(--fill-hover-bottom)) padding-box, linear-gradient(var(--fill-edge-top), var(--fill-edge-bottom)) border-box; }
+/* (Filled and red: removing for good, said once more.) */
+.btn.primary.danger { background: var(--err); color: var(--on-fill); box-shadow: 0 0 0 1px color-mix(in srgb, var(--err) 80%, #000), 0 2px 4px rgba(0, 0, 0, .1); }
+.btn.primary.danger:hover { background: color-mix(in srgb, var(--err) 90%, #000); }
+.btn.quiet, .btn.plain, .btn[data-cancel] { background: transparent; color: var(--muted); box-shadow: none; }
+.btn.quiet:hover, .btn.plain:hover, .btn[data-cancel]:hover { background: var(--raised); color: var(--text); }
+.btn.quiet.ok, .btn.quiet.danger { color: var(--tone); }
+.btn svg, .icon-btn svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* A square button with only an icon (it carries an aria-label). */
 .icon-btn {
-  display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0;
+  display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0;
   border: 0; border-radius: var(--r); background: transparent; color: var(--muted);
-  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  transition: background-color var(--t-fast) ease, color var(--t-fast) ease, transform var(--t-fast) var(--ease);
 }
 .icon-btn:hover { background: var(--raised); color: var(--text); }
+.icon-btn:active { transform: scale(.94); }
 
 kbd, .kbd {
-  display: inline-flex; align-items: center; min-height: 18px; padding: 0 5px;
-  border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: var(--r-sm);
-  font: 500 var(--fs-xs)/1 var(--mono); color: var(--muted); background: var(--panel); white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px;
+  border: 0; border-radius: var(--r-sm); background: var(--panel); box-shadow: 0 0 0 1px var(--line), 0 1px 0 var(--line-2);
+  font: 500 var(--fs-xs)/1 var(--sans); color: var(--muted); white-space: nowrap;
 }
 
 /* --- state ----------------------------------------------------------------- */
@@ -69,92 +83,139 @@ kbd, .kbd {
 .role.worker { color: var(--worker); --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'/%3E%3C/svg%3E"); }
 .role.solo { color: var(--muted); --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3C/svg%3E"); }
 
-/* A count: accent for news, warn for something waiting on you. */
+/* A count: the brand's albero for news, warn for something waiting on you. */
 .badge {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  min-width: 18px; height: 18px; padding: 0 6px; border-radius: var(--r-pill);
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
   background: var(--accent); color: var(--on-accent); font: 600 var(--fs-xs)/1 var(--sans); font-variant-numeric: tabular-nums;
 }
-.badge.perm, .badge.attn { background: var(--warn); color: var(--panel); }
-.badge.soft { background: var(--raised); color: var(--muted); }
+.badge.perm, .badge.attn { background: var(--warn-soft); color: var(--warn); }
+.badge.soft { background: var(--tray); color: var(--muted); }
 
+/* A label: soft, in a tint (.ok, .warn, .err, .info), or neutral. */
 .tag {
-  display: inline-flex; align-items: center; gap: 4px; min-height: 18px; padding: 0 6px;
-  border: 1px solid var(--line-2); border-radius: var(--r-sm); font-size: var(--fs-xs); color: var(--muted); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px;
+  border: 0; border-radius: var(--r-sm); background: var(--tray); font: 500 var(--fs-xs)/1 var(--sans); color: var(--muted); white-space: nowrap;
 }
+.tag.ok { background: var(--ok-soft); color: var(--ok); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.err { background: var(--err-soft); color: var(--err); }
+.tag.info { background: var(--info-soft); color: var(--info); }
 
 /* --- controls -------------------------------------------------------------- */
-/* Options that exclude each other. */
-.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-md); background: var(--raised); border: 0; overflow: visible; }
+/* Options that exclude each other: a grey tray, the chosen one a white pill. */
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: calc(var(--r) + 1px); background: var(--tray); border: 0; overflow: visible; }
 .seg button, .seg a {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 3px 10px;
-  border: 0; border-radius: var(--r); background: none; color: var(--muted); font: 500 var(--fs-sm)/1.2 var(--sans);
-  text-decoration: none; white-space: nowrap; transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px;
+  border: 0; border-radius: calc(var(--r) - 2px); background: none; color: var(--muted); font: 500 var(--fs-md)/1 var(--sans);
+  text-decoration: none; white-space: nowrap; transition: background-color var(--t-fast) ease, color var(--t-fast) ease, box-shadow var(--t-fast) ease;
 }
 .seg button:hover, .seg a:hover { color: var(--text); }
-.seg button.on, .seg a.on, .seg [aria-current="page"], .seg [aria-pressed="true"] { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
-
-.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: var(--s3); }
-.field > span { font-size: var(--fs-sm); font-weight: 500; color: var(--muted); }
-.field .hint { font-size: var(--fs-sm); color: var(--muted); }
-.input, .field input:not([type=checkbox]):not([type=radio]), .field select, .field textarea, table.people select {
-  width: 100%; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: var(--r);
-  background: var(--bg); color: var(--text); font: 400 var(--fs-md)/1.4 var(--sans);
-  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+.seg button.on, .seg a.on, .seg [aria-current="page"], .seg [aria-pressed="true"] {
+  background: var(--panel); color: var(--text);
+  box-shadow: 0 0 0 .5px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .08), 0 2px 8px -2px rgba(0, 0, 0, .06);
 }
-table.people select { width: auto; min-height: 28px; padding: 3px 8px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--s4); }
+.field > span { font-size: var(--fs-md); font-weight: 500; color: var(--text); }
+.field .hint { font-size: var(--fs-sm); color: var(--muted); }
+/* A field: white, a 1 px ring that darkens on hover and when it has the focus. */
+.input, .field input:not([type=checkbox]):not([type=radio]), .field select, .field textarea, table.people select {
+  width: 100%; min-height: 36px; padding: 8px 12px; border: 0; border-radius: var(--r);
+  background: var(--panel); color: var(--text); font: 400 var(--fs-md)/1.4 var(--sans);
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, .04);
+  transition: box-shadow var(--t-fast) ease, background-color var(--t-fast) ease;
+}
+.input::placeholder, .field input::placeholder, .field textarea::placeholder { color: var(--faint); opacity: 1; }
+.input:hover, .field input:not([type=checkbox]):not([type=radio]):hover, .field select:hover, .field textarea:hover, table.people select:hover { box-shadow: 0 0 0 1px var(--line-2), 0 1px 2px rgba(0, 0, 0, .04); }
+table.people select { width: auto; min-height: 30px; padding: 4px 10px; }
 /* One height for every one-line field, typed or chosen. */
-.input:not(textarea), .field input:not([type=checkbox]):not([type=radio]), .field select { height: 34px; }
+.input:not(textarea), .field input:not([type=checkbox]):not([type=radio]), .field select { height: 36px; padding-top: 0; padding-bottom: 0; }
+.field select, table.people select, select.input {
+  appearance: none; padding-right: 32px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238f8f8f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 16px;
+}
 .field textarea { resize: vertical; }
 .input:focus-visible, .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible, table.people select:focus-visible {
-  outline: none; border-color: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 22%, transparent);
+  outline: none; box-shadow: 0 0 0 1px var(--line-2), 0 0 0 4px color-mix(in srgb, var(--focus) 22%, transparent);
 }
-.check { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-md); margin-bottom: var(--s3); }
-.check input { margin-top: 3px; accent-color: var(--info); }
+.input:disabled, .field input:disabled, .field select:disabled, .field textarea:disabled { background: var(--raised); color: var(--muted); cursor: not-allowed; }
+
+/* A box to tick: drawn, not the system's; dark when ticked, like the main action. */
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-md); margin-bottom: var(--s3); cursor: pointer; }
+input[type=checkbox] {
+  appearance: none; flex: none; width: 16px; height: 16px; margin: 2px 0 0; border-radius: 5px; cursor: pointer;
+  background: var(--panel); box-shadow: 0 0 0 1px var(--line-2), 0 1px 2px rgba(0, 0, 0, .06);
+  display: inline-grid; place-items: center; transition: background-color var(--t-fast) ease, box-shadow var(--t-fast) ease;
+}
+input[type=checkbox]:hover { box-shadow: 0 0 0 1px var(--muted), 0 1px 2px rgba(0, 0, 0, .06); }
+input[type=checkbox]:checked { background: linear-gradient(var(--fill-top), var(--fill-bottom)); box-shadow: 0 0 0 1px var(--fill-ring); }
+input[type=checkbox]:checked::after {
+  content: ""; width: 10px; height: 10px; background: var(--on-ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+input[type=checkbox]:disabled { opacity: .45; cursor: not-allowed; }
+input[type=checkbox]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.check input { margin-top: 2px; }
+input[type=radio] { accent-color: var(--text); }
 
 /* --- surfaces -------------------------------------------------------------- */
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); min-width: 0; }
+.card { background: var(--panel); border: 0; border-radius: var(--r-lg); box-shadow: var(--shadow-card); min-width: 0; }
 
+/* A menu: a white sheet with a soft shadow; its rows light up grey. */
 .menu {
-  position: fixed; z-index: 60; min-width: 200px; padding: 4px;
-  background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-pop);
-  animation: ds-pop var(--t-fast) var(--ease);
+  position: fixed; z-index: 60; min-width: 200px; padding: 5px;
+  background: var(--panel); border: 0; border-radius: calc(var(--r) + 4px); box-shadow: var(--shadow-pop);
+  animation: ds-pop var(--t) var(--ease);
 }
-.menu button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; padding: 5px 10px; border: 0; border-radius: var(--r); background: none; text-align: left; font-size: var(--fs-md); }
-.menu button:hover, .menu button:focus-visible { background: var(--raised); outline: none; }
-.menu button.danger { color: var(--err); }
-.menu button:disabled { color: var(--muted); background: none; cursor: default; }
-.menu .hint { padding: 2px 10px 6px; font-size: var(--fs-sm); color: var(--muted); }
+.menu button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; padding: 0 10px; border: 0; border-radius: calc(var(--r-sm) + 3px); background: none; text-align: left; font-size: var(--fs-md); color: var(--ink-2); transition: background-color 80ms ease, color 80ms ease; }
+.menu button svg { color: var(--faint); }
+.menu button:hover, .menu button:focus-visible { background: var(--raised); color: var(--text); outline: none; }
+.menu button:hover svg, .menu button:focus-visible svg { color: var(--text); }
+.menu button.danger, .menu button.danger svg { color: var(--err); }
+.menu button.danger:hover { background: var(--err-soft); }
+.menu button:disabled { color: var(--faint); background: none; cursor: default; }
+.menu .hint { padding: 4px 10px 6px; font-size: var(--fs-sm); color: var(--muted); }
 
+/* A dialog: a white card with its buttons on a grey band below. */
 .modal-bg { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: var(--s4); background: var(--scrim); animation: ds-fade var(--t) var(--ease); }
 .modal {
-  width: min(460px, 100%); padding: var(--s5); background: var(--panel); border: 1px solid var(--line-2);
-  border-radius: var(--r-lg); box-shadow: var(--shadow-pop); animation: ds-pop var(--t) var(--ease);
+  --pad: var(--s5);
+  width: min(460px, 100%); padding: var(--pad); background: var(--panel); border: 0;
+  border-radius: var(--r-xl); box-shadow: var(--shadow-dialog); animation: ds-rise var(--t-slow) var(--ease);
 }
-.modal.wide { width: min(700px, 100%); }
-.modal h3 { margin: 0 0 var(--s4); font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.005em; }
+.modal.wide { width: min(720px, 100%); }
+.modal h3 { margin: 0 0 var(--s4); font-size: var(--fs-lg); font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 .modal h3 + p { margin-top: calc(var(--s2) * -1); }
 .modal p { margin: 0 0 var(--s4); color: var(--muted); }
 .modal p.hint { margin: 0 0 var(--s3); font-size: var(--fs-sm); }
 .err-hint { margin-top: 2px; color: var(--err); font-size: var(--fs-sm); }
 .modal .err { color: var(--err); font-size: var(--fs-sm); min-height: 1.2em; }
 .modal .actions { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s4); }
+/* (The last one, closing the dialog: on the grey band, as wide as it.) */
+.modal > .actions:last-child, .modal > form:last-child > .actions:last-child {
+  margin: var(--s4) calc(var(--pad) * -1) calc(var(--pad) * -1); padding: 12px var(--pad);
+  background: var(--tray); border-top: 1px solid var(--line); border-radius: 0 0 var(--r-xl) var(--r-xl);
+}
 
-.cmd { background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; font: 12px/1.55 var(--mono); }
+.cmd { background: var(--raised); border: 0; box-shadow: 0 0 0 1px var(--line); border-radius: var(--r); padding: 10px 12px; font: 12px/1.55 var(--mono); }
 
 @keyframes ds-fade { from { opacity: 0; } }
-@keyframes ds-pop { from { opacity: 0; transform: translateY(4px) scale(.985); } }
+@keyframes ds-pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes ds-rise { from { opacity: 0; transform: translateY(8px) scale(.98); filter: blur(2px); } }
 
 /* --- empty states ---------------------------------------------------------- */
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--s2); padding: 64px var(--s5); text-align: center; color: var(--muted); }
 .empty b { color: var(--text); font-size: var(--fs-lg); font-weight: 600; }
 
 /* A quiet button at either end of a row lines its text up with the text around it. */
-.tq-h > .btn.quiet:last-child, .nt-card-h > .btn.quiet:last-child { margin-right: -11px; }
+.tq-h > .btn.quiet:last-child, .nt-card-h > .btn.quiet:last-child { margin-right: -12px; }
 .tq-act.quiet { margin-left: -1px; }
 
 /* An empty place: its mark, what it is, what to do, and the action. */
-.empty .empty-ic { width: 40px; height: 40px; stroke-width: 1.3; color: var(--line-2); margin-bottom: 4px; }
+.empty .empty-ic { width: 44px; height: 44px; padding: 11px; border-radius: var(--r-md); stroke-width: 1.6; color: var(--muted); background: var(--panel); box-shadow: var(--shadow-card); margin-bottom: 8px; }
 .empty > span { max-width: 380px; }
 .empty > .btn { margin-top: var(--s2); }
 
