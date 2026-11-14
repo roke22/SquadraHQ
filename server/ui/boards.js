@@ -362,7 +362,7 @@ export function boardsHead(r) {
   const right = [
     ghStatus(b),
     can('operator') && b.pending ? `<button class="btn ok" data-bnotify>${esc(T.notifyTeams(b.pending))}</button>` : '',
-    can('operator') && !b.archived_at ? `<a class="btn primary" href="#/b/${b.id}/new">${esc(T.newTask)}</a>` : '',
+    can('operator') && !b.archived_at ? `<a class="btn primary" href="#/b/${b.id}/new" data-newtaskhead>${esc(T.newTask)}</a>` : '',
     can('manager') && b.trash ? `<button class="icon-btn" data-btrash title="${esc(T.bTrash(b.trash))}" aria-label="${esc(T.bTrash(b.trash))}">${icon('trash')}</button>` : '',
     can('manager') ? `<button class="icon-btn" data-bsettings title="${esc(T.boardSettings)}" aria-label="${esc(T.boardSettings)}">${icon('settings')}</button>` : '',
   ].join('')
@@ -429,8 +429,17 @@ function panelHtml(b, t) {
 
 let newStatus = null
 let newParent = null // (a subtask being added: the task it is of)
+// A new task's panel, drawn at once (not when the address has changed): what is
+// typed goes into it, never into the task that was open before.
+function openNew(boardId) {
+  drawNew(boardOf(boardId))
+  if (currentRoute().task !== 'new') location.hash = `#/b/${boardId}/new`
+}
 function drawNew(b) {
   const panel = $('boards').querySelector('.bd-panel')
+  if (!b || !panel) return
+  panel.hidden = false
+  $('boards').querySelector('.bd')?.classList.add('with-panel')
   const status = newStatus ?? (b.statuses.find(s => s.category === 'unstarted') ?? b.statuses[0])?.id
   // (In a column someone handles: theirs, as the server will make it.)
   detail = { seq: 'new', task: { title: '', status, labels: [], priority: 0, assignee: statusOf(b, status)?.handler ?? null, parent: newParent }, dirty: false }
@@ -816,7 +825,7 @@ $('boards').addEventListener('click', e => {
   const step = e.target.closest('[data-colflow]')
   if (step) { const b = boardOf(currentRoute().board); const s = statusOf(b, Number(step.dataset.colflow)); if (s) void loadPeople().then(() => flowDialog(b, s)); return }
   const add = e.target.closest('[data-newtask]')
-  if (add) { newStatus = Number(add.dataset.newtask); newParent = null; detail = null; const id = currentRoute().board; if (currentRoute().task === 'new') drawNew(boardOf(id)); else location.hash = `#/b/${id}/new`; return }
+  if (add) { newStatus = Number(add.dataset.newtask); newParent = null; openNew(currentRoute().board); return }
   if (e.target.closest('[data-bdelete]') && detail?.task?.seq) {
     const t = detail.task
     const b = boardOf(currentRoute().board)
@@ -829,8 +838,8 @@ $('boards').addEventListener('click', e => {
   }
   if (e.target.closest('[data-addsub]') && detail?.task?.seq) {
     const parent = detail.task
-    newStatus = null; newParent = parent.seq; detail = null
-    location.hash = `#/b/${currentRoute().board}/new`
+    newStatus = null; newParent = parent.seq
+    openNew(currentRoute().board)
     return
   }
   // A card, a row or a subtask: open it (its title is the link; the rest of it too).
@@ -891,6 +900,7 @@ $('boards').addEventListener('keydown', e => {
 // The header's buttons (see topbar.js).
 export function boardsTopClick(e) {
   if (e.target.closest('[data-newboard]')) { newBoardDialog(); return true }
+  if (e.target.closest('[data-newtaskhead]') && currentRoute().board) { e.preventDefault(); newStatus = null; newParent = null; openNew(currentRoute().board); return true }
   const b = boardOf(currentRoute().board)
   const m = e.target.closest('[data-bmode]')
   if (m) { store.set(companyPref('pishaBoardMode'), m.dataset.bmode); soon(renderBoard); soon(renderTop); return true }

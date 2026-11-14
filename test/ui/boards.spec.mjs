@@ -69,8 +69,9 @@ test('a board: handed out quietly, the team told when the person says so, moved,
   await expect(page).toHaveURL(/#\/b\/\d+\/SQ-1$/)
   const c1 = page.locator('.bd-card', { hasText: 'Write the launch post' })
   await expect(c1.locator('.bd-pending')).toHaveText('Not told')
-  // A second one, for the coordinator itself, also not yet.
-  await page.locator('.bd-col[data-cat=unstarted] [data-newtask]').click()
+  // A second one, for the coordinator itself, also not yet. (Its panel is there the
+  // moment + is pressed: what is typed never lands in the task that was open.)
+  expect(await page.evaluate(() => { document.querySelector('.bd-col[data-cat=unstarted] [data-newtask]').click(); return document.querySelector('.bd-panel-h .bd-id').textContent })).toBe('New task')
   await f.locator('[name=title]').fill('Record the demo')
   await f.locator('[name=assignee]').selectOption('s:lead')
   await f.locator('[type=submit]').click()

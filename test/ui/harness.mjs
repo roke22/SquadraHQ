@@ -87,10 +87,12 @@ export async function startSession(server, name, role, coordinator, secret, { ag
   const opts = { auth: secret, instance }
   await server.call('claimSession', { instance, role, coordinator, ...(agent ? { agent } : {}) }, opts)
   let stopped = false
-  const stop = new AbortController()
+  // (One signal per request: reusing one piles a listener on it each time.)
+  let stop = new AbortController()
   const polling = (async () => {
     let offset = 0
     while (!stopped) {
+      stop = new AbortController()
       try {
         const res = await fetch(`${server.url}/getUpdates`, {
           method: 'POST',
