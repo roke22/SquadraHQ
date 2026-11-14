@@ -969,3 +969,18 @@ test('people in all companies: a column each, the role changed in place, and one
   await expect(page.locator('#settings .roles-help')).toContainText('answers in the inbox')
   void other
 })
+
+test('the org chart: a message between linked teams runs along their link', async ({ page }) => {
+  const other = await startSession(server, 'linkc', 'coordinator')
+  await signIn(page, '#/org')
+  await page.evaluate(() => import('/ui/machines.js').then(m => m.postJson('/api/links/add', { a: 'coord', b: 'linkc' })))
+  const label = page.locator('.org-label[data-la][data-lb]').filter({ hasText: /^\d+$/ })
+  await expect(label).toHaveText('0')
+  await other.send('coord', 'The landing page copy is ready for your team')
+  await expect(page.locator('.org-lines .run')).toHaveCount(1)
+  await expect(label).toHaveClass(/got/)
+  await expect(label).toHaveText('1')
+  // (Only while it runs.)
+  await expect(page.locator('.org-lines .run')).toHaveCount(0, { timeout: 4000 })
+  await page.evaluate(() => import('/ui/machines.js').then(m => m.postJson('/api/links/delete', { a: 'coord', b: 'linkc' })))
+})

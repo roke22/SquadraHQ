@@ -109,6 +109,18 @@ function orgLinkPath(p, q) {
   const d = Math.max(30, Math.abs(y2 - y1) / 2) * (down ? 1 : -1)
   return { d: `M${pc} ${y1} C${pc} ${y1 + d} ${qc} ${y2 - d} ${qc} ${y2}`, mx: (pc + qc) / 2, my: (y1 + y2) / 2 }
 }
+// A message between two linked coordinators: a light runs along their link,
+// from the one who wrote to the other, and its count pulses.
+const linkFlashes = new Map() // "from>to" -> when
+const LINK_FLASH = 1800
+export function flashLink(from, to) {
+  linkFlashes.set(`${from}>${to}`, now())
+  if (currentRoute().view !== 'org') return
+  soon(renderOrg)
+  setTimeout(() => { linkFlashes.delete(`${from}>${to}`); if (currentRoute().view === 'org') soon(renderOrg) }, LINK_FLASH + 100)
+}
+const flashing = (from, to) => now() - (linkFlashes.get(`${from}>${to}`) ?? 0) < LINK_FLASH
+
 function orgLinesHtml() {
   let paths = '', labels = ''
   for (const l of state.links) {
@@ -118,8 +130,9 @@ function orgLinesHtml() {
     const n = recentOf(l)
     // (Amber from three quarters of what two coordinators may send each other in an hour.)
     const cls = n >= 60 ? 'full' : n >= 45 ? 'warn' : ''
-    paths += `<path class="l ${cls}" d="${d}"/><path class="hit" d="${d}" data-la="${esc(l.a)}" data-lb="${esc(l.b)}"/>`
-    labels += `<button class="org-label ${cls}" style="left:${Math.round(mx)}px;top:${Math.round(my)}px" data-la="${esc(l.a)}" data-lb="${esc(l.b)}" title="${esc(T.orgLinkRecent(n))}">${n}</button>`
+    const runs = [[l.a, l.b, p, q], [l.b, l.a, q, p]].filter(([f, t]) => flashing(f, t)).map(([, , from, to]) => `<path class="run" pathLength="100" d="${orgLinkPath(from, to).d}"/>`).join('')
+    paths += `<path class="l ${cls}" d="${d}"/>${runs}<path class="hit" d="${d}" data-la="${esc(l.a)}" data-lb="${esc(l.b)}"/>`
+    labels += `<button class="org-label ${cls}${runs ? ' got' : ''}" style="left:${Math.round(mx)}px;top:${Math.round(my)}px" data-la="${esc(l.a)}" data-lb="${esc(l.b)}" title="${esc(T.orgLinkRecent(n))}">${n}</button>`
   }
   return { paths, labels }
 }

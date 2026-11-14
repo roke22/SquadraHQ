@@ -101,7 +101,13 @@
 .org-extra { border-radius: 18px; border: 1.5px dashed var(--line-2); background: none; padding: 8px; display: flex; flex-direction: column; gap: 8px; width: auto; }
 .org-extra .org-agent { width: 232px; }
 
-@media (prefers-reduced-motion: reduce) { .oa-wires .run, .org-agent.got, .oa-spin { animation: none; } }
+/* A message between linked teams: a light along their link, and its count pulses. */
+.org-lines .run { fill: none; stroke: var(--coord); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 16 100; animation: org-link-run 1.6s cubic-bezier(.4, 0, .2, 1) both; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--coord) 75%, transparent)); }
+@keyframes org-link-run { from { stroke-dashoffset: 16; } to { stroke-dashoffset: -100; } }
+.org-label.got { animation: org-label-got 1.6s ease-out; }
+@keyframes org-label-got { 25%, 55% { transform: translate(-50%, -50%) scale(1.35); box-shadow: 0 0 0 6px color-mix(in srgb, var(--coord) 22%, transparent); } }
+
+@media (prefers-reduced-motion: reduce) { .oa-wires .run, .org-agent.got, .oa-spin, .org-lines .run, .org-label.got { animation: none; } }
 
 @media (max-width: 900px) {
   .org-card { width: auto; }

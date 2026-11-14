@@ -8,7 +8,7 @@ import { roleTag } from './topbar.js'
 import { alertBox } from './mosaic.js'
 import { dialog } from './dialogs.js'
 import { terminalOf, postJson, addFolderDialog, renderHosts } from './machines.js'
-import { renderOrg } from './org.js'
+import { renderOrg, flashLink } from './org.js'
 
 // A worker for this coordinator's squad, by default on the coordinator's machine.
 // A session opened from here that ended (/quit, closed): open it again on
@@ -144,6 +144,7 @@ export function noteLinkMessage(m) {
   const l = state.links.find(x => (x.a === m.from && x.b === m.target) || (x.b === m.from && x.a === m.target))
   if (!l) return
   l.recent = [m.created_at, ...(l.recent ?? [])].slice(0, 100)
+  flashLink(m.from, m.target)
   if (currentRoute().view === 'org') soon(renderOrg)
 }
 
