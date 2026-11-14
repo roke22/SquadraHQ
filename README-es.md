@@ -8,6 +8,7 @@
   <a href="https://github.com/roke22/pisha/releases"><img src="https://img.shields.io/github/v/release/roke22/pisha?label=release&color=F2B90F" alt="Última versión"></a>
   <a href="https://github.com/roke22/pisha/actions/workflows/test.yml"><img src="https://github.com/roke22/pisha/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="Licencia MIT"></a>
+  <a href="https://www.npmjs.com/package/pisha-server"><img src="https://img.shields.io/npm/v/pisha-server?label=npm&color=F2B90F" alt="npm"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white" alt="Node.js 22+">
   <img src="https://img.shields.io/badge/server%20dependencies-0-success" alt="El servidor no tiene dependencias">
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="Estrellas en GitHub"></a>
@@ -19,7 +20,7 @@
 
 Pisha le da a [Claude Code](https://claude.com/product/claude-code) un **coordinador**: le dices lo que quieres y él reparte el trabajo entre un equipo de **workers** (otras sesiones de Claude Code), sigue cómo avanzan, aprueba sus acciones seguras y solo vuelve a ti para las decisiones importantes.
 
-Un panel web reúne en una bandeja lo que te necesita, muestra cada equipo con su plan y abre un equipo entero en directo, como una pared de terminales: qué hace cada agente, qué dice Claude y quién te está esperando. Desde ahí también añades tus ordenadores y abres sesiones nuevas en ellos.
+Un panel web reúne en una bandeja lo que te necesita, muestra cada equipo con su plan y abre un equipo entero en directo, como una pared de terminales: qué hace cada agente, qué dice Claude y quién te está esperando. Desde ahí también añades tus ordenadores y abres sesiones nuevas en ellos. Los tableros de tareas, a la par con GitHub Projects si quieres, guardan el trabajo de personas y agentes.
 
 Coordinadores y workers pueden ser también sesiones de **Codex CLI** o de **Grok CLI**, mezcladas con las de Claude Code en el mismo equipo (experimental): consulta [Codex CLI y Grok CLI](#codex-cli-y-grok-cli-experimental).
 
@@ -66,7 +67,7 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Partir un trabajo grande en piezas en paralelo:** una migración, una refactorización o más tests, un worker por módulo.
 - **Dejarlo trabajando solo:** los workers deciden los detalles técnicos y el coordinador aprueba sus acciones seguras, así el equipo sigue mientras no estás.
 - **Vigilarlo desde cualquier sitio:** todos los equipos y agentes en directo en tu navegador, también en el móvil (añádelo a la pantalla de inicio y se abre como una app), y todo lo que te espera arriba en la bandeja.
-- **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal (a lo que también puedes responder); respondes desde el panel eligiendo una opción (con un detalle si quieres) o con tus palabras, también hablando, con la bandeja leída en voz alta, o descartas una pregunta y a su coordinador se le dice que no espere.
+- **Decidir desde tu bandeja:** los coordinadores te dejan las decisiones que son tuyas, una pregunta por decisión con opciones y lo que recomiendan, y te cuentan lo que terminó o salió mal (a lo que también puedes responder); respondes desde el panel eligiendo una opción (con un detalle si quieres) o con tus palabras, también hablando, con la bandeja leída en voz alta, o descartas una pregunta y a su coordinador se le dice que no espere. La pestaña **En curso** muestra quién está trabajando ahora, cada uno con un reloj de cuánto lleva.
 - **Decidir qué puede hacer cada agente:** escribe un perfil de permisos con tus palabras (editar ficheros, pasar los tests, hacer commit, pero nunca push, por ejemplo) y dáselo a un equipo o a una sesión; llega a Claude Code como reglas de permisos de verdad, hasta donde cada máquina lo permita.
 - **Seguir el plan de cada equipo:** el coordinador mantiene en la página del equipo la lista de tareas en las que trabaja, quién lleva cada una y en qué estado está.
 - **Ver qué ha hecho cada agente sin leerlo todo:** junto a su terminal y su conversación, qué hace ahora y una línea de tiempo con lo importante (sus órdenes, los ficheros que editó, pruebas y commits, permisos e informes), sacada de lo que ya informa, así que no gasta tokens.
@@ -74,7 +75,9 @@ Para pararlo, `docker-compose down` (la carpeta se queda). Para actualizarlo, `g
 - **Mezclar agentes (experimental):** da a un worker o a un coordinador Codex CLI o Grok CLI en lugar de Claude Code; el panel marca cada sesión con su agente (A, O, X) y el equipo funciona igual.
 - **Montar equipos con tus propias skills:** dale a cada agente una skill o un agente de su proyecto (diseño, marketing, RR. HH., revisión de código…) como persona, y guarda todo el equipo como plantilla para volver a abrirlo de un clic.
 - **Enlazar equipos:** enlaza los coordinadores de dos equipos (por ejemplo, diseño y marketing) para que se repartan trabajo, y cada uno lo pase a sus propios workers.
-- **Ver y montar toda tu organización:** el organigrama muestra cada equipo, sus agentes y cómo se enlazan, con para qué sirve cada uno al pasar el ratón; desde ahí se añaden, describen, enlazan, mueven y cierran.
+- **Ver y montar toda tu organización:** el organigrama muestra cada equipo como un grupo, el coordinador primero y sus workers debajo, cada agente con su tarea y cuánto lleva con ella, qué hace ahora y cuánto contexto le queda; lo que el coordinador le pasa a un worker baja hasta él como una luz, y al pulsar un agente se abre su terminal. Desde ahí añades, describes, enlazas, mueves y cierras equipos.
+- **Planificar el trabajo en tableros:** tableros con tus propias columnas, cada una un paso de un flujo si quieres (quién la atiende, qué hacer, a dónde va después); tareas con tipos, etiquetas, prioridad, fecha límite, subtareas, un agente y personas. Los agentes leen y mueven sus tareas; dar una tarea a un agente no avisa a nadie hasta que tú lo dices; borrar es mandar a la papelera.
+- **Tener un tablero a la par con GitHub:** conéctalo a un proyecto de GitHub y sus columnas, issues, sub-issues, etiquetas, asignados y comentarios se siguen en los dos sentidos; los pull requests que nombran una tarea (`SQ-12`) salen en ella, y al fusionar uno la tarea pasa a hecha.
 
 ## Cómo funciona
 
@@ -188,6 +191,19 @@ Después:
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-es.jpg"><img src="docs/screenshots/org-chart-light-es.jpg" alt="El organigrama de Pisha: los equipos de Desarrollo, QA y Contenidos, cada coordinador con sus workers" width="1440"></picture>
 
 Los **[ejemplos](https://roke22.github.io/pisha/es/ejemplos.html)** muestran organizaciones completas montadas así: una agencia de marketing, una marca personal en redes sociales, una empresa de software y el lanzamiento de un producto, con los equipos, las personas, los enlaces y el primer mensaje de cada uno. Todo lo que hace el organigrama está en la [referencia](docs/referencia.md#organigrama).
+
+## 4. Planifica el trabajo en tableros
+
+**Tableros**, en la barra lateral, guarda las tareas de la empresa, para ti y para tus agentes. **Nuevo tablero**, dáselo a los equipos que trabajan en él y añade tareas: cada una con un tipo, etiquetas, prioridad, fecha límite, subtareas, un agente que trabaja en ella y personas además.
+
+- **Reparte sin poner a nadie a trabajar:** dar una tarea a un agente no avisa a nadie hasta que tú lo dices. Cuando hayas repartido lo que quieras, **Avisar a los equipos**: cada coordinador recibe un solo mensaje con las tareas nuevas de su equipo y las reparte entre sus workers.
+- **Haz de cada columna un paso:** ⋯ en una columna elige quién la atiende (un equipo, un agente o una persona), qué hacer en ella y a dónde va una tarea cuando termina o a dónde vuelve si no vale. Una tarea que llega a la columna pasa a quien la atiende.
+- **Los agentes usan el tablero ellos mismos:** un coordinador lista, crea y reparte tareas; un worker lee las suyas, las mueve como dice su paso y comenta. El identificador de cada tarea (`SQ-12`) es como todos la nombran, también en ramas y pull requests.
+- **No se pierde nada:** borrar una tarea la manda a la papelera del tablero, con sus subtareas si tú quieres, y vuelve tal como estaba.
+
+**A la par con GitHub:** en los ajustes del tablero, dale la dirección de un proyecto de GitHub, un repositorio para las tareas nuevas y un token (uno clásico con los permisos `project` y `repo` para un proyecto personal; uno fine-grained con Projects, Issues y Pull requests para uno de organización). Las columnas del proyecto pasan a ser las del tablero, y desde ahí columnas, issues, sub-issues, etiquetas, asignados (por el usuario de GitHub que cada uno pone en **Ajustes → Perfil**) y comentarios se siguen en los dos sentidos. Un pull request que nombra una tarea (`SQ-12` en su título, rama o texto) o cierra su issue sale en ella con su estado y su revisión, y al fusionarlo la tarea pasa a hecha. Solo se consulta GitHub mientras el tablero se usa; su cabecera dice cuándo se sincronizó, con un botón para sincronizar ahora.
+
+Todo sobre los tableros está en la [referencia](docs/referencia.md#tableros-de-tareas).
 
 ## Buenos consejos
 

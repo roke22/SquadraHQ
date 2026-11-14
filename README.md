@@ -8,6 +8,7 @@
   <a href="https://github.com/roke22/pisha/releases"><img src="https://img.shields.io/github/v/release/roke22/pisha?label=release&color=F2B90F" alt="Latest release"></a>
   <a href="https://github.com/roke22/pisha/actions/workflows/test.yml"><img src="https://github.com/roke22/pisha/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://www.npmjs.com/package/pisha-server"><img src="https://img.shields.io/npm/v/pisha-server?label=npm&color=F2B90F" alt="npm"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white" alt="Node.js 22+">
   <img src="https://img.shields.io/badge/server%20dependencies-0-success" alt="Server has zero dependencies">
   <a href="https://github.com/roke22/pisha/stargazers"><img src="https://img.shields.io/github/stars/roke22/pisha?style=social" alt="GitHub stars"></a>
@@ -19,7 +20,7 @@
 
 Pisha gives [Claude Code](https://claude.com/product/claude-code) a **coordinator**: you tell it what you want, and it splits the work among a team of **workers** (other Claude Code sessions), follows their progress, approves their safe actions and only comes back to you for the decisions that matter.
 
-A web dashboard keeps what needs you in one inbox, shows each team with its plan, and opens a whole team live, like a wall of terminals: what each agent is doing, what Claude is saying, and who is waiting for you. From there you also add your computers and open new sessions on them.
+A web dashboard keeps what needs you in one inbox, shows each team with its plan, and opens a whole team live, like a wall of terminals: what each agent is doing, what Claude is saying, and who is waiting for you. From there you also add your computers and open new sessions on them. Task boards, in step with GitHub Projects if you want, keep the work for people and agents alike.
 
 Coordinators and workers can also be **Codex CLI** or **Grok CLI** sessions, mixed with Claude Code ones in the same team (experimental): see [Codex CLI and Grok CLI](#codex-cli-and-grok-cli-experimental).
 
@@ -66,7 +67,7 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Split a big job into parallel pieces:** a migration, a refactor or more tests, one worker per module.
 - **Leave it working unattended:** workers decide the technical details and the coordinator approves their safe actions, so the team keeps going while you are away.
 - **Keep watch from anywhere:** every team and agent live in your browser, on a phone too (add it to the home screen and it opens as an app), and everything that waits on you at the top of the inbox.
-- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong (which you can reply to as well); you answer from the dashboard picking an option (with a detail if you want) or in your own words, also by voice with the inbox read aloud, or dismiss a question and its coordinator is told not to wait.
+- **Decide from your inbox:** coordinators leave you the decisions that are yours, one question per decision with options and what they recommend, and tell you what finished or went wrong (which you can reply to as well); you answer from the dashboard picking an option (with a detail if you want) or in your own words, also by voice with the inbox read aloud, or dismiss a question and its coordinator is told not to wait. A **Running** tab shows who is at work right now, each with a clock of how long it has been at it.
 - **Decide what each agent may do:** write a permission profile in your own words (edit files, run the tests, commit, but never push, say) and give it to a team or a session; it reaches Claude Code as real permission rules, as far as each machine allows.
 - **Follow each team's plan:** the coordinator keeps the list of tasks it is working through, who has each one and its state, on the team's page.
 - **See what each agent did without reading it all:** beside its terminal and its conversation, what it is doing now and a timeline of what mattered (its orders, the files it edited, tests and commits, permissions and reports), read from what it already reports, so it costs no tokens.
@@ -74,7 +75,9 @@ To stop it, `docker-compose down` (the folder stays). To update it, `git fetch -
 - **Mix agents (experimental):** give a worker or a coordinator Codex CLI or Grok CLI instead of Claude Code; the dashboard marks each session with its agent (A, O, X) and the team works the same way.
 - **Build teams with your own skills:** give each agent a skill or agent from its project (design, marketing, HR, code review…) as its persona, and save the whole team as a template to open it again in one click.
 - **Link teams:** link the coordinators of two teams (design and marketing, say) so they share work, each handing what it takes on to its own workers.
-- **See and shape your whole organisation:** the org chart shows every team, its agents and how teams are linked, with what each one is for on hover; add, describe, link, move and close them from there.
+- **See and shape your whole organisation:** the org chart shows each team as one group, its coordinator first and its workers below, each agent with what it is on and for how long, what it does now and how full its context is; something handed to a worker runs down to it as a light, and pressing an agent opens its terminal. Add, describe, link, move and close teams from there.
+- **Plan the work on task boards:** boards with your own columns, each one a step of a flow if you want (who handles it, what to do, where next); tasks with types, labels, priority, due dates, subtasks, an agent and people. Agents read and move their own tasks; giving one a task tells nobody until you say so; deleting goes to a trash.
+- **Keep a board in step with GitHub:** connect it to a GitHub project and its columns, issues, sub-issues, labels, assignees and comments follow each other both ways; the pull requests that name a task (`SQ-12`) show on it, and merging one takes the task to done.
 
 ## How it works
 
@@ -188,6 +191,19 @@ Then:
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/org-chart-dark-en.jpg"><img src="docs/screenshots/org-chart-light-en.jpg" alt="The Pisha org chart: the Development, QA and Content teams, each coordinator with its workers" width="1440"></picture>
 
 The **[examples](https://roke22.github.io/pisha/examples.html)** show whole organisations built this way: a marketing agency, a personal brand on social media, a software company and a product launch, with the teams, personas, links and first message for each. Everything the org chart does is in the [reference](docs/reference.md#org-chart).
+
+## 4. Plan the work on boards
+
+**Boards** in the sidebar keep the company's tasks, for you and your agents alike. **New board**, give it to the teams that work on it, and add tasks: each one with a type, labels, priority, due date, subtasks, an agent who works on it and people besides.
+
+- **Hand out without setting anyone to work:** giving a task to an agent tells nobody until you say so. When you have handed out what you want, **Notify the teams**: each coordinator gets one message with its team's new tasks, and hands them out to its workers.
+- **Make each column a step:** ⋯ on a column chooses who handles it (a team, one agent or a person), what to do there, and where a task goes when done or back to if it isn't acceptable. A task that reaches the column goes to whoever handles it.
+- **Agents use the board themselves:** a coordinator lists, creates and hands out tasks; a worker reads its own, moves them as their step says and comments. Each task's id (`SQ-12`) is how everyone names it, in branches and pull requests too.
+- **Nothing is lost:** deleting a task puts it in the board's trash, with its subtasks if you say so, and it comes back as it was.
+
+**In step with GitHub:** in the board's settings, give it the address of a GitHub project, a repository for new tasks and a token (a classic token with the `project` and `repo` scopes for a personal project; a fine-grained one with Projects, Issues and Pull requests for an organisation's). The project's columns become the board's, and from then on columns, issues, sub-issues, labels, assignees (by the GitHub user each person sets in **Settings → Profile**) and comments follow each other both ways. A pull request that names a task (`SQ-12` in its title, branch or text) or closes its issue shows on it with its state and review, and merging it takes the task to done. GitHub is asked only while the board is in use; its header says when it last synced, with a button to sync now.
+
+Everything about boards is in the [reference](docs/reference.md#task-boards).
 
 ## Good tips
 
